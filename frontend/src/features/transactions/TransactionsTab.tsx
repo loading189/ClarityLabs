@@ -8,6 +8,7 @@ import {
   setBrainVendor,
   forgetBrainVendor,
   saveCategorization,
+  createCategoryRule,
   type BrainVendor,
   type CategoryOut,
 } from "../../api/categorize";
@@ -94,6 +95,14 @@ function toMerchantKey(description?: string | null) {
   return tokens.join(" ");
 }
 
+function buildRuleContainsText(description?: string | null) {
+  const cleaned = (description || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned) return "";
+  return cleaned.slice(0, 80);
+}
+
 export function TransactionsTab({
   businessId,
   drilldown,
@@ -124,6 +133,15 @@ export function TransactionsTab({
   const [vendorCategoryId, setVendorCategoryId] = useState<string>("");
   const [vendorCanonicalName, setVendorCanonicalName] = useState<string>("");
   const [applyToUncategorized, setApplyToUncategorized] = useState(false);
+  const [rulePanelOpen, setRulePanelOpen] = useState(false);
+  const [ruleContainsText, setRuleContainsText] = useState("");
+  const [ruleDirection, setRuleDirection] = useState<"" | "inflow" | "outflow">("");
+  const [ruleAccount, setRuleAccount] = useState("");
+  const [rulePriority, setRulePriority] = useState(100);
+  const [ruleCategoryId, setRuleCategoryId] = useState("");
+  const [ruleActionErr, setRuleActionErr] = useState<string | null>(null);
+  const [ruleActionMsg, setRuleActionMsg] = useState<string | null>(null);
+  const [ruleActionLoading, setRuleActionLoading] = useState(false);
 
   const drilldownKey = useMemo(() => {
     if (!drilldown) return "";
@@ -304,6 +322,15 @@ export function TransactionsTab({
       setVendorCategoryId("");
       setVendorCanonicalName("");
       setApplyToUncategorized(false);
+      setRulePanelOpen(false);
+      setRuleContainsText("");
+      setRuleDirection("");
+      setRuleAccount("");
+      setRulePriority(100);
+      setRuleCategoryId("");
+      setRuleActionErr(null);
+      setRuleActionMsg(null);
+      setRuleActionLoading(false);
       return;
     }
     setVendorPanelOpen(false);
@@ -315,6 +342,15 @@ export function TransactionsTab({
     setVendorCategoryId("");
     setVendorCanonicalName(selectedTxn.description ?? "");
     setApplyToUncategorized(false);
+    setRulePanelOpen(false);
+    setRuleContainsText(buildRuleContainsText(selectedTxn.description));
+    setRuleDirection((selectedTxn.direction ?? "") as "inflow" | "outflow" | "");
+    setRuleAccount(selectedTxn.account ?? "");
+    setRulePriority(100);
+    setRuleCategoryId("");
+    setRuleActionErr(null);
+    setRuleActionMsg(null);
+    setRuleActionLoading(false);
   }, [selectedTxn]);
 
   useEffect(() => {
@@ -329,6 +365,25 @@ export function TransactionsTab({
   const selectedCategoryValid = Boolean(
     selectedCategoryId && selectedCategory && !isCategoryUncategorized(selectedCategory)
   );
+
+  useEffect(() => {
+    if (!selectedTxn) return;
+    const existing = ruleCategoryId ? categoriesById.get(ruleCategoryId) ?? null : null;
+    if (existing && !isCategoryUncategorized(existing)) return;
+    if (selectedCategoryValid) {
+      setRuleCategoryId(selectedCategoryId);
+    } else {
+      setRuleCategoryId(selectableCategories[0]?.id ?? "");
+    }
+  }, [
+    categoriesById,
+    isCategoryUncategorized,
+    ruleCategoryId,
+    selectableCategories,
+    selectedCategoryId,
+    selectedCategoryValid,
+    selectedTxn,
+  ]);
 
   useEffect(() => {
     if (!vendorPanelOpen) return;
@@ -589,6 +644,54 @@ export function TransactionsTab({
       setVendorActionLoading(false);
     }
   }, [businessId, selectedTxn]);
+
+  const handleRuleCreate = useCallback(async () => {
+    if (!selectedTxn) return;
+    const trimmedContains = ruleContainsText.trim();
+    if (!trimmedContains) {
+      setRuleActionErr("Enter text to match before saving this rule.");
+      return;
+    }
+    if (!ruleCategoryId) {
+      setRuleActionErr("Select a category for this rule.");
+      return;
+    }
+    const category = categoriesById.get(ruleCategoryId);
+    if (!category || isCategoryUncategorized(category)) {
+      setRuleActionErr("Select a valid category for this rule.");
+      return;
+    }
+    setRuleActionErr(null);
+    setRuleActionMsg(null);
+    setRuleActionLoading(true);
+    try {
+      await createCategoryRule(businessId, {
+        contains_text: trimmedContains,
+        category_id: ruleCategoryId,
+        direction: ruleDirection || null,
+        account: ruleAccount.trim() || null,
+        priority: Number.isFinite(rulePriority) ? rulePriority : 100,
+        active: true,
+      });
+      setRuleActionMsg("Rule created. Refreshing transactions…");
+      await refresh();
+    } catch (e: any) {
+      setRuleActionErr(e?.message ?? "Failed to create rule");
+    } finally {
+      setRuleActionLoading(false);
+    }
+  }, [
+    businessId,
+    categoriesById,
+    isCategoryUncategorized,
+    refresh,
+    ruleAccount,
+    ruleCategoryId,
+    ruleContainsText,
+    ruleDirection,
+    rulePriority,
+    selectedTxn,
+  ]);
 
   if (loading && !data) return <div className={styles.loading}>Loading transactions…</div>;
 
@@ -1010,6 +1113,108 @@ export function TransactionsTab({
                 </div>
               </div>
             )}
+
+            <div className={styles.drawerSection}>
+              <div className={styles.drawerSectionHeader}>
+                <div className={styles.drawerSectionLabel}>Create rule</div>
+                <button
+                  className={styles.linkButton}
+                  onClick={() => setRulePanelOpen((open) => !open)}
+                  type="button"
+                >
+                  {rulePanelOpen ? "Hide" : "Show"}
+                </button>
+              </div>
+              <div className={styles.drawerHelp}>
+                Create a business rule that auto-categorizes matching transactions.
+              </div>
+              {rulePanelOpen && (
+                <div className={styles.rulePanel}>
+                  <label className={styles.ruleLabel} htmlFor="rule-contains">
+                    Contains text
+                  </label>
+                  <input
+                    id="rule-contains"
+                    className={styles.textInput}
+                    value={ruleContainsText}
+                    onChange={(event) => setRuleContainsText(event.target.value)}
+                    placeholder="e.g., Acme Coffee"
+                  />
+                  <label className={styles.ruleLabel} htmlFor="rule-direction">
+                    Direction
+                  </label>
+                  <select
+                    id="rule-direction"
+                    className={styles.select}
+                    value={ruleDirection}
+                    onChange={(event) =>
+                      setRuleDirection(event.target.value as "" | "inflow" | "outflow")
+                    }
+                  >
+                    <option value="">Any direction</option>
+                    <option value="inflow">Inflow</option>
+                    <option value="outflow">Outflow</option>
+                  </select>
+                  <label className={styles.ruleLabel} htmlFor="rule-account">
+                    Account
+                  </label>
+                  <input
+                    id="rule-account"
+                    className={styles.textInput}
+                    value={ruleAccount}
+                    onChange={(event) => setRuleAccount(event.target.value)}
+                    placeholder="e.g., Checking"
+                  />
+                  <label className={styles.ruleLabel} htmlFor="rule-category">
+                    Category
+                  </label>
+                  <select
+                    id="rule-category"
+                    className={styles.select}
+                    value={ruleCategoryId}
+                    onChange={(event) => setRuleCategoryId(event.target.value)}
+                    disabled={selectableCategories.length === 0}
+                  >
+                    {selectableCategories.length === 0 && (
+                      <option value="">No categories available</option>
+                    )}
+                    {selectableCategories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                  <label className={styles.ruleLabel} htmlFor="rule-priority">
+                    Priority
+                  </label>
+                  <input
+                    id="rule-priority"
+                    className={styles.textInput}
+                    type="number"
+                    min={1}
+                    value={Number.isFinite(rulePriority) ? rulePriority : 100}
+                    onChange={(event) => {
+                      const next = Number(event.target.value);
+                      setRulePriority(Number.isFinite(next) ? next : 100);
+                    }}
+                  />
+
+                  {ruleActionErr && <div className={styles.actionError}>{ruleActionErr}</div>}
+                  {ruleActionMsg && <div className={styles.actionMessage}>{ruleActionMsg}</div>}
+
+                  <div className={styles.ruleActions}>
+                    <button
+                      className={styles.primaryButton}
+                      onClick={handleRuleCreate}
+                      disabled={!ruleContainsText.trim() || !ruleCategoryId || ruleActionLoading}
+                      type="button"
+                    >
+                      {ruleActionLoading ? "Creating…" : "Create rule"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
 
             <div className={styles.drawerSection}>
               <label className={styles.drawerSectionLabel} htmlFor="txn-category">

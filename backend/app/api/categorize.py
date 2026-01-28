@@ -4,12 +4,19 @@ from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select, and_
 from sqlalchemy.orm import Session
 
 from backend.app.db import get_db
-from backend.app.models import Business, RawEvent, Category, TxnCategorization, BusinessCategoryMap
+from backend.app.models import (
+    Business,
+    RawEvent,
+    Category,
+    TxnCategorization,
+    BusinessCategoryMap,
+    CategoryRule,
+)
 from backend.app.norma.from_events import raw_event_to_txn
 from backend.app.norma.category_engine import suggest_category
 from backend.app.norma.merchant import merchant_key, canonical_merchant_name
@@ -127,6 +134,27 @@ class CategorizationMetricsOut(BaseModel):
     uncategorized: int
     suggestion_coverage: int
     brain_coverage: int
+
+
+class CategoryRuleIn(BaseModel):
+    contains_text: str = Field(min_length=1, max_length=120)
+    category_id: str
+    priority: Optional[int] = 100
+    direction: Optional[str] = None
+    account: Optional[str] = None
+    active: Optional[bool] = True
+
+
+class CategoryRuleOut(BaseModel):
+    id: str
+    business_id: str
+    category_id: str
+    contains_text: str
+    direction: Optional[str] = None
+    account: Optional[str] = None
+    priority: int
+    active: bool
+    created_at: datetime
 
 
 @router.post("/business/{business_id}/label_vendor")
@@ -419,6 +447,51 @@ def list_categories(business_id: str, db: Session = Depends(get_db)):
         )
         for c in cats
     ]
+
+
+@router.post("/business/{business_id}/rules", response_model=CategoryRuleOut)
+def create_category_rule(business_id: str, req: CategoryRuleIn, db: Session = Depends(get_db)):
+    _require_business(db, business_id)
+    seed_coa_and_categories_and_mappings(db, business_id)
+    _require_category(db, business_id, req.category_id)
+
+    system_key = _system_key_for_category(db, business_id, req.category_id)
+    if not system_key or system_key == "uncategorized":
+        raise HTTPException(400, "category must map to a valid system_key")
+
+    contains_text = (req.contains_text or "").strip().lower()
+    if not contains_text:
+        raise HTTPException(400, "contains_text required")
+
+    direction = (req.direction or "").strip().lower() or None
+    account = (req.account or "").strip().lower() or None
+    priority = int(req.priority) if req.priority is not None else 100
+    active = bool(req.active) if req.active is not None else True
+
+    rule = CategoryRule(
+        business_id=business_id,
+        category_id=req.category_id,
+        contains_text=contains_text,
+        direction=direction,
+        account=account,
+        priority=priority,
+        active=active,
+    )
+    db.add(rule)
+    db.commit()
+    db.refresh(rule)
+
+    return CategoryRuleOut(
+        id=rule.id,
+        business_id=rule.business_id,
+        category_id=rule.category_id,
+        contains_text=rule.contains_text,
+        direction=rule.direction,
+        account=rule.account,
+        priority=rule.priority,
+        active=rule.active,
+        created_at=rule.created_at,
+    )
 
 
 @router.post("/business/{business_id}/categorize")

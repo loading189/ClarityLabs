@@ -61,6 +61,18 @@ export type BulkApplyByMerchantKeyOut = {
   updated: number;
 };
 
+export type CategoryRuleOut = {
+  id: string;
+  business_id: string;
+  category_id: string;
+  contains_text: string;
+  direction?: string | null;
+  account?: string | null;
+  priority: number;
+  active: boolean;
+  created_at: string;
+};
+
 export function labelVendor(
   businessId: string,
   payload: { source_event_id: string; system_key: string; canonical_name?: string; confidence?: number }
@@ -121,4 +133,18 @@ export function saveCategorization(
     `/categorize/business/${businessId}/categorize`,
     payload
   );
+}
+
+export function createCategoryRule(
+  businessId: string,
+  payload: {
+    contains_text: string;
+    category_id: string;
+    priority?: number;
+    direction?: "inflow" | "outflow" | null;
+    account?: string | null;
+    active?: boolean;
+  }
+) {
+  return apiPost<CategoryRuleOut>(`/categorize/business/${businessId}/rules`, payload);
 }
