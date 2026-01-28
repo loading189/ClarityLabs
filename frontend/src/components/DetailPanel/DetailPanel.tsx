@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import SimulatorTab from "./simulatorTab";
 import { SignalsTab } from "../../features/signals";
 import { CategorizeTab } from "../../features/categorize";
-import { TransactionsTab } from "../../features/transactions";
+import { TransactionsTab, type TransactionsDrilldown } from "../../features/transactions";
 import CoaTab from "./CoaTab";
 import { LedgerTab } from "../../features/ledger";
 import { deleteBusiness } from "../../api/admin"; // ✅ add this (adjust path if needed)
@@ -21,6 +21,9 @@ export default function DetailPanel({
 
   const [mode, setMode] = useState<PanelMode>("signals");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [transactionsDrilldown, setTransactionsDrilldown] = useState<TransactionsDrilldown | null>(
+    null
+  );
 
   // ✅ delete UI state
   const [dangerOpen, setDangerOpen] = useState(false);
@@ -33,6 +36,7 @@ export default function DetailPanel({
     if (selectedId) {
       setMode("signals");
       setRefreshKey((k) => k + 1); // force tabs to re-load when business changes
+      setTransactionsDrilldown(null);
 
       // ✅ reset delete UI when switching businesses
       setDangerOpen(false);
@@ -219,7 +223,12 @@ export default function DetailPanel({
           
 
           {mode === "transactions" && (
-            <TransactionsTab key={`txn-${selectedId}-${refreshKey}`} businessId={selectedId} />
+            <TransactionsTab
+              key={`txn-${selectedId}-${refreshKey}`}
+              businessId={selectedId}
+              drilldown={transactionsDrilldown}
+              onClearDrilldown={() => setTransactionsDrilldown(null)}
+            />
           )}
 
           {mode === "categorize" && (
@@ -230,7 +239,15 @@ export default function DetailPanel({
             <LedgerTab key={`led-${selectedId}-${refreshKey}`} businessId={selectedId} />
           )}
           {mode === "signals" && detail && (
-            <SignalsTab detail={detail} onNavigate={(target) => setMode(target)} />
+            <SignalsTab
+              detail={detail}
+              onNavigate={(target, drilldown) => {
+                if (target === "transactions") {
+                  setTransactionsDrilldown(drilldown ?? null);
+                }
+                setMode(target);
+              }}
+            />
           )}
       
           {mode === "trends" && (
