@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
+import { getCategorizeMetrics, type CategorizeMetricsOut } from "../../api/categorize";
 import type { BusinessDetail, Signal } from "../../types";
 import SignalGrid from "../../components/DetailPanel/SignalGrid";
 import SignalDetail from "../../components/DetailPanel/SignalDetail";
+import styles from "./HealthTab.module.css";
 
 function sevRank(sev?: string) {
   if (sev === "red") return 3;
@@ -9,7 +11,15 @@ function sevRank(sev?: string) {
   return 1;
 }
 
-export default function SignalsTab({ detail }: { detail: BusinessDetail }) {
+type HealthNavigateTarget = "transactions" | "trends" | "categorize";
+
+export default function SignalsTab({
+  detail,
+  onNavigate,
+}: {
+  detail: BusinessDetail;
+  onNavigate?: (target: HealthNavigateTarget) => void;
+}) {
   const signals = (detail.signals ?? []) as Signal[];
 
   // Sort once for stable UI behavior
@@ -40,55 +50,181 @@ export default function SignalsTab({ detail }: { detail: BusinessDetail }) {
     return sorted.find((s) => s.key === selectedKey) ?? sorted[0] ?? null;
   }, [sorted, selectedKey]);
 
-  if (!sorted.length) {
-    return (
-      <div style={{ paddingTop: 8 }}>
-        <h3 style={{ marginTop: 0 }}>Signals</h3>
-        <div style={{ opacity: 0.7 }}>No signals yet.</div>
-      </div>
-    );
-  }
+  const [metrics, setMetrics] = useState<CategorizeMetricsOut | null>(null);
+  const [metricsLoading, setMetricsLoading] = useState(false);
+  const [metricsErr, setMetricsErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    async function loadMetrics() {
+      setMetricsLoading(true);
+      setMetricsErr(null);
+      try {
+        const data = await getCategorizeMetrics(detail.business_id);
+        if (!active) return;
+        setMetrics(data);
+      } catch (e: any) {
+        if (!active) return;
+        setMetricsErr(e?.message ?? "Failed to load categorization metrics");
+      } finally {
+        if (active) setMetricsLoading(false);
+      }
+    }
+
+    if (detail.business_id) {
+      loadMetrics();
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [detail.business_id]);
+
+  const redSignals = useMemo(
+    () => sorted.filter((s) => s.severity === "red").length,
+    [sorted]
+  );
+  const yellowSignals = useMemo(
+    () => sorted.filter((s) => s.severity === "yellow").length,
+    [sorted]
+  );
+
+  const suggestionPercent = useMemo(() => {
+    if (!metrics) return null;
+    const denom = metrics.uncategorized || metrics.total_events || 0;
+    if (!denom) return null;
+    return Math.round((metrics.suggestion_coverage / denom) * 100);
+  }, [metrics]);
+
+  const brainPercent = useMemo(() => {
+    if (!metrics) return null;
+    const denom = metrics.total_events || 0;
+    if (!denom) return null;
+    return Math.round((metrics.brain_coverage / denom) * 100);
+  }, [metrics]);
+
+  const lastLedgerBalance = useMemo(() => {
+    const rows = detail.ledger_preview ?? [];
+    if (!rows.length) return null;
+    const last = rows[rows.length - 1];
+    const balance = Number(last?.balance);
+    if (!Number.isFinite(balance)) return null;
+    return balance;
+  }, [detail.ledger_preview]);
+
+  const summaryTiles = [
+    {
+      label: "Health score",
+      value: detail.health_score ?? null,
+      hint: detail.risk ? `Risk: ${detail.risk}` : null,
+    },
+    {
+      label: "Signals (red / yellow)",
+      value: `${redSignals} / ${yellowSignals}`,
+      hint: `${sorted.length} total`,
+    },
+    {
+      label: "Uncategorized remaining",
+      value: metrics?.uncategorized ?? null,
+      hint: metrics ? `${metrics.posted} posted` : null,
+      action: {
+        label: "Review",
+        onClick: () => onNavigate?.("categorize"),
+      },
+    },
+    {
+      label: "Suggestion coverage",
+      value: suggestionPercent != null ? `${suggestionPercent}%` : null,
+      hint: metrics ? `${metrics.suggestion_coverage} suggested` : null,
+    },
+    {
+      label: "Brain coverage",
+      value: brainPercent != null ? `${brainPercent}%` : null,
+      hint: metrics ? `${metrics.brain_coverage} learned` : null,
+    },
+    {
+      label: "Latest balance",
+      value: lastLedgerBalance != null ? `$${lastLedgerBalance.toFixed(2)}` : null,
+      hint: detail.ledger_preview?.length ? "Ledger preview" : null,
+    },
+  ];
 
   return (
-    <div style={{ paddingTop: 8 }}>
-      <h3 style={{ marginTop: 0 }}>Signals</h3>
-
-      <div className="signalDashboardLayout">
-        <SignalGrid
-          signals={sorted}
-          selectedKey={selectedKey}
-          onSelect={(s) => setSelectedKey(s.key)}
-        />
-
-        {/* Pass businessId so SignalDetail can fetch related transactions via evidence_refs */}
-        {selected && (
-          <SignalDetail
-            businessId={detail.business_id}
-            signal={selected}
-          />
-        )}
+    <div className={styles.healthTab}>
+      <div className={styles.healthHeader}>
+        <div>
+          <h3 className={styles.healthTitle}>Health</h3>
+          <div className={styles.healthSubtitle}>
+            Signals and categorization health for {detail.name ?? "this business"}.
+          </div>
+        </div>
+        <div className={styles.healthActions}>
+          <button className={styles.actionButton} onClick={() => onNavigate?.("transactions")}>
+            View transactions
+          </button>
+          <button className={styles.actionButton} onClick={() => onNavigate?.("trends")}>
+            View trends
+          </button>
+        </div>
       </div>
 
-      {/* Optional: keep your ledger preview below */}
+      <div className={styles.summaryPanel}>
+        <div className={styles.summaryHeader}>
+          <div>
+            <div className={styles.summaryTitle}>Summary</div>
+            <div className={styles.summarySub}>Snapshot across key health indicators.</div>
+          </div>
+          <div className={styles.summaryStatus}>
+            {metricsLoading && "Loading categorization metrics…"}
+            {!metricsLoading && metricsErr && `Metrics unavailable: ${metricsErr}`}
+          </div>
+        </div>
+        <div className={styles.summaryGrid}>
+          {summaryTiles.map((tile) => (
+            <div key={tile.label} className={styles.summaryTile}>
+              <div className={styles.tileLabel}>{tile.label}</div>
+              <div className={styles.tileValue}>{tile.value ?? "—"}</div>
+              {tile.hint && <div className={styles.tileHint}>{tile.hint}</div>}
+              {tile.action && (
+                <button className={styles.tileAction} onClick={tile.action.onClick}>
+                  {tile.action.label}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {sorted.length === 0 ? (
+        <div className={styles.emptyState}>No signals yet.</div>
+      ) : (
+        <div className={styles.signalDashboardLayout}>
+          <SignalGrid
+            signals={sorted}
+            selectedKey={selectedKey}
+            onSelect={(s) => setSelectedKey(s.key)}
+          />
+
+          {/* Pass businessId so SignalDetail can fetch related transactions via evidence_refs */}
+          {selected && (
+            <SignalDetail
+              businessId={detail.business_id}
+              signal={selected}
+              onNavigate={(target) => onNavigate?.(target)}
+            />
+          )}
+        </div>
+      )}
+
       {detail.ledger_preview && detail.ledger_preview.length > 0 && (
-        <div style={{ marginTop: 14 }}>
-          <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 6 }}>Ledger preview</div>
-          <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden" }}>
+        <div className={styles.ledgerPreview}>
+          <div className={styles.ledgerTitle}>Ledger preview</div>
+          <div className={styles.ledgerTable}>
             {detail.ledger_preview.slice(0, 8).map((row: any, i: number) => (
-              <div
-                key={i}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "140px 1fr 120px",
-                  gap: 10,
-                  padding: 10,
-                  borderBottom: "1px solid #f3f4f6",
-                  fontSize: 12,
-                }}
-              >
+              <div key={i} className={styles.ledgerRow}>
                 <div>{String(row.date ?? "")}</div>
-                <div style={{ opacity: 0.85 }}>{String(row.description ?? "")}</div>
-                <div style={{ textAlign: "right" }}>
+                <div className={styles.ledgerDesc}>{String(row.description ?? "")}</div>
+                <div className={styles.alignRight}>
                   {row.balance != null ? `$${Number(row.balance).toFixed(2)}` : ""}
                 </div>
               </div>
