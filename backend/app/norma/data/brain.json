@@ -13,7 +13,7 @@
     {
       "merchant_id": "7863c639-7381-43a3-b352-a2ce3ebb20e1",
       "canonical_name": "Square",
-      "updated_at": "2026-01-28T00:56:41.438206+00:00"
+      "updated_at": "2026-01-28T17:36:10.991387+00:00"
     },
     {
       "merchant_id": "4901765f-799c-45e5-90c6-d3da56676385",
@@ -39,6 +39,41 @@
       "merchant_id": "4b5141f1-161f-44f2-992e-9bfbab5a6c81",
       "canonical_name": "Office Depot",
       "updated_at": "2026-01-28T00:56:09.776880+00:00"
+    },
+    {
+      "merchant_id": "c0c60fe8-2509-4962-8e79-f9b7ede1803c",
+      "canonical_name": "Clover Deposits",
+      "updated_at": "2026-01-28T17:19:29.598699+00:00"
+    },
+    {
+      "merchant_id": "df13a2c8-4751-4607-90aa-c5e78c4d3257",
+      "canonical_name": "Us Foods",
+      "updated_at": "2026-01-28T17:34:25.350488+00:00"
+    },
+    {
+      "merchant_id": "2cbec0e6-00e6-432d-8722-a77a04ef8476",
+      "canonical_name": "Sysco Foods",
+      "updated_at": "2026-01-28T17:34:34.749655+00:00"
+    },
+    {
+      "merchant_id": "9e6240cd-45c9-4f8a-870f-06e9ffc22975",
+      "canonical_name": "Stripe Payouts",
+      "updated_at": "2026-01-28T17:34:45.801838+00:00"
+    },
+    {
+      "merchant_id": "41bc9549-f2ca-4d0d-bd8c-83123b2541ef",
+      "canonical_name": "Square Deposits",
+      "updated_at": "2026-01-28T17:38:05.622748+00:00"
+    },
+    {
+      "merchant_id": "5cd2a648-20b0-4fc9-9808-359a7ababf0a",
+      "canonical_name": "Payroll Run",
+      "updated_at": "2026-01-28T17:38:39.763313+00:00"
+    },
+    {
+      "merchant_id": "0d52062c-2138-4521-b0ac-f4b0cefaea37",
+      "canonical_name": "Toast Payments",
+      "updated_at": "2026-01-28T17:38:48.047957+00:00"
     }
   ],
   "aliases": [
@@ -60,8 +95,8 @@
       "alias_key": "square",
       "merchant_id": "7863c639-7381-43a3-b352-a2ce3ebb20e1",
       "match_type": "exact",
-      "evidence_count": 5,
-      "updated_at": "2026-01-28T00:56:41.438206+00:00"
+      "evidence_count": 6,
+      "updated_at": "2026-01-28T17:36:10.991387+00:00"
     },
     {
       "alias_key": "stripe payout",
@@ -97,6 +132,55 @@
       "match_type": "exact",
       "evidence_count": 3,
       "updated_at": "2026-01-28T00:56:09.776880+00:00"
+    },
+    {
+      "alias_key": "clover deposits",
+      "merchant_id": "c0c60fe8-2509-4962-8e79-f9b7ede1803c",
+      "match_type": "exact",
+      "evidence_count": 5,
+      "updated_at": "2026-01-28T17:19:29.598699+00:00"
+    },
+    {
+      "alias_key": "us foods",
+      "merchant_id": "df13a2c8-4751-4607-90aa-c5e78c4d3257",
+      "match_type": "exact",
+      "evidence_count": 1,
+      "updated_at": "2026-01-28T17:34:25.350488+00:00"
+    },
+    {
+      "alias_key": "sysco foods",
+      "merchant_id": "2cbec0e6-00e6-432d-8722-a77a04ef8476",
+      "match_type": "exact",
+      "evidence_count": 1,
+      "updated_at": "2026-01-28T17:34:34.749655+00:00"
+    },
+    {
+      "alias_key": "stripe payouts",
+      "merchant_id": "9e6240cd-45c9-4f8a-870f-06e9ffc22975",
+      "match_type": "exact",
+      "evidence_count": 1,
+      "updated_at": "2026-01-28T17:34:45.801838+00:00"
+    },
+    {
+      "alias_key": "square deposits",
+      "merchant_id": "41bc9549-f2ca-4d0d-bd8c-83123b2541ef",
+      "match_type": "exact",
+      "evidence_count": 1,
+      "updated_at": "2026-01-28T17:38:05.622748+00:00"
+    },
+    {
+      "alias_key": "payroll run",
+      "merchant_id": "5cd2a648-20b0-4fc9-9808-359a7ababf0a",
+      "match_type": "exact",
+      "evidence_count": 1,
+      "updated_at": "2026-01-28T17:38:39.763313+00:00"
+    },
+    {
+      "alias_key": "toast payments",
+      "merchant_id": "0d52062c-2138-4521-b0ac-f4b0cefaea37",
+      "match_type": "exact",
+      "evidence_count": 1,
+      "updated_at": "2026-01-28T17:38:48.047957+00:00"
     }
   ],
   "labels": {
@@ -202,6 +286,74 @@
         "confidence": 1.0,
         "evidence_count": 1,
         "updated_at": "2026-01-28T00:57:06.422050+00:00"
+      }
+    },
+    "be71b5d8-7d3e-42bc-acd0-44b3c55cef85": {
+      "c0c60fe8-2509-4962-8e79-f9b7ede1803c": {
+        "business_id": "be71b5d8-7d3e-42bc-acd0-44b3c55cef85",
+        "merchant_id": "c0c60fe8-2509-4962-8e79-f9b7ede1803c",
+        "system_key": "sales",
+        "confidence": 1.0,
+        "evidence_count": 5,
+        "updated_at": "2026-01-28T17:19:29.598699+00:00"
+      },
+      "df13a2c8-4751-4607-90aa-c5e78c4d3257": {
+        "business_id": "be71b5d8-7d3e-42bc-acd0-44b3c55cef85",
+        "merchant_id": "df13a2c8-4751-4607-90aa-c5e78c4d3257",
+        "system_key": "cogs",
+        "confidence": 1.0,
+        "evidence_count": 1,
+        "updated_at": "2026-01-28T17:34:25.350488+00:00"
+      },
+      "2cbec0e6-00e6-432d-8722-a77a04ef8476": {
+        "business_id": "be71b5d8-7d3e-42bc-acd0-44b3c55cef85",
+        "merchant_id": "2cbec0e6-00e6-432d-8722-a77a04ef8476",
+        "system_key": "cogs",
+        "confidence": 1.0,
+        "evidence_count": 1,
+        "updated_at": "2026-01-28T17:34:34.749655+00:00"
+      },
+      "9e6240cd-45c9-4f8a-870f-06e9ffc22975": {
+        "business_id": "be71b5d8-7d3e-42bc-acd0-44b3c55cef85",
+        "merchant_id": "9e6240cd-45c9-4f8a-870f-06e9ffc22975",
+        "system_key": "sales",
+        "confidence": 1.0,
+        "evidence_count": 1,
+        "updated_at": "2026-01-28T17:34:45.801838+00:00"
+      },
+      "41bc9549-f2ca-4d0d-bd8c-83123b2541ef": {
+        "business_id": "be71b5d8-7d3e-42bc-acd0-44b3c55cef85",
+        "merchant_id": "41bc9549-f2ca-4d0d-bd8c-83123b2541ef",
+        "system_key": "sales",
+        "confidence": 1.0,
+        "evidence_count": 1,
+        "updated_at": "2026-01-28T17:38:05.622748+00:00"
+      },
+      "5cd2a648-20b0-4fc9-9808-359a7ababf0a": {
+        "business_id": "be71b5d8-7d3e-42bc-acd0-44b3c55cef85",
+        "merchant_id": "5cd2a648-20b0-4fc9-9808-359a7ababf0a",
+        "system_key": "payroll",
+        "confidence": 1.0,
+        "evidence_count": 1,
+        "updated_at": "2026-01-28T17:38:39.763313+00:00"
+      },
+      "0d52062c-2138-4521-b0ac-f4b0cefaea37": {
+        "business_id": "be71b5d8-7d3e-42bc-acd0-44b3c55cef85",
+        "merchant_id": "0d52062c-2138-4521-b0ac-f4b0cefaea37",
+        "system_key": "sales",
+        "confidence": 1.0,
+        "evidence_count": 1,
+        "updated_at": "2026-01-28T17:38:48.047957+00:00"
+      }
+    },
+    "b2ec5249-50d8-40bb-b7e5-854b488279e1": {
+      "7863c639-7381-43a3-b352-a2ce3ebb20e1": {
+        "business_id": "b2ec5249-50d8-40bb-b7e5-854b488279e1",
+        "merchant_id": "7863c639-7381-43a3-b352-a2ce3ebb20e1",
+        "system_key": "sales",
+        "confidence": 1.0,
+        "evidence_count": 1,
+        "updated_at": "2026-01-28T17:36:10.991387+00:00"
       }
     }
   }
