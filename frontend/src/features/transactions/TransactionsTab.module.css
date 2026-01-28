@@ -326,6 +326,13 @@
   gap: 8px;
 }
 
+.drawerSectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
 .drawerSectionLabel {
   font-size: 11px;
   text-transform: uppercase;
@@ -492,6 +499,28 @@
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 4px var(--focus);
+}
+
+.rulePanel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+  background: var(--surface-muted);
+}
+
+.ruleLabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.ruleActions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .drawerActions {

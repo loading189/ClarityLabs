@@ -18,16 +18,19 @@ from backend.app.models import (
     BusinessCategoryMap,
     RawEvent,
     TxnCategorization,
+    CategoryRule,
 )
 from backend.app.api.categorize import (
     bulk_apply_categorization,
     upsert_categorization,
     categorization_metrics,
+    create_category_rule,
     get_brain_vendor,
     set_brain_vendor,
     forget_brain_vendor,
     BulkCategorizationIn,
     CategorizationUpsertIn,
+    CategoryRuleIn,
     BrainVendorSetIn,
     BrainVendorForgetIn,
 )
@@ -242,3 +245,28 @@ def test_brain_vendor_endpoints_round_trip(db_session, brain_store):
     forget_req = BrainVendorForgetIn(merchant_key="ACME CO*123")
     forget_res = forget_brain_vendor(biz.id, forget_req, db_session)
     assert forget_res == {"status": "ok", "deleted": True}
+
+
+def test_create_category_rule_returns_rule(db_session):
+    biz = _create_business(db_session)
+    category = _create_category(db_session, biz.id, "Software", "software")
+
+    req = CategoryRuleIn(
+        contains_text="Acme Software",
+        category_id=category.id,
+        direction="outflow",
+        account="checking",
+        priority=100,
+        active=True,
+    )
+    res = create_category_rule(biz.id, req, db_session)
+
+    assert res.category_id == category.id
+    assert res.contains_text == "acme software"
+    assert res.direction == "outflow"
+    assert res.account == "checking"
+    assert res.active is True
+
+    row = db_session.query(CategoryRule).filter(CategoryRule.id == res.id).one()
+    assert row.business_id == biz.id
+    assert row.contains_text == "acme software"
