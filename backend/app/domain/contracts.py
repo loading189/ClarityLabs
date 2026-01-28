@@ -67,3 +67,23 @@ class SignalResult(BaseModel):
     evidence_refs: Optional[List[Dict[str, Any]]] = None
 
     version: int = 1
+
+
+class BriefFactsMeta(BaseModel):
+    as_of: Optional[str] = None
+    txn_count: int
+    months_covered: int
+
+
+class BriefResult(BaseModel):
+    business_id: str
+    as_of: Optional[str] = None
+    window_days: int
+    status: str
+    headline: str
+    bullets: List[str]
+    next_best_action: str
+    confidence: float
+    confidence_reason: str
+    top_signals: List[SignalResult]
+    facts_meta: BriefFactsMeta

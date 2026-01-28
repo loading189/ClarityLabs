@@ -11,6 +11,7 @@ from backend.app.api.coa import router as coa_router
 from backend.app.seed.run import seed_system_categories
 from backend.app.api.admin import router as admin_router
 from backend.app.api.ledger import router as ledger_router
+from backend.app.api.brief import router as brief_router
 
 
 
@@ -48,4 +49,4 @@ app.include_router(categorize_router)
 app.include_router(coa_router)
 app.include_router(admin_router)
 app.include_router(ledger_router)
-
+app.include_router(brief_router)
