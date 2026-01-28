@@ -12,6 +12,15 @@ function sevRank(sev?: string) {
   return 1;
 }
 
+function toPercent(part?: number | null, total?: number | null) {
+  const safePart = Number(part ?? 0);
+  const safeTotal = Number(total ?? 0);
+  if (!Number.isFinite(safePart) || !Number.isFinite(safeTotal) || safeTotal <= 0) {
+    return null;
+  }
+  return Math.round((safePart / safeTotal) * 100);
+}
+
 type HealthNavigateTarget = "transactions" | "trends" | "categorize";
 
 export default function SignalsTab({
@@ -90,18 +99,25 @@ export default function SignalsTab({
     [sorted]
   );
 
+  const categorizedPercent = useMemo(() => {
+    if (!metrics) return null;
+    return toPercent(metrics.posted, metrics.total_events);
+  }, [metrics]);
+
+  const remainingPercent = useMemo(() => {
+    if (!metrics) return null;
+    return toPercent(metrics.uncategorized, metrics.total_events);
+  }, [metrics]);
+
   const suggestionPercent = useMemo(() => {
     if (!metrics) return null;
-    const denom = metrics.uncategorized || metrics.total_events || 0;
-    if (!denom) return null;
-    return Math.round((metrics.suggestion_coverage / denom) * 100);
+    const denom = Math.max(metrics.uncategorized, metrics.total_events);
+    return toPercent(metrics.suggestion_coverage, denom);
   }, [metrics]);
 
   const brainPercent = useMemo(() => {
     if (!metrics) return null;
-    const denom = metrics.total_events || 0;
-    if (!denom) return null;
-    return Math.round((metrics.brain_coverage / denom) * 100);
+    return toPercent(metrics.brain_coverage, metrics.total_events);
   }, [metrics]);
 
   const lastLedgerBalance = useMemo(() => {
@@ -180,7 +196,6 @@ export default function SignalsTab({
           </div>
           <div className={styles.summaryStatus}>
             {metricsLoading && "Loading categorization metrics…"}
-            {!metricsLoading && metricsErr && `Metrics unavailable: ${metricsErr}`}
           </div>
         </div>
         <div className={styles.summaryGrid}>
@@ -196,6 +211,79 @@ export default function SignalsTab({
               )}
             </div>
           ))}
+        </div>
+      </div>
+
+      <div className={styles.dataQualityCard}>
+        <div className={styles.dataQualityHeader}>
+          <div>
+            <div className={styles.dataQualityTitle}>Data quality</div>
+            <div className={styles.dataQualitySub}>
+              Keep transactions categorized so health and trends stay reliable.
+            </div>
+          </div>
+          <div className={styles.dataQualityActions}>
+            <button className={styles.actionButton} onClick={() => onNavigate?.("categorize")}>
+              Categorize now
+            </button>
+            <button
+              className={styles.actionButton}
+              onClick={() => onNavigate?.("transactions", { category_id: "uncategorized" })}
+            >
+              View uncategorized
+            </button>
+          </div>
+        </div>
+        {metricsErr && <div className={styles.inlineError}>Metrics unavailable: {metricsErr}</div>}
+        {!metricsErr && metricsLoading && (
+          <div className={styles.inlineMuted}>Loading categorization metrics…</div>
+        )}
+        <div className={styles.dataQualityGrid}>
+          <div className={styles.dataQualityMetric}>
+            <div className={styles.dataQualityLabel}>Categorized</div>
+            <div className={styles.dataQualityValue}>
+              {categorizedPercent != null ? `${categorizedPercent}%` : "—"}
+            </div>
+            <div className={styles.dataQualityHint}>
+              {metrics ? `${metrics.posted} of ${metrics.total_events} events` : "—"}
+            </div>
+            {categorizedPercent != null && (
+              <div className={styles.progressTrack}>
+                <div className={styles.progressFill} style={{ width: `${categorizedPercent}%` }} />
+              </div>
+            )}
+          </div>
+          <div className={styles.dataQualityMetric}>
+            <div className={styles.dataQualityLabel}>Remaining</div>
+            <div className={styles.dataQualityValue}>{metrics ? metrics.uncategorized : "—"}</div>
+            <div className={styles.dataQualityHint}>Uncategorized transactions</div>
+            {remainingPercent != null && (
+              <div className={styles.progressTrack}>
+                <div className={styles.progressFill} style={{ width: `${remainingPercent}%` }} />
+              </div>
+            )}
+          </div>
+          <div className={styles.dataQualityMetric}>
+            <div className={styles.dataQualityLabel}>Suggestion coverage</div>
+            <div className={styles.dataQualityValue}>
+              {suggestionPercent != null ? `${suggestionPercent}%` : "—"}
+            </div>
+            <div className={styles.dataQualityHint}>
+              {metrics ? `${metrics.suggestion_coverage} suggestions` : "—"}
+            </div>
+            {suggestionPercent != null && (
+              <div className={styles.progressTrack}>
+                <div className={styles.progressFill} style={{ width: `${suggestionPercent}%` }} />
+              </div>
+            )}
+          </div>
+          <div className={styles.dataQualityMetric}>
+            <div className={styles.dataQualityLabel}>Brain coverage</div>
+            <div className={styles.dataQualityValue}>
+              {metrics ? metrics.brain_coverage : "—"}
+            </div>
+            <div className={styles.dataQualityHint}>Vendors with memory</div>
+          </div>
         </div>
       </div>
 

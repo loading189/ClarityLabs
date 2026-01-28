@@ -239,8 +239,12 @@ export function TransactionsTab({
       if (filters.direction !== "all" && t.direction !== filters.direction) {
         return false;
       }
-      if (filters.categoryId !== "all" && t.category !== filters.categoryId) {
-        return false;
+      if (filters.categoryId !== "all") {
+        if (filters.categoryId === "uncategorized") {
+          if (!isUncategorized(t.category)) return false;
+        } else if (t.category !== filters.categoryId) {
+          return false;
+        }
       }
       if (search) {
         const haystack = `${t.description ?? ""} ${t.counterparty_hint ?? ""}`.toLowerCase();
@@ -256,7 +260,7 @@ export function TransactionsTab({
       }
       return true;
     });
-  }, [filters, getTxnKey, merchantKeyByTxn, txns]);
+  }, [filters, getTxnKey, isUncategorized, merchantKeyByTxn, txns]);
 
   const loadCategories = useCallback(async () => {
     if (!businessId) return;
@@ -774,6 +778,7 @@ export function TransactionsTab({
             }
           >
             <option value="all">All categories</option>
+            <option value="uncategorized">Uncategorized</option>
             {categoryOptions.map((category) => (
               <option key={category} value={category}>
                 {category}
