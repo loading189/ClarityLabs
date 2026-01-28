@@ -12,6 +12,13 @@ export type NormalizedTxn = {
   account: string;
   category: string;
   counterparty_hint?: string | null;
+  merchant_key?: string | null;
+  suggested_system_key?: string | null;
+  suggested_category_id?: string | null;
+  suggested_category_name?: string | null;
+  suggestion_source?: string | null;
+  confidence?: number | null;
+  reason?: string | null;
 };
 
 export type TransactionsResponse = {

@@ -1,6 +1,13 @@
 // src/components/detail/TransactionsTab.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTransactions } from "../../hooks/useTransactions";
+import {
+  bulkApplyByMerchantKey,
+  getCategories,
+  saveCategorization,
+  type CategoryOut,
+} from "../../api/categorize";
+import type { NormalizedTxn } from "../../api/transactions";
 import styles from "./TransactionsTab.module.css";
 
 export type TransactionsDrilldown = {
@@ -93,6 +100,15 @@ export function TransactionsTab({
 }) {
   const { data, loading, err, refresh } = useTransactions(businessId, 50);
   const [filters, setFilters] = useState<TransactionFilters>(DEFAULT_FILTERS);
+  const [selectedTxn, setSelectedTxn] = useState<NormalizedTxn | null>(null);
+  const [categories, setCategories] = useState<CategoryOut[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const [categoriesErr, setCategoriesErr] = useState<string | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
+  const [actionErr, setActionErr] = useState<string | null>(null);
+  const [actionMsg, setActionMsg] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   const drilldownKey = useMemo(() => {
     if (!drilldown) return "";
@@ -118,13 +134,34 @@ export function TransactionsTab({
 
   const txns = data?.transactions ?? [];
 
-  const categories = useMemo(() => {
-    const uniq = new Set<string>();
-    txns.forEach((t) => {
-      if (t.category) uniq.add(t.category);
-    });
-    return Array.from(uniq).sort((a, b) => a.localeCompare(b));
-  }, [txns]);
+  const isUncategorized = useCallback((value?: string | null) => {
+    return (value ?? "").trim().toLowerCase() === "uncategorized";
+  }, []);
+
+  const isCategoryUncategorized = useCallback(
+    (category?: CategoryOut | null) => {
+      if (!category) return false;
+      return isUncategorized(category.system_key) || isUncategorized(category.name);
+    },
+    [isUncategorized]
+  );
+
+  const categoriesById = useMemo(() => {
+    const map = new Map<string, CategoryOut>();
+    categories.forEach((category) => map.set(category.id, category));
+    return map;
+  }, [categories]);
+
+  const categoriesByName = useMemo(() => {
+    const map = new Map<string, CategoryOut>();
+    categories.forEach((category) => map.set(category.name.toLowerCase(), category));
+    return map;
+  }, [categories]);
+
+  const selectableCategories = useMemo(
+    () => categories.filter((category) => !isCategoryUncategorized(category)),
+    [categories, isCategoryUncategorized]
+  );
 
   const filteredTxns = useMemo(() => {
     if (!txns.length) return [];
@@ -157,13 +194,168 @@ export function TransactionsTab({
     });
   }, [filters, txns]);
 
-  if (loading && !data) return <div style={{ padding: 12 }}>Loading transactions…</div>;
-  if (err) return (
-    <div style={{ padding: 12 }}>
-      <div style={{ marginBottom: 8 }}>Error: {err}</div>
-      <button onClick={refresh}>Retry</button>
-    </div>
+  const loadCategories = useCallback(async () => {
+    if (!businessId) return;
+    setCategoriesLoading(true);
+    setCategoriesErr(null);
+    try {
+      const res = await getCategories(businessId);
+      setCategories(res);
+    } catch (e: any) {
+      setCategoriesErr(e?.message ?? "Failed to load categories");
+    } finally {
+      setCategoriesLoading(false);
+    }
+  }, [businessId]);
+
+  useEffect(() => {
+    loadCategories();
+  }, [loadCategories]);
+
+  useEffect(() => {
+    if (!selectedTxn) return;
+    const stillVisible = filteredTxns.some((txn) => txn.id === selectedTxn.id);
+    if (!stillVisible) {
+      setSelectedTxn(null);
+    }
+  }, [filteredTxns, selectedTxn]);
+
+  const pickDefaultCategoryId = useCallback(
+    (txn: NormalizedTxn | null) => {
+      if (!txn) return "";
+      const suggestedId = (txn.suggested_category_id ?? "") as string;
+      if (suggestedId) {
+        const match = categoriesById.get(suggestedId);
+        if (match && !isCategoryUncategorized(match)) return match.id;
+      }
+      const byName = categoriesByName.get((txn.category ?? "").toLowerCase());
+      if (byName && !isCategoryUncategorized(byName)) return byName.id;
+      return selectableCategories[0]?.id ?? "";
+    },
+    [categoriesById, categoriesByName, isCategoryUncategorized, selectableCategories]
   );
+
+  useEffect(() => {
+    if (!selectedTxn) {
+      setSelectedCategoryId("");
+      return;
+    }
+    const nextId = pickDefaultCategoryId(selectedTxn);
+    setSelectedCategoryId(nextId);
+    setActionErr(null);
+    setActionMsg(null);
+  }, [pickDefaultCategoryId, selectedTxn]);
+
+  useEffect(() => {
+    if (!selectedTxn) return;
+    if (!selectedCategoryId || !categoriesById.has(selectedCategoryId)) {
+      const nextId = pickDefaultCategoryId(selectedTxn);
+      if (nextId) setSelectedCategoryId(nextId);
+    }
+  }, [categoriesById, pickDefaultCategoryId, selectedCategoryId, selectedTxn]);
+
+  useEffect(() => {
+    if (!selectedTxn) return;
+    const suggestedId = selectedTxn.suggested_category_id ?? "";
+    if (suggestedId && selectedCategoryId) {
+      const match = categoriesById.get(suggestedId);
+      if (match && !isCategoryUncategorized(match) && suggestedId !== selectedCategoryId) {
+        setSelectedCategoryId(suggestedId);
+      }
+    }
+  }, [categoriesById, isCategoryUncategorized, selectedCategoryId, selectedTxn]);
+
+  useEffect(() => {
+    if (!selectedTxn) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setSelectedTxn(null);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [selectedTxn]);
+
+  const selectedCategory = selectedCategoryId ? categoriesById.get(selectedCategoryId) ?? null : null;
+  const selectedCategoryValid = Boolean(
+    selectedCategoryId && selectedCategory && !isCategoryUncategorized(selectedCategory)
+  );
+
+  const suggestionInfo = useMemo(() => {
+    if (!selectedTxn) return null;
+    const suggestedId = selectedTxn.suggested_category_id ?? "";
+    const suggestedCategory = suggestedId ? categoriesById.get(suggestedId) ?? null : null;
+    const suggestedName = suggestedCategory?.name ?? selectedTxn.suggested_category_name ?? "";
+    const suggestedSystemKey = selectedTxn.suggested_system_key ?? suggestedCategory?.system_key ?? "";
+    if (!suggestedName) return null;
+    if (isUncategorized(suggestedName) || isUncategorized(suggestedSystemKey)) return null;
+    if (suggestedCategory && isCategoryUncategorized(suggestedCategory)) return null;
+    const confidence = Math.max(0, Math.min(100, Math.round(Number(selectedTxn.confidence ?? 0) * 100)));
+    return {
+      name: suggestedName,
+      confidence,
+      source: selectedTxn.suggestion_source ?? "",
+      reason: selectedTxn.reason ?? "",
+    };
+  }, [categoriesById, isCategoryUncategorized, isUncategorized, selectedTxn]);
+
+  const handleSave = useCallback(async () => {
+    if (!selectedTxn) return;
+    if (!selectedCategoryValid) {
+      setActionErr("Select a valid category before saving.");
+      return;
+    }
+    setActionErr(null);
+    setActionMsg(null);
+    setActionLoading(true);
+    try {
+      await saveCategorization(businessId, {
+        source_event_id: selectedTxn.source_event_id,
+        category_id: selectedCategoryId,
+        source: "manual",
+        confidence: 1.0,
+      });
+      setActionMsg("Categorization saved. Refreshing transactions…");
+      await refresh();
+    } catch (e: any) {
+      setActionErr(e?.message ?? "Failed to save categorization");
+    } finally {
+      setActionLoading(false);
+    }
+  }, [businessId, refresh, selectedCategoryId, selectedCategoryValid, selectedTxn]);
+
+  const handleBulkApply = useCallback(async () => {
+    if (!selectedTxn) return;
+    if (!selectedTxn.merchant_key) {
+      setActionErr("No merchant key available for this vendor.");
+      return;
+    }
+    if (!selectedCategoryValid) {
+      setActionErr("Select a valid category before applying to this vendor.");
+      return;
+    }
+    setActionErr(null);
+    setActionMsg(null);
+    setBulkLoading(true);
+    try {
+      const res = await bulkApplyByMerchantKey(businessId, {
+        merchant_key: selectedTxn.merchant_key,
+        category_id: selectedCategoryId,
+        source: "bulk",
+        confidence: 1.0,
+      });
+      setActionMsg(
+        `Applied to ${res.matched_events} events (${res.created} new, ${res.updated} updated). Refreshing…`
+      );
+      await refresh();
+    } catch (e: any) {
+      setActionErr(e?.message ?? "Failed to apply vendor categorization");
+    } finally {
+      setBulkLoading(false);
+    }
+  }, [businessId, refresh, selectedCategoryId, selectedCategoryValid, selectedTxn]);
+
+  if (loading && !data) return <div style={{ padding: 12 }}>Loading transactions…</div>;
 
   const hasFilters = Boolean(
     filters.search.trim() ||
@@ -184,6 +376,27 @@ export function TransactionsTab({
           <button className={styles.secondaryButton} onClick={refresh}>Refresh</button>
         </div>
       </div>
+
+      {(err || categoriesErr) && (
+        <div className={styles.loadError}>
+          {err && (
+            <div>
+              Transactions error: {err}{" "}
+              <button className={styles.linkButton} onClick={refresh}>
+                Retry
+              </button>
+            </div>
+          )}
+          {categoriesErr && (
+            <div>
+              Categories error: {categoriesErr}{" "}
+              <button className={styles.linkButton} onClick={loadCategories}>
+                Retry
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className={styles.filterBar}>
         <div className={styles.filterGroup}>
@@ -223,11 +436,13 @@ export function TransactionsTab({
             }
           >
             <option value="all">All categories</option>
-            {categories.map((category) => (
-              <option key={category} value={category}>
-                {category}
-              </option>
-            ))}
+            {Array.from(new Set(txns.map((t) => t.category)))
+              .sort((a, b) => a.localeCompare(b))
+              .map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
           </select>
           <div className={styles.datePresetGroup}>
             {(["7d", "30d", "90d"] as DatePreset[]).map((preset) => (
@@ -282,7 +497,19 @@ export function TransactionsTab({
           </thead>
           <tbody>
             {filteredTxns.map((t) => (
-              <tr key={t.id}>
+              <tr
+                key={t.id}
+                className={t.id === selectedTxn?.id ? styles.tableRowSelected : ""}
+                onClick={() => setSelectedTxn(t)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    setSelectedTxn(t);
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+                aria-label={`Open actions for ${t.description}`}
+              >
                 <td className={styles.noWrap}>
                   {new Date(t.occurred_at).toLocaleString()}
                 </td>
@@ -315,6 +542,114 @@ export function TransactionsTab({
         <small className={styles.footerMeta}>
           Latest event occurred at {new Date(data.last_event_occurred_at).toLocaleString()}.
         </small>
+      )}
+
+      {selectedTxn && (
+        <div className={styles.drawerOverlay} onClick={() => setSelectedTxn(null)}>
+          <aside
+            className={styles.drawerPanel}
+            aria-label="Transaction actions"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className={styles.drawerHeader}>
+              <div>
+                <div className={styles.drawerTitle}>{selectedTxn.description}</div>
+                <div className={styles.drawerMeta}>
+                  {new Date(selectedTxn.occurred_at).toLocaleString()}
+                </div>
+              </div>
+              <button
+                className={styles.closeButton}
+                aria-label="Close drawer"
+                onClick={() => setSelectedTxn(null)}
+                type="button"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className={styles.drawerAmount}>
+              {fmtMoney(selectedTxn.amount, selectedTxn.direction)}
+            </div>
+
+            <div className={styles.drawerSection}>
+              <div className={styles.drawerSectionLabel}>Current category</div>
+              <div className={styles.drawerSectionValue}>
+                {selectedTxn.category || "—"}
+              </div>
+            </div>
+
+            {suggestionInfo && (
+              <div className={styles.drawerSection}>
+                <div className={styles.drawerSectionLabel}>Suggestion</div>
+                <div className={styles.suggestionCard}>
+                  <div className={styles.suggestionTitle}>{suggestionInfo.name}</div>
+                  <div className={styles.suggestionMeta}>
+                    Confidence: {suggestionInfo.confidence}%
+                  </div>
+                  {suggestionInfo.source && (
+                    <div className={styles.suggestionMeta}>
+                      Source: {suggestionInfo.source}
+                    </div>
+                  )}
+                  {suggestionInfo.reason && (
+                    <div className={styles.suggestionReason}>{suggestionInfo.reason}</div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className={styles.drawerSection}>
+              <label className={styles.drawerSectionLabel} htmlFor="txn-category">
+                Categorize as
+              </label>
+              <select
+                id="txn-category"
+                className={styles.select}
+                value={selectedCategoryId}
+                onChange={(event) => setSelectedCategoryId(event.target.value)}
+                disabled={categoriesLoading || selectableCategories.length === 0}
+              >
+                {selectableCategories.length === 0 && (
+                  <option value="">No categories available</option>
+                )}
+                {selectableCategories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+              {categoriesLoading && (
+                <div className={styles.drawerHelp}>Loading categories…</div>
+              )}
+            </div>
+
+            {actionErr && <div className={styles.actionError}>{actionErr}</div>}
+            {actionMsg && <div className={styles.actionMessage}>{actionMsg}</div>}
+
+            <div className={styles.drawerActions}>
+              <button
+                className={styles.primaryButton}
+                onClick={handleSave}
+                disabled={!selectedCategoryValid || actionLoading}
+                type="button"
+              >
+                {actionLoading ? "Saving…" : "Save categorization"}
+              </button>
+              <button
+                className={styles.secondaryButton}
+                onClick={handleBulkApply}
+                disabled={!selectedTxn.merchant_key || !selectedCategoryValid || bulkLoading}
+                type="button"
+              >
+                {bulkLoading ? "Applying…" : "Always use this for vendor"}
+              </button>
+              {!selectedTxn.merchant_key && (
+                <div className={styles.drawerHelp}>Merchant key required for vendor rule.</div>
+              )}
+            </div>
+          </aside>
+        </div>
       )}
     </div>
   );
