@@ -231,3 +231,6 @@ class BrainStore:
             return None
         per = self.labels.get(business_id, {})
         return per.get(mid)
+
+    def count_learned_merchants(self, business_id: str) -> int:
+        return len(self.labels.get(business_id, {}))
