@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { BusinessDetail, Signal } from "../../types";
-import SignalGrid from "./SignalGrid";
-import SignalDetail from "./SignalDetail";
+import SignalGrid from "../../components/DetailPanel/SignalGrid";
+import SignalDetail from "../../components/DetailPanel/SignalDetail";
 
 function sevRank(sev?: string) {
   if (sev === "red") return 3;
