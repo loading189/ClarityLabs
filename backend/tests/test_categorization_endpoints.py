@@ -23,8 +23,13 @@ from backend.app.api.categorize import (
     bulk_apply_categorization,
     upsert_categorization,
     categorization_metrics,
+    get_brain_vendor,
+    set_brain_vendor,
+    forget_brain_vendor,
     BulkCategorizationIn,
     CategorizationUpsertIn,
+    BrainVendorSetIn,
+    BrainVendorForgetIn,
 )
 from backend.app.norma.categorize_brain import brain
 from backend.app.norma.merchant import merchant_key, canonical_merchant_name
@@ -214,3 +219,26 @@ def test_categorization_metrics_counts(db_session, brain_store):
     assert metrics.uncategorized == 2
     assert metrics.suggestion_coverage == 1
     assert metrics.brain_coverage == 1
+
+
+def test_brain_vendor_endpoints_round_trip(db_session, brain_store):
+    biz = _create_business(db_session)
+    category = _create_category(db_session, biz.id, "Software", "software")
+
+    set_req = BrainVendorSetIn(
+        merchant_key="ACME CO*123",
+        category_id=category.id,
+        canonical_name="Acme Co",
+    )
+    set_res = set_brain_vendor(biz.id, set_req, db_session)
+
+    assert set_res.system_key == "software"
+    assert set_res.merchant_key == merchant_key("ACME CO*123")
+
+    get_res = get_brain_vendor(biz.id, merchant_key_value="ACME CO*123", db=db_session)
+    assert get_res.merchant_id == set_res.merchant_id
+    assert get_res.system_key == "software"
+
+    forget_req = BrainVendorForgetIn(merchant_key="ACME CO*123")
+    forget_res = forget_brain_vendor(biz.id, forget_req, db_session)
+    assert forget_res == {"status": "ok", "deleted": True}
