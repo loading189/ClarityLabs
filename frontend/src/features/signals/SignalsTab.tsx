@@ -4,6 +4,7 @@ import type { BusinessDetail, Signal } from "../../types";
 import SignalGrid from "../../components/DetailPanel/SignalGrid";
 import SignalDetail from "../../components/DetailPanel/SignalDetail";
 import styles from "./HealthTab.module.css";
+import type { TransactionsDrilldown } from "../transactions";
 
 function sevRank(sev?: string) {
   if (sev === "red") return 3;
@@ -18,7 +19,7 @@ export default function SignalsTab({
   onNavigate,
 }: {
   detail: BusinessDetail;
-  onNavigate?: (target: HealthNavigateTarget) => void;
+  onNavigate?: (target: HealthNavigateTarget, drilldown?: TransactionsDrilldown | null) => void;
 }) {
   const signals = (detail.signals ?? []) as Signal[];
 
@@ -159,7 +160,10 @@ export default function SignalsTab({
           </div>
         </div>
         <div className={styles.healthActions}>
-          <button className={styles.actionButton} onClick={() => onNavigate?.("transactions")}>
+          <button
+            className={styles.actionButton}
+            onClick={() => onNavigate?.("transactions", { date_preset: "30d" })}
+          >
             View transactions
           </button>
           <button className={styles.actionButton} onClick={() => onNavigate?.("trends")}>
@@ -210,7 +214,7 @@ export default function SignalsTab({
             <SignalDetail
               businessId={detail.business_id}
               signal={selected}
-              onNavigate={(target) => onNavigate?.(target)}
+              onNavigate={(target, drilldown) => onNavigate?.(target, drilldown)}
             />
           )}
         </div>

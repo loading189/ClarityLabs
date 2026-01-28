@@ -1,13 +1,14 @@
 // src/components/detail/SignalDetail.tsx
 import { useMemo } from "react";
 import type { Signal } from "../../types";
+import type { TransactionsDrilldown } from "../../features/transactions";
 import { useTransactions } from "../../hooks/useTransactions";
 import styles from "../../features/signals/HealthTab.module.css";
 
 type Props = {
   businessId: string;
   signal: Signal;
-  onNavigate?: (target: "transactions" | "trends") => void;
+  onNavigate?: (target: "transactions" | "trends", drilldown?: TransactionsDrilldown | null) => void;
 };
 
 function extractSourceEventIds(signal: Signal): string[] {
