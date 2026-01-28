@@ -3,14 +3,14 @@ import { apiGet } from "./client";
 
 export type NormalizedTxn = {
   id: string;
-  source_event_id: string;
-  occurred_at: string; // ISO
-  date: string;        // YYYY-MM-DD
-  description: string;
+  source_event_id?: string | null;
+  occurred_at?: string | null; // ISO
+  date?: string | null;        // YYYY-MM-DD
+  description?: string | null;
   amount: number;
   direction: "inflow" | "outflow";
-  account: string;
-  category: string;
+  account?: string | null;
+  category?: string | null;
   counterparty_hint?: string | null;
   merchant_key?: string | null;
   suggested_system_key?: string | null;
