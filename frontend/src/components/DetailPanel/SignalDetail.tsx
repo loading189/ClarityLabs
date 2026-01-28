@@ -1,34 +1,34 @@
 // src/components/detail/SignalDetail.tsx
-import { useMemo } from "react";
-import type { Signal } from "../../types";
+import type { HealthSignal } from "../../types";
 import type { TransactionsDrilldown } from "../../features/transactions";
-import { useTransactions } from "../../hooks/useTransactions";
 import styles from "../../features/signals/HealthTab.module.css";
 
 type Props = {
   businessId: string;
-  signal: Signal;
-  onNavigate?: (target: "transactions" | "trends", drilldown?: TransactionsDrilldown | null) => void;
+  signal: HealthSignal;
+  onNavigate?: (
+    target: "transactions" | "trends" | "categorize" | "ledger",
+    drilldown?: TransactionsDrilldown | null
+  ) => void;
 };
 
-function extractSourceEventIds(signal: Signal): string[] {
-  const refs = signal.evidence_refs ?? [];
-  const ids = refs
-    .map((r: any) => String(r?.source_event_id ?? "").trim())
-    .filter(Boolean);
-  return Array.from(new Set(ids));
-}
-
 export default function SignalDetail({ businessId, signal, onNavigate }: Props) {
-  const sourceEventIds = useMemo(() => extractSourceEventIds(signal), [signal]);
+  void businessId;
 
-  // Only fetch if we actually have refs
-  const shouldFetch = sourceEventIds.length > 0;
-  const { data, loading, err, refresh } = useTransactions(
-    shouldFetch ? businessId : null,
-    50,
-    shouldFetch ? sourceEventIds : undefined
-  );
+  const drilldownButtons = (signal.drilldowns ?? []).map((d, idx) => {
+    const label = d.label ?? "Open drilldown";
+    const payload = d.payload ?? null;
+    return (
+      <button
+        key={`${d.target}-${idx}`}
+        className={styles.actionButton}
+        onClick={() => onNavigate?.(d.target, payload as TransactionsDrilldown | null)}
+        type="button"
+      >
+        {label}
+      </button>
+    );
+  });
 
   return (
     <div className={styles.signalDetail}>
@@ -36,7 +36,6 @@ export default function SignalDetail({ businessId, signal, onNavigate }: Props) 
         <div>
           <div className={styles.signalDetailTitle}>{signal.title}</div>
           <div className={styles.signalDetailMeta}>
-            <span className={`${styles.pill} ${styles.pillSoft}`}>{signal.dimension ?? "other"}</span>
             <span
               className={`${styles.pill} ${
                 signal.severity === "red"
@@ -48,106 +47,73 @@ export default function SignalDetail({ businessId, signal, onNavigate }: Props) 
             >
               {String(signal.severity ?? "green").toUpperCase()}
             </span>
-            <span className={styles.pill}>Priority {signal.priority ?? 0}</span>
+            <span className={`${styles.pill} ${styles.pillSoft}`}>{signal.status}</span>
+            {signal.updated_at && <span className={styles.pill}>Updated {signal.updated_at}</span>}
           </div>
         </div>
-
-        {shouldFetch && (
-          <button className={styles.actionButton} onClick={refresh} disabled={loading}>
-            {loading ? "Loading…" : "Refresh"}
-          </button>
-        )}
       </div>
 
-      <div className={styles.signalDetailMessage}>{signal.message}</div>
+      <div className={styles.signalDetailMessage}>{signal.short_summary}</div>
 
-      {signal.why && (
-        <div className={styles.signalDetailBlock}>
-          <div className={styles.signalDetailLabel}>Why</div>
-          <div className={styles.signalDetailBody}>{signal.why}</div>
-        </div>
-      )}
-
-      {signal.how_to_fix && (
-        <div className={styles.signalDetailBlock}>
-          <div className={styles.signalDetailLabel}>Next step</div>
-          <div className={styles.signalDetailBody}>{signal.how_to_fix}</div>
-        </div>
-      )}
-
-      {signal.evidence && (
-        <details className={styles.signalDetailDetails}>
-          <summary>Evidence</summary>
-          <pre>{JSON.stringify(signal.evidence, null, 2)}</pre>
-        </details>
-      )}
-
-      <div className={styles.signalActions}>
-        <button className={styles.actionButton} onClick={() => onNavigate?.("transactions")}>
-          View transactions
-        </button>
-        <button className={styles.actionButton} onClick={() => onNavigate?.("trends")}>
-          View trend
-        </button>
-      </div>
-
-      {/* Drilldown transactions */}
       <div className={styles.signalDetailBlock}>
-        <div className={styles.signalDetailLabel}>
-          Related transactions {shouldFetch ? `(${sourceEventIds.length} refs)` : "(no refs)"}
-        </div>
-
-        {!shouldFetch && (
-          <div className={styles.inlineMuted}>
-            This signal doesn’t yet include transaction references (evidence_refs).
-          </div>
-        )}
-
-        {shouldFetch && err && <div className={styles.inlineError}>Error loading transactions: {err}</div>}
-
-        {shouldFetch && loading && !data && <div className={styles.inlineMuted}>Loading…</div>}
-
-        {shouldFetch && data && (
-          <div className={styles.signalTableWrap}>
-            <table className={styles.signalTable}>
-              <thead>
-                <tr>
-                  <th>When</th>
-                  <th>Description</th>
-                  <th>Account</th>
-                  <th>Category</th>
-                  <th className={styles.alignRight}>Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(data.transactions ?? []).map((t) => (
-                  <tr key={t.id}>
-                    <td className={styles.noWrap}>
-                      {t.occurred_at ? new Date(t.occurred_at).toLocaleString() : "—"}
-                    </td>
-                    <td>
-                      <div className={styles.tableTitle}>{t.description}</div>
-                      <small className={styles.tableSub}>event {String(t.source_event_id).slice(-6)}</small>
-                    </td>
-                    <td>{t.account}</td>
-                    <td>{t.category}</td>
-                    <td className={styles.alignRight}>
-                      {t.amount < 0 ? "-" : ""}${Math.abs(t.amount).toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
-                {(data.transactions ?? []).length === 0 && (
-                  <tr>
-                    <td colSpan={5} className={styles.emptyCell}>
-                      No matching transactions returned for these refs.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <div className={styles.signalDetailLabel}>Why it matters</div>
+        <div className={styles.signalDetailBody}>{signal.why_it_matters}</div>
       </div>
+
+      <div className={styles.signalDetailBlock}>
+        <div className={styles.signalDetailLabel}>Evidence</div>
+        <div className={styles.signalEvidenceStack}>
+          {(signal.evidence ?? []).map((ev, idx) => (
+            <div key={idx} className={styles.signalEvidenceCard}>
+              <div className={styles.signalEvidenceHeader}>
+                <div className={styles.signalEvidenceTitle}>
+                  {ev.date_range?.label || "Period"}
+                </div>
+                <div className={styles.signalEvidenceRange}>
+                  {ev.date_range?.start} → {ev.date_range?.end}
+                </div>
+              </div>
+              <div className={styles.signalEvidenceMetrics}>
+                {Object.entries(ev.metrics ?? {}).map(([key, value]) => (
+                  <div key={key} className={styles.signalEvidenceMetric}>
+                    <div className={styles.signalEvidenceKey}>{key}</div>
+                    <div className={styles.signalEvidenceValue}>{String(value)}</div>
+                  </div>
+                ))}
+              </div>
+              {ev.examples && ev.examples.length > 0 && (
+                <div className={styles.signalEvidenceExamples}>
+                  <div className={styles.signalEvidenceLabel}>Example transactions</div>
+                  <div className={styles.signalEvidenceTable}>
+                    {ev.examples.map((ex: any, i: number) => (
+                      <div key={`${ex.source_event_id}-${i}`} className={styles.signalEvidenceRow}>
+                        <div className={styles.noWrap}>{ex.date ?? ex.occurred_at ?? "—"}</div>
+                        <div className={styles.signalEvidenceDesc}>
+                          {ex.description ?? "—"}
+                          <div className={styles.signalEvidenceSub}>
+                            event {String(ex.source_event_id ?? "").slice(-6)}
+                          </div>
+                        </div>
+                        <div className={styles.alignRight}>
+                          {ex.amount != null
+                            ? `${ex.direction === "outflow" ? "-" : ""}$${Number(
+                                Math.abs(ex.amount)
+                              ).toFixed(2)}`
+                            : "—"}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {drilldownButtons.length > 0 && (
+        <div className={styles.signalActions}>{drilldownButtons}</div>
+      )}
     </div>
   );
 }

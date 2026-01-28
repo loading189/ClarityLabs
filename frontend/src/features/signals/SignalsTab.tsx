@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { getCategorizeMetrics, type CategorizeMetricsOut } from "../../api/categorize";
-import type { BusinessDetail, Signal } from "../../types";
+import type { BusinessDetail, HealthSignal } from "../../types";
 import SignalGrid from "../../components/DetailPanel/SignalGrid";
 import SignalDetail from "../../components/DetailPanel/SignalDetail";
 import styles from "./HealthTab.module.css";
@@ -21,7 +21,7 @@ function toPercent(part?: number | null, total?: number | null) {
   return Math.round((safePart / safeTotal) * 100);
 }
 
-type HealthNavigateTarget = "transactions" | "trends" | "categorize";
+type HealthNavigateTarget = "transactions" | "trends" | "categorize" | "ledger";
 
 export default function SignalsTab({
   detail,
@@ -30,34 +30,35 @@ export default function SignalsTab({
   detail: BusinessDetail;
   onNavigate?: (target: HealthNavigateTarget, drilldown?: TransactionsDrilldown | null) => void;
 }) {
-  const signals = (detail.signals ?? []) as Signal[];
+  const signals = (detail.health_signals ?? []) as HealthSignal[];
 
   // Sort once for stable UI behavior
   const sorted = useMemo(() => {
     return [...signals].sort((a, b) => {
       const r = sevRank(b.severity) - sevRank(a.severity);
       if (r !== 0) return r;
-
-      const p = (b.priority ?? 0) - (a.priority ?? 0);
-      if (p !== 0) return p;
-
-      return String(a.key).localeCompare(String(b.key));
+      const aUpdated = a.updated_at ?? "";
+      const bUpdated = b.updated_at ?? "";
+      if (aUpdated !== bUpdated) {
+        return bUpdated.localeCompare(aUpdated);
+      }
+      return String(a.id).localeCompare(String(b.id));
     });
   }, [signals]);
 
   // Keep selection stable across renders AND reset when business changes
-  const [selectedKey, setSelectedKey] = useState<string | null>(sorted[0]?.key ?? null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(sorted[0]?.id ?? null);
 
   // When switching businesses, default to the top signal for that business
   useEffect(() => {
-    setSelectedKey(sorted[0]?.key ?? null);
+    setSelectedKey(sorted[0]?.id ?? null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detail.business_id]); // only when business changes
 
   // If keys change (signals recomputed), keep selection valid
   const selected = useMemo(() => {
     if (!sorted.length) return null;
-    return sorted.find((s) => s.key === selectedKey) ?? sorted[0] ?? null;
+    return sorted.find((s) => s.id === selectedKey) ?? sorted[0] ?? null;
   }, [sorted, selectedKey]);
 
   const [metrics, setMetrics] = useState<CategorizeMetricsOut | null>(null);
@@ -294,7 +295,7 @@ export default function SignalsTab({
           <SignalGrid
             signals={sorted}
             selectedKey={selectedKey}
-            onSelect={(s) => setSelectedKey(s.key)}
+            onSelect={(s) => setSelectedKey(s.id)}
           />
 
           {/* Pass businessId so SignalDetail can fetch related transactions via evidence_refs */}

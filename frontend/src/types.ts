@@ -27,6 +27,33 @@ export type Signal = {
   version?: number;
 };
 
+export type HealthSignalStatus = "open" | "monitoring" | "resolved";
+export type HealthSignalDrilldownTarget = "transactions" | "categorize" | "ledger" | "trends";
+
+export type HealthSignalEvidence = {
+  date_range: { start: string; end: string; label?: string };
+  metrics: Record<string, any>;
+  examples: Array<Record<string, any>>;
+};
+
+export type HealthSignalDrilldown = {
+  target: HealthSignalDrilldownTarget;
+  payload?: Record<string, any> | null;
+  label?: string | null;
+};
+
+export type HealthSignal = {
+  id: string;
+  title: string;
+  severity: Severity;
+  status: HealthSignalStatus;
+  updated_at?: string | null;
+  short_summary: string;
+  why_it_matters: string;
+  evidence: HealthSignalEvidence[];
+  drilldowns: HealthSignalDrilldown[];
+};
+
 export type BusinessDetail = {
   business_id: string;
   name: string;
@@ -35,6 +62,7 @@ export type BusinessDetail = {
   health_score: number;
   highlights: string[];
   signals: Signal[];
+  health_signals?: HealthSignal[];
   pillars?: { liquidity: number; stability: number; discipline: number };
   ledger_preview?: Array<Record<string, any>>;
   facts?: Record<string, any>;
@@ -69,7 +97,6 @@ export type BrainLabelRequest = {
   category: string;
   confidence?: number;
 };
-
 
 
 
