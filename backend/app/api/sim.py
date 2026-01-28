@@ -20,6 +20,7 @@ from backend.app.sim.generators.stripe import make_stripe_payout_event, make_str
 from backend.app.sim.generators.shopify import make_shopify_order_paid_event, make_shopify_refund_event
 from backend.app.sim.generators.payroll import make_payroll_run_event
 from backend.app.sim.generators.invoicing import make_invoice_paid_event
+from backend.app.sim.generators.restaurant_v1 import generate_restaurant_v1_events
 
 router = APIRouter(tags=["simulator"])
 
@@ -34,7 +35,7 @@ SCENARIO_CATALOG: Dict[str, Any] = {
         {
             "id": "restaurant_v1",
             "name": "Restaurant (v1)",
-            "summary": "Daily card sales, some refunds, payroll biweekly, supplier spend, mild seasonality.",
+            "summary": "Daily deposits, weekly suppliers, biweekly payroll, monthly fixed costs, occasional misc spend.",
             "defaults": {
                 "plan": {
                     "business_hours": {"open_hour": 11, "close_hour": 22, "business_hours_only": True},
@@ -885,6 +886,67 @@ def generate_history(business_id: str, req: GenerateIn, db: Session = Depends(ge
             )
         )
         deleted_count = int(getattr(res, "rowcount", 0) or 0)
+
+    end_d = start_d + timedelta(days=req.days)
+
+    if scenario_id == "restaurant_v1":
+        mods_by_day: Dict[date, Dict[str, Any]] = {}
+        truth_events: List[Dict[str, Any]] = []
+
+        for d in range(req.days):
+            day_date = start_d + timedelta(days=d)
+            mods_day = _mods_for_day(ivs, day_date)
+            mods_by_day[day_date] = mods_day
+
+            active_iv = []
+            for iv in ivs:
+                if isinstance(iv, dict) and _iv_active_on(iv, day_date):
+                    active_iv.append({"kind": iv.get("kind"), "name": iv.get("name"), "id": iv.get("id")})
+            if active_iv:
+                truth_events.append(
+                    {
+                        "type": "interventions_active",
+                        "date": day_date.isoformat(),
+                        "active": active_iv,
+                        "mods": {
+                            "volume_mult": float(mods_day["volume_mult"]),
+                            "revenue_mult": float(mods_day["revenue_mult"]),
+                            "expense_mult": float(mods_day["expense_mult"]),
+                            "deposit_delay_days": int(mods_day["deposit_delay_days"]),
+                            "deposit_delay_pct": float(mods_day["deposit_delay_pct"]),
+                            "refund_rate": mods_day["refund_rate"],
+                        },
+                    }
+                )
+
+        events = generate_restaurant_v1_events(
+            business_id=business_id,
+            start_date=start_d,
+            end_date=end_d,
+            seed=req.seed,
+            mods_by_day=mods_by_day,
+        )
+
+        inserted = 0
+        for ev in events:
+            inserted += _insert_raw_event(db, business_id, ev)
+
+        sim.setdefault("truth_events", [])
+        sim["truth_events"] = truth_events
+
+        prof.simulation_params["simulator"] = sim  # type: ignore[index]
+        db.add(prof)
+        db.commit()
+
+        return GenerateOut(
+            status="ok",
+            business_id=business_id,
+            start_date=req.start_date,
+            days=req.days,
+            inserted=inserted,
+            deleted=deleted_count,
+            shock_window=None,
+        )
 
     r = _rng(req.seed)
 
