@@ -1,0 +1,38 @@
+date,description,amount,source_account,raw_category
+2025-11-01,Client payment,6500.00,Checking,Sales Income
+2025-11-03,Rent,-1400.00,Checking,Rent
+2025-11-06,Payroll,-2500.00,Checking,Payroll
+2025-11-10,Software subscriptions,-180.00,Checking,Software
+2025-11-14,Client payment,2200.00,Checking,Sales Income
+2025-11-18,Office supplies,-240.00,Checking,Office Supplies
+2025-11-20,Payroll,-2500.00,Checking,Payroll
+2025-11-25,Insurance,-320.00,Checking,Insurance
+
+2025-12-01,Retainer payment,16200.00,Checking,Sales Income
+2025-12-03,Rent,-1400.00,Checking,Rent
+2025-12-06,Payroll,-2600.00,Checking,Payroll
+2025-12-09,Hosting,-200.00,Checking,Hosting
+2025-12-12,Client payment,1800.00,Checking,Sales Income
+2025-12-15,Office supplies,-190.00,Checking,Office Supplies
+2025-12-18,Payroll,-2600.00,Checking,Payroll
+2025-12-22,Marketing spend,-450.00,Checking,Marketing
+2025-12-29,Year-end tax payment,-900.00,Checking,Taxes
+
+2026-01-03,Client payment,6800.00,Checking,Sales Income
+2026-01-06,Hosting,-200.00,Checking,Hosting
+2026-01-07,Payroll,-2700.00,Checking,Payroll
+2026-01-10,Software subscriptions,-180.00,Checking,Software
+2026-01-14,Client payment,2400.00,Checking,Sales Income
+2026-01-18,Office supplies,-260.00,Checking,Office Supplies
+2026-01-21,Payroll,-1700.00,Checking,Payroll
+2026-01-25,Insurance,-320.00,Checking,Insurance
+
+2026-02-01,Retainer payment,70000.00,Checking,Sales Income
+2026-02-03,Rent,-1450.00,Checking,Rent
+2026-02-06,Payroll,-2800.00,Checking,Payroll
+2026-02-09,Hosting,-220.00,Checking,Hosting
+2026-02-12,Client payment,2600.00,Checking,Sales Income
+2026-02-15,Office supplies,-310.00,Checking,Office Supplies
+2026-02-18,Payroll,-1800.00,Checking,Payroll
+2026-02-21,Marketing spend,-600.00,Checking,Marketing
+2026-02-25,Quarterly tax estimate,-1200.00,Checking,Taxes

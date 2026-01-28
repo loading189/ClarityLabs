@@ -1,0 +1,208 @@
+{
+  "merchants": [
+    {
+      "merchant_id": "1121c3ce-2e10-488c-99dc-5544751cb44b",
+      "canonical_name": "insurance premium",
+      "updated_at": "2026-01-17T18:47:17.065462+00:00"
+    },
+    {
+      "merchant_id": "620ab281-f0e7-4dee-8a13-a370ddf8085f",
+      "canonical_name": "Payroll",
+      "updated_at": "2026-01-26T17:34:49.625280+00:00"
+    },
+    {
+      "merchant_id": "7863c639-7381-43a3-b352-a2ce3ebb20e1",
+      "canonical_name": "Square",
+      "updated_at": "2026-01-28T00:56:41.438206+00:00"
+    },
+    {
+      "merchant_id": "4901765f-799c-45e5-90c6-d3da56676385",
+      "canonical_name": "Stripe Payout",
+      "updated_at": "2026-01-28T00:57:06.422050+00:00"
+    },
+    {
+      "merchant_id": "7fe43e0e-dde1-40c3-90f6-70017faed280",
+      "canonical_name": "Shopify Order #93859",
+      "updated_at": "2026-01-25T21:22:47.276336+00:00"
+    },
+    {
+      "merchant_id": "e6495066-1af3-4bd5-8bd8-e45e25ce4ebb",
+      "canonical_name": "Walmart",
+      "updated_at": "2026-01-28T00:56:55.476441+00:00"
+    },
+    {
+      "merchant_id": "3a9ed453-8db4-4e97-9167-6a225c755527",
+      "canonical_name": "Shell Oil",
+      "updated_at": "2026-01-28T00:56:19.591184+00:00"
+    },
+    {
+      "merchant_id": "4b5141f1-161f-44f2-992e-9bfbab5a6c81",
+      "canonical_name": "Office Depot",
+      "updated_at": "2026-01-28T00:56:09.776880+00:00"
+    }
+  ],
+  "aliases": [
+    {
+      "alias_key": "insurance premium",
+      "merchant_id": "1121c3ce-2e10-488c-99dc-5544751cb44b",
+      "match_type": "exact",
+      "evidence_count": 1,
+      "updated_at": "2026-01-17T18:47:17.065462+00:00"
+    },
+    {
+      "alias_key": "payroll",
+      "merchant_id": "620ab281-f0e7-4dee-8a13-a370ddf8085f",
+      "match_type": "exact",
+      "evidence_count": 8,
+      "updated_at": "2026-01-26T17:34:49.625280+00:00"
+    },
+    {
+      "alias_key": "square",
+      "merchant_id": "7863c639-7381-43a3-b352-a2ce3ebb20e1",
+      "match_type": "exact",
+      "evidence_count": 5,
+      "updated_at": "2026-01-28T00:56:41.438206+00:00"
+    },
+    {
+      "alias_key": "stripe payout",
+      "merchant_id": "4901765f-799c-45e5-90c6-d3da56676385",
+      "match_type": "exact",
+      "evidence_count": 2,
+      "updated_at": "2026-01-28T00:57:06.422073+00:00"
+    },
+    {
+      "alias_key": "shopify order",
+      "merchant_id": "7fe43e0e-dde1-40c3-90f6-70017faed280",
+      "match_type": "exact",
+      "evidence_count": 2,
+      "updated_at": "2026-01-25T21:22:47.276336+00:00"
+    },
+    {
+      "alias_key": "walmart",
+      "merchant_id": "e6495066-1af3-4bd5-8bd8-e45e25ce4ebb",
+      "match_type": "exact",
+      "evidence_count": 9,
+      "updated_at": "2026-01-28T00:56:55.476441+00:00"
+    },
+    {
+      "alias_key": "shell oil",
+      "merchant_id": "3a9ed453-8db4-4e97-9167-6a225c755527",
+      "match_type": "exact",
+      "evidence_count": 3,
+      "updated_at": "2026-01-28T00:56:19.591184+00:00"
+    },
+    {
+      "alias_key": "office depot",
+      "merchant_id": "4b5141f1-161f-44f2-992e-9bfbab5a6c81",
+      "match_type": "exact",
+      "evidence_count": 3,
+      "updated_at": "2026-01-28T00:56:09.776880+00:00"
+    }
+  ],
+  "labels": {
+    "__legacy__": {
+      "1121c3ce-2e10-488c-99dc-5544751cb44b": {
+        "business_id": "__legacy__",
+        "merchant_id": "1121c3ce-2e10-488c-99dc-5544751cb44b",
+        "system_key": "revenue",
+        "confidence": 0.92,
+        "evidence_count": 1,
+        "updated_at": "2026-01-17T18:47:17.065462+00:00"
+      }
+    },
+    "0c48e3cc-46d8-492c-8238-474715ff4331": {
+      "620ab281-f0e7-4dee-8a13-a370ddf8085f": {
+        "business_id": "0c48e3cc-46d8-492c-8238-474715ff4331",
+        "merchant_id": "620ab281-f0e7-4dee-8a13-a370ddf8085f",
+        "system_key": "payroll",
+        "confidence": 1.0,
+        "evidence_count": 4,
+        "updated_at": "2026-01-25T23:12:42.663798+00:00"
+      },
+      "7fe43e0e-dde1-40c3-90f6-70017faed280": {
+        "business_id": "0c48e3cc-46d8-492c-8238-474715ff4331",
+        "merchant_id": "7fe43e0e-dde1-40c3-90f6-70017faed280",
+        "system_key": "acct_2d54d64b-41ea-46f6-98b9-c0f2ec7d3f2d",
+        "confidence": 1.0,
+        "evidence_count": 2,
+        "updated_at": "2026-01-25T21:22:47.276336+00:00"
+      }
+    },
+    "49aee783-1800-4b51-a6ec-82d9b708d31f": {
+      "7863c639-7381-43a3-b352-a2ce3ebb20e1": {
+        "business_id": "49aee783-1800-4b51-a6ec-82d9b708d31f",
+        "merchant_id": "7863c639-7381-43a3-b352-a2ce3ebb20e1",
+        "system_key": "sales",
+        "confidence": 1.0,
+        "evidence_count": 1,
+        "updated_at": "2026-01-25T21:13:34.105171+00:00"
+      },
+      "4901765f-799c-45e5-90c6-d3da56676385": {
+        "business_id": "49aee783-1800-4b51-a6ec-82d9b708d31f",
+        "merchant_id": "4901765f-799c-45e5-90c6-d3da56676385",
+        "system_key": "sales",
+        "confidence": 1.0,
+        "evidence_count": 1,
+        "updated_at": "2026-01-25T21:13:42.366393+00:00"
+      },
+      "620ab281-f0e7-4dee-8a13-a370ddf8085f": {
+        "business_id": "49aee783-1800-4b51-a6ec-82d9b708d31f",
+        "merchant_id": "620ab281-f0e7-4dee-8a13-a370ddf8085f",
+        "system_key": "payroll",
+        "confidence": 1.0,
+        "evidence_count": 2,
+        "updated_at": "2026-01-25T22:51:55.505425+00:00"
+      }
+    },
+    "134c92a4-f569-486f-a421-70ce7d31ffb6": {
+      "7863c639-7381-43a3-b352-a2ce3ebb20e1": {
+        "business_id": "134c92a4-f569-486f-a421-70ce7d31ffb6",
+        "merchant_id": "7863c639-7381-43a3-b352-a2ce3ebb20e1",
+        "system_key": "sales",
+        "confidence": 1.0,
+        "evidence_count": 4,
+        "updated_at": "2026-01-28T00:56:41.438206+00:00"
+      },
+      "e6495066-1af3-4bd5-8bd8-e45e25ce4ebb": {
+        "business_id": "134c92a4-f569-486f-a421-70ce7d31ffb6",
+        "merchant_id": "e6495066-1af3-4bd5-8bd8-e45e25ce4ebb",
+        "system_key": "office_supplies",
+        "confidence": 1.0,
+        "evidence_count": 9,
+        "updated_at": "2026-01-28T00:56:55.476441+00:00"
+      },
+      "620ab281-f0e7-4dee-8a13-a370ddf8085f": {
+        "business_id": "134c92a4-f569-486f-a421-70ce7d31ffb6",
+        "merchant_id": "620ab281-f0e7-4dee-8a13-a370ddf8085f",
+        "system_key": "contra",
+        "confidence": 1.0,
+        "evidence_count": 2,
+        "updated_at": "2026-01-26T17:34:49.625280+00:00"
+      },
+      "3a9ed453-8db4-4e97-9167-6a225c755527": {
+        "business_id": "134c92a4-f569-486f-a421-70ce7d31ffb6",
+        "merchant_id": "3a9ed453-8db4-4e97-9167-6a225c755527",
+        "system_key": "travel",
+        "confidence": 1.0,
+        "evidence_count": 3,
+        "updated_at": "2026-01-28T00:56:19.591184+00:00"
+      },
+      "4b5141f1-161f-44f2-992e-9bfbab5a6c81": {
+        "business_id": "134c92a4-f569-486f-a421-70ce7d31ffb6",
+        "merchant_id": "4b5141f1-161f-44f2-992e-9bfbab5a6c81",
+        "system_key": "office_supplies",
+        "confidence": 1.0,
+        "evidence_count": 3,
+        "updated_at": "2026-01-28T00:56:09.776880+00:00"
+      },
+      "4901765f-799c-45e5-90c6-d3da56676385": {
+        "business_id": "134c92a4-f569-486f-a421-70ce7d31ffb6",
+        "merchant_id": "4901765f-799c-45e5-90c6-d3da56676385",
+        "system_key": "sales",
+        "confidence": 1.0,
+        "evidence_count": 1,
+        "updated_at": "2026-01-28T00:57:06.422050+00:00"
+      }
+    }
+  }
+}

@@ -1,0 +1,17 @@
+date,description,amount,source_account,raw_category
+2025-11-01,Client payment - Invoice 1042,5200.00,Checking,Sales Income
+2025-11-02,Stripe payout,1830.55,Checking,Sales Income
+2025-11-03,Rent - Office, -1400.00,Checking,Rent
+2025-11-04,Adobe Creative Cloud, -59.99,Checking,Software
+2025-11-05,Google Ads, -220.00,Checking,Advertising
+2025-11-06,Payroll - Team, -3200.00,Checking,Payroll
+2025-11-07,Amazon Web Services, -148.32,Checking,Hosting
+2025-12-01,Client payment - Invoice 1049,4800.00,Checking,Sales Income
+2025-12-03,Rent - Office, -1400.00,Checking,Rent
+2025-12-04,QuickBooks Online, -75.00,Checking,Software
+2025-12-06,Payroll - Team, -3350.00,Checking,Payroll
+2025-12-10,Refund - Customer, -250.00,Checking,Refunds
+2026-01-03,Client payment - Invoice 1061,3100.00,Checking,Sales Income
+2026-01-06,Google Ads, -480.00,Checking,Advertising
+2026-01-07,Payroll - Team, -3600.00,Checking,Payroll
+2026-01-08,Chase Credit Card Payment, -900.00,Checking,Card Payment

@@ -1,0 +1,18 @@
+SYSTEM_CATEGORIES = [
+    ("payroll", "Payroll", "labor"),
+    ("rent", "Rent", "operating"),
+    ("utilities", "Utilities", "operating"),
+    ("software", "Software & Subscriptions", "operating"),
+    ("marketing", "Marketing & Advertising", "operating"),
+    ("hosting", "Hosting / Infrastructure", "operating"),
+    ("insurance", "Insurance", "operating"),
+    ("office_supplies", "Office Supplies", "operating"),
+    ("meals", "Meals & Entertainment", "operating"),
+    ("travel", "Travel", "operating"),
+    ("taxes", "Taxes & Licenses", "operating"),
+    ("cogs", "Cost of Goods Sold", "cogs"),
+    ("sales", "Sales Revenue", "income"),
+    ("contra", "Refunds / Contra Revenue", "income"),
+    ("owner_draw", "Owner Draw", "equity"),
+    ("uncategorized", "Uncategorized", "unknown"),
+]

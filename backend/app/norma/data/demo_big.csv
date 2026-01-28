@@ -1,0 +1,1881 @@
+date,description,amount,source_account,raw_category
+2025-01-01,Rent,-1766.18,Checking,Rent
+2025-01-01,Client payment,1375.51,Checking,Sales Income
+2025-01-01,Shop supplies,-145.68,Checking,Supplies
+2025-01-01,Meals,-130.35,Business Checking,Meals
+2025-01-02,Retainer payment,6336.82,Checking,Sales Income
+2025-01-02,Project deposit,4468.64,Checking,Sales Income
+2025-01-02,Marketing,-476.44,Business Checking,Marketing
+2025-01-03,Retainer payment,5113.45,Checking,Sales Income
+2025-01-03,Hosting,-108.6,Operating Checking,Hosting
+2025-01-03,Payroll,-3302.6,Business Checking,Payroll
+2025-01-03,Fuel,-103.2,Operating Checking,Fuel
+2025-01-03,Fuel,-185.24,Business Checking,Fuel
+2025-01-04,Team lunch,-111.2,Business Checking,Meals
+2025-01-04,Supplies,-408.62,Business Checking,Supplies
+2025-01-05,Gas,-147.4,Checking,Fuel
+2025-01-05,Hosting,-376.64,Operating Checking,Hosting
+2025-01-05,Project deposit,3772.56,Business Checking,Sales Income
+2025-01-06,Project deposit,4565.35,Business Checking,Sales Income
+2025-01-06,Invoice paid,5845.19,Checking,Sales Income
+2025-01-07,Meals,-65.08,Checking,Meals
+2025-01-08,Project deposit,4540.09,Checking,Sales Income
+2025-01-08,Project deposit,2967.51,Business Checking,Sales Income
+2025-01-08,Team lunch,-63.58,Operating Checking,Meals
+2025-01-08,Insurance premium,-312.4,Business Checking,Insurance
+2025-01-09,Marketing,-332.07,Checking,Marketing
+2025-01-09,Shop supplies,-366.49,Operating Checking,Supplies
+2025-01-09,Project deposit,8521.26,Business Checking,Sales Income
+2025-01-09,Retainer payment,1610.74,Business Checking,Sales Income
+2025-01-09,Marketing,-399.13,Checking,Marketing
+2025-01-10,Project deposit,3660.7,Operating Checking,Sales Income
+2025-01-10,Payroll,-3593.22,Business Checking,Payroll
+2025-01-10,Project deposit,7696.28,Business Checking,Sales Income
+2025-01-11,Insurance premium,-116.4,Business Checking,Insurance
+2025-01-12,Invoice paid,7376.77,Checking,Sales Income
+2025-01-13,Project deposit,7651.33,Checking,Sales Income
+2025-01-13,Shop supplies,-318.39,Checking,Supplies
+2025-01-13,Marketing,-278.46,Checking,Marketing
+2025-01-16,Project deposit,3449.82,Operating Checking,Sales Income
+2025-01-16,Gas,-166.09,Checking,Fuel
+2025-01-16,Software subscription,-419.76,Checking,Hosting
+2025-01-16,Invoice paid,6736.52,Business Checking,Sales Income
+2025-01-16,Shop supplies,-384.14,Checking,Supplies
+2025-01-17,Supplies,-58.72,Business Checking,Supplies
+2025-01-17,Client payment,1666.06,Checking,Sales Income
+2025-01-17,Payroll run,-3703.9,Checking,Payroll
+2025-01-17,Invoice paid,2845.15,Checking,Sales Income
+2025-01-19,Cloud services,-256.73,Business Checking,Hosting
+2025-01-19,Retainer payment,2940.61,Operating Checking,Sales Income
+2025-01-19,Insurance premium,-272.75,Business Checking,Insurance
+2025-01-20,Cloud services,-110.07,Operating Checking,Hosting
+2025-01-20,Client payment,4186.27,Business Checking,Sales Income
+2025-01-22,Materials,-127.65,Checking,Supplies
+2025-01-22,Insurance premium,-249.96,Checking,Insurance
+2025-01-22,Meals,-67.44,Checking,Meals
+2025-01-23,Supplies,-496.07,Checking,Supplies
+2025-01-23,Marketing,-117.26,Checking,Marketing
+2025-01-23,Materials,-114.6,Operating Checking,Supplies
+2025-01-23,Retainer payment,1155.97,Operating Checking,Sales Income
+2025-01-24,Payroll run,-3780.58,Operating Checking,Payroll
+2025-01-24,Team lunch,-99.24,Checking,Meals
+2025-01-24,Team lunch,-164.31,Checking,Meals
+2025-01-24,Supplies,-185.83,Business Checking,Supplies
+2025-01-25,Marketing,-702.56,Checking,Marketing
+2025-01-25,Marketing,-95.92,Operating Checking,Marketing
+2025-01-25,Marketing,-104.58,Checking,Marketing
+2025-01-26,Invoice paid,8066.17,Business Checking,Sales Income
+2025-01-26,Marketing,-471.09,Operating Checking,Marketing
+2025-01-27,Supplies,-168.84,Business Checking,Supplies
+2025-01-27,Team lunch,-61.27,Checking,Meals
+2025-01-28,Project deposit,2308.9,Business Checking,Sales Income
+2025-01-28,Marketing,-758.9,Checking,Marketing
+2025-01-28,Ads spend,-199.37,Checking,Marketing
+2025-01-28,Fuel,-255.01,Operating Checking,Fuel
+2025-01-29,Invoice paid,1907.58,Operating Checking,Sales Income
+2025-01-29,Project deposit,7194.74,Business Checking,Sales Income
+2025-01-31,Ads spend,-197.57,Checking,Marketing
+2025-01-31,Client payment,3000.81,Checking,Sales Income
+2025-01-31,Team lunch,-113.67,Business Checking,Meals
+2025-01-31,Payroll,-3255.89,Operating Checking,Payroll
+2025-02-01,Rent,-1758.86,Operating Checking,Rent
+2025-02-02,Team lunch,-83.51,Business Checking,Meals
+2025-02-02,Materials,-371.77,Checking,Supplies
+2025-02-04,Client payment,3424.19,Operating Checking,Sales Income
+2025-02-04,Invoice paid,2237.37,Checking,Sales Income
+2025-02-04,Ads spend,-73.17,Business Checking,Marketing
+2025-02-05,Invoice paid,6693.63,Checking,Sales Income
+2025-02-05,Retainer payment,7691.44,Business Checking,Sales Income
+2025-02-05,Meals,-53.36,Operating Checking,Meals
+2025-02-06,Insurance premium,-132.37,Operating Checking,Insurance
+2025-02-06,Client payment,2319.66,Operating Checking,Sales Income
+2025-02-06,Invoice paid,7542.71,Operating Checking,Sales Income
+2025-02-07,Insurance premium,-373.1,Checking,Insurance
+2025-02-07,Payroll run,-3625.68,Checking,Payroll
+2025-02-08,Retainer payment,5893.38,Business Checking,Sales Income
+2025-02-08,Insurance premium,-357.24,Operating Checking,Insurance
+2025-02-09,Ads spend,-733.31,Checking,Marketing
+2025-02-09,Cloud services,-116.54,Checking,Hosting
+2025-02-10,Marketing,-748.77,Operating Checking,Marketing
+2025-02-10,Invoice paid,1152.53,Operating Checking,Sales Income
+2025-02-10,Marketing,-182.93,Business Checking,Marketing
+2025-02-10,Gas,-216.66,Operating Checking,Fuel
+2025-02-11,Cloud services,-409.53,Business Checking,Hosting
+2025-02-11,Invoice paid,6306.31,Checking,Sales Income
+2025-02-11,Fuel,-200.26,Business Checking,Fuel
+2025-02-11,Gas,-160.92,Operating Checking,Fuel
+2025-02-12,Meals,-161.65,Business Checking,Meals
+2025-02-12,Gas,-86.16,Operating Checking,Fuel
+2025-02-12,Marketing,-261.93,Operating Checking,Marketing
+2025-02-12,Invoice paid,4416.4,Business Checking,Sales Income
+2025-02-13,Meals,-40.85,Operating Checking,Meals
+2025-02-13,Ads spend,-520.5,Checking,Marketing
+2025-02-13,Supplies,-391.26,Checking,Supplies
+2025-02-14,Invoice paid,4211.01,Business Checking,Sales Income
+2025-02-14,Payroll,-1209.61,Operating Checking,Payroll
+2025-02-15,Shop supplies,-119.83,Business Checking,Supplies
+2025-02-15,Meals,-15.12,Operating Checking,Meals
+2025-02-15,Invoice paid,1512.12,Checking,Sales Income
+2025-02-15,Insurance premium,-410.14,Business Checking,Insurance
+2025-02-16,Retainer payment,7788.31,Operating Checking,Sales Income
+2025-02-16,Ads spend,-471.76,Business Checking,Marketing
+2025-02-16,Team lunch,-154.07,Business Checking,Meals
+2025-02-16,Shop supplies,-461.52,Business Checking,Supplies
+2025-02-17,Insurance premium,-578.42,Operating Checking,Insurance
+2025-02-17,Materials,-482.53,Business Checking,Supplies
+2025-02-18,Invoice paid,2272.29,Checking,Sales Income
+2025-02-18,Materials,-172.17,Business Checking,Supplies
+2025-02-18,Project deposit,4214.17,Business Checking,Sales Income
+2025-02-18,Hosting,-124.64,Operating Checking,Hosting
+2025-02-19,Retainer payment,7464.05,Business Checking,Sales Income
+2025-02-19,Marketing,-721.57,Business Checking,Marketing
+2025-02-19,Insurance premium,-160.14,Operating Checking,Insurance
+2025-02-19,Insurance premium,-467.44,Operating Checking,Insurance
+2025-02-20,Insurance premium,-276.59,Operating Checking,Insurance
+2025-02-21,Marketing,-519.89,Business Checking,Marketing
+2025-02-21,Ads spend,-428.06,Business Checking,Marketing
+2025-02-21,Retainer payment,2145.53,Checking,Sales Income
+2025-02-21,Wages,-2248.24,Business Checking,Payroll
+2025-02-21,Team lunch,-40.12,Checking,Meals
+2025-02-22,Invoice paid,3949.16,Operating Checking,Sales Income
+2025-02-23,Gas,-224.89,Operating Checking,Fuel
+2025-02-23,Insurance premium,-300.93,Operating Checking,Insurance
+2025-02-24,Client payment,2801.49,Business Checking,Sales Income
+2025-02-26,Shop supplies,-482.18,Checking,Supplies
+2025-02-27,Project deposit,3038.77,Checking,Sales Income
+2025-02-27,Client payment,5629.66,Checking,Sales Income
+2025-02-27,Insurance premium,-610.07,Operating Checking,Insurance
+2025-02-28,Payroll,-3889.45,Business Checking,Payroll
+2025-02-28,Retainer payment,5406.65,Operating Checking,Sales Income
+2025-03-01,Rent,-2312.21,Checking,Rent
+2025-03-02,Client payment,7832.29,Business Checking,Sales Income
+2025-03-03,Project deposit,5355.41,Checking,Sales Income
+2025-03-04,Cloud services,-394.34,Checking,Hosting
+2025-03-04,Insurance premium,-869.41,Business Checking,Insurance
+2025-03-05,Ads spend,-656.15,Operating Checking,Marketing
+2025-03-05,Shop supplies,-446.93,Operating Checking,Supplies
+2025-03-05,Insurance premium,-764.07,Operating Checking,Insurance
+2025-03-06,Invoice paid,8076.72,Operating Checking,Sales Income
+2025-03-07,Wages,-2909.55,Operating Checking,Payroll
+2025-03-07,Project deposit,8066.5,Business Checking,Sales Income
+2025-03-07,Cloud services,-262.89,Checking,Hosting
+2025-03-07,Insurance premium,-285.45,Operating Checking,Insurance
+2025-03-10,Hosting,-114.43,Operating Checking,Hosting
+2025-03-10,Project deposit,3097.78,Operating Checking,Sales Income
+2025-03-10,Project deposit,5517.09,Operating Checking,Sales Income
+2025-03-10,Insurance premium,-553.04,Business Checking,Insurance
+2025-03-10,Insurance premium,-623.8,Operating Checking,Insurance
+2025-03-11,Gas,-221.26,Operating Checking,Fuel
+2025-03-11,Fuel,-96.09,Operating Checking,Fuel
+2025-03-12,Project deposit,5798.78,Checking,Sales Income
+2025-03-12,Project deposit,7694.5,Checking,Sales Income
+2025-03-12,Materials,-149.42,Operating Checking,Supplies
+2025-03-13,Shop supplies,-198.8,Business Checking,Supplies
+2025-03-13,Supplies,-182.73,Business Checking,Supplies
+2025-03-13,Invoice paid,6639.86,Business Checking,Sales Income
+2025-03-14,Client payment,3857.51,Operating Checking,Sales Income
+2025-03-14,Retainer payment,3417.85,Operating Checking,Sales Income
+2025-03-14,Payroll run,-3805.38,Checking,Payroll
+2025-03-15,Software subscription,-293.5,Checking,Hosting
+2025-03-15,Cloud services,-384.18,Operating Checking,Hosting
+2025-03-15,Shop supplies,-110.79,Operating Checking,Supplies
+2025-03-16,Cloud services,-286.49,Business Checking,Hosting
+2025-03-17,Meals,-31.37,Business Checking,Meals
+2025-03-17,Insurance premium,-828.63,Business Checking,Insurance
+2025-03-17,Insurance premium,-358.2,Business Checking,Insurance
+2025-03-18,Marketing,-106.3,Operating Checking,Marketing
+2025-03-18,Meals,-28.4,Checking,Meals
+2025-03-18,Retainer payment,6577.09,Operating Checking,Sales Income
+2025-03-20,Invoice paid,6357.23,Operating Checking,Sales Income
+2025-03-20,Team lunch,-61.65,Checking,Meals
+2025-03-20,Team lunch,-53.51,Business Checking,Meals
+2025-03-20,Invoice paid,2095.26,Business Checking,Sales Income
+2025-03-21,Payroll run,-1646.97,Checking,Payroll
+2025-03-22,Gas,-192.69,Operating Checking,Fuel
+2025-03-23,Team lunch,-65.18,Operating Checking,Meals
+2025-03-23,Ads spend,-454.99,Checking,Marketing
+2025-03-23,Client payment,5908.97,Checking,Sales Income
+2025-03-23,Ads spend,-79.9,Business Checking,Marketing
+2025-03-24,Meals,-152.93,Business Checking,Meals
+2025-03-24,Invoice paid,5694.73,Operating Checking,Sales Income
+2025-03-25,Gas,-83.09,Business Checking,Fuel
+2025-03-25,Insurance premium,-379.98,Checking,Insurance
+2025-03-25,Retainer payment,4410.83,Operating Checking,Sales Income
+2025-03-25,Insurance premium,-875.86,Operating Checking,Insurance
+2025-03-26,Gas,-120.67,Business Checking,Fuel
+2025-03-26,Project deposit,1622.79,Business Checking,Sales Income
+2025-03-26,Software subscription,-323.33,Operating Checking,Hosting
+2025-03-26,Marketing,-77.52,Operating Checking,Marketing
+2025-03-27,Retainer payment,5496.54,Checking,Sales Income
+2025-03-27,Meals,-94.98,Business Checking,Meals
+2025-03-27,Invoice paid,7434.65,Operating Checking,Sales Income
+2025-03-27,Meals,-87.94,Checking,Meals
+2025-03-27,Gas,-180.54,Operating Checking,Fuel
+2025-03-28,Payroll,-1874.1,Operating Checking,Payroll
+2025-03-28,Project deposit,3476.52,Operating Checking,Sales Income
+2025-03-28,Retainer payment,7690.72,Business Checking,Sales Income
+2025-03-29,Materials,-521.82,Operating Checking,Supplies
+2025-03-29,Project deposit,8487.14,Checking,Sales Income
+2025-03-29,Insurance premium,-310.11,Operating Checking,Insurance
+2025-03-29,Shop supplies,-555.07,Business Checking,Supplies
+2025-03-30,Team lunch,-64.26,Checking,Meals
+2025-03-30,Project deposit,4751.69,Checking,Sales Income
+2025-03-30,Insurance premium,-540.09,Operating Checking,Insurance
+2025-03-31,Ads spend,-337.23,Checking,Marketing
+2025-03-31,Retainer payment,7008.7,Operating Checking,Sales Income
+2025-04-01,Rent,-2382.62,Business Checking,Rent
+2025-04-01,Insurance premium,-872.56,Business Checking,Insurance
+2025-04-01,Client payment,3789.56,Operating Checking,Sales Income
+2025-04-01,Retainer payment,1977.75,Checking,Sales Income
+2025-04-02,Insurance premium,-799.33,Checking,Insurance
+2025-04-02,Project deposit,7295.9,Operating Checking,Sales Income
+2025-04-03,Ads spend,-335.01,Business Checking,Marketing
+2025-04-03,Team lunch,-28.25,Business Checking,Meals
+2025-04-03,Team lunch,-161.43,Business Checking,Meals
+2025-04-04,Meals,-131.14,Operating Checking,Meals
+2025-04-04,Materials,-454.39,Checking,Supplies
+2025-04-04,Payroll,-3052.38,Business Checking,Payroll
+2025-04-05,Hosting,-97.02,Operating Checking,Hosting
+2025-04-05,Fuel,-134.33,Checking,Fuel
+2025-04-05,Invoice paid,5614.24,Checking,Sales Income
+2025-04-06,Cloud services,-305.51,Business Checking,Hosting
+2025-04-07,Fuel,-214.57,Checking,Fuel
+2025-04-07,Ads spend,-157.34,Business Checking,Marketing
+2025-04-07,Project deposit,8572.84,Business Checking,Sales Income
+2025-04-07,Fuel,-156.79,Operating Checking,Fuel
+2025-04-08,Team lunch,-56.27,Checking,Meals
+2025-04-08,Insurance premium,-785.6,Checking,Insurance
+2025-04-08,Insurance premium,-566.1,Business Checking,Insurance
+2025-04-08,Retainer payment,1371.13,Operating Checking,Sales Income
+2025-04-09,Client payment,7947.53,Business Checking,Sales Income
+2025-04-09,Project deposit,7012.34,Checking,Sales Income
+2025-04-10,Shop supplies,-391.06,Operating Checking,Supplies
+2025-04-10,Meals,-139.67,Business Checking,Meals
+2025-04-11,Materials,-76.83,Operating Checking,Supplies
+2025-04-11,Project deposit,7334.8,Business Checking,Sales Income
+2025-04-11,Wages,-3910.21,Checking,Payroll
+2025-04-11,Invoice paid,4440.92,Checking,Sales Income
+2025-04-11,Insurance premium,-146.02,Business Checking,Insurance
+2025-04-12,Materials,-172.76,Operating Checking,Supplies
+2025-04-12,Meals,-158.62,Operating Checking,Meals
+2025-04-13,Shop supplies,-519.58,Business Checking,Supplies
+2025-04-13,Project deposit,8744.7,Checking,Sales Income
+2025-04-14,Insurance premium,-761.49,Checking,Insurance
+2025-04-14,Project deposit,8097.03,Business Checking,Sales Income
+2025-04-14,Hosting,-177.85,Operating Checking,Hosting
+2025-04-14,Gas,-213.3,Business Checking,Fuel
+2025-04-14,Client payment,3023.81,Business Checking,Sales Income
+2025-04-15,Client payment,6264.07,Checking,Sales Income
+2025-04-15,Team lunch,-25.43,Business Checking,Meals
+2025-04-17,Materials,-248.47,Business Checking,Supplies
+2025-04-17,Retainer payment,6632.58,Business Checking,Sales Income
+2025-04-17,Insurance premium,-210.57,Business Checking,Insurance
+2025-04-17,Invoice paid,6989.7,Operating Checking,Sales Income
+2025-04-18,Client payment,2680.51,Operating Checking,Sales Income
+2025-04-18,Payroll run,-3164.77,Business Checking,Payroll
+2025-04-18,Cloud services,-442.94,Business Checking,Hosting
+2025-04-18,Retainer payment,3997.66,Operating Checking,Sales Income
+2025-04-18,Insurance premium,-466.86,Operating Checking,Insurance
+2025-04-18,Gas,-43.67,Checking,Fuel
+2025-04-21,Shop supplies,-593.57,Checking,Supplies
+2025-04-21,Invoice paid,2884.42,Operating Checking,Sales Income
+2025-04-21,Software subscription,-387.03,Checking,Hosting
+2025-04-21,Client payment,7240.07,Operating Checking,Sales Income
+2025-04-22,Invoice paid,3994.29,Business Checking,Sales Income
+2025-04-22,Invoice paid,7958.29,Checking,Sales Income
+2025-04-22,Supplies,-335.62,Checking,Supplies
+2025-04-23,Hosting,-144.47,Checking,Hosting
+2025-04-23,Meals,-84.46,Business Checking,Meals
+2025-04-24,Team lunch,-101.04,Business Checking,Meals
+2025-04-24,Insurance premium,-726.85,Operating Checking,Insurance
+2025-04-24,Marketing,-216.16,Business Checking,Marketing
+2025-04-25,Shop supplies,-183.13,Business Checking,Supplies
+2025-04-25,Payroll run,-1382.48,Operating Checking,Payroll
+2025-04-25,Retainer payment,6754.79,Business Checking,Sales Income
+2025-04-25,Team lunch,-32.81,Checking,Meals
+2025-04-25,Hosting,-199.18,Checking,Hosting
+2025-04-25,Retainer payment,5338.34,Business Checking,Sales Income
+2025-04-26,Meals,-159.82,Operating Checking,Meals
+2025-04-26,Client payment,4310.1,Operating Checking,Sales Income
+2025-04-26,Hosting,-373.45,Business Checking,Hosting
+2025-04-26,Insurance premium,-812.71,Operating Checking,Insurance
+2025-04-27,Client payment,7531.8,Business Checking,Sales Income
+2025-04-27,Hosting,-114.5,Business Checking,Hosting
+2025-04-27,Meals,-167.29,Checking,Meals
+2025-04-27,Gas,-211.25,Checking,Fuel
+2025-04-28,Invoice paid,5157.82,Business Checking,Sales Income
+2025-04-28,Team lunch,-35.17,Business Checking,Meals
+2025-04-28,Client payment,3637.1,Business Checking,Sales Income
+2025-04-28,Insurance premium,-797.11,Operating Checking,Insurance
+2025-04-29,Materials,-512.18,Business Checking,Supplies
+2025-04-29,Client payment,6464.82,Business Checking,Sales Income
+2025-04-29,Project deposit,8446.86,Checking,Sales Income
+2025-04-29,Shop supplies,-489.15,Business Checking,Supplies
+2025-04-29,Gas,-65.44,Business Checking,Fuel
+2025-04-30,Invoice paid,1247.63,Business Checking,Sales Income
+2025-04-30,Gas,-221.22,Operating Checking,Fuel
+2025-05-01,Invoice paid,4738.44,Operating Checking,Sales Income
+2025-05-01,Meals,-119.47,Checking,Meals
+2025-05-01,Retainer payment,5337.76,Operating Checking,Sales Income
+2025-05-01,Rent,-1886.02,Checking,Rent
+2025-05-02,Payroll run,-2134.91,Business Checking,Payroll
+2025-05-03,Supplies,-458.8,Business Checking,Supplies
+2025-05-04,Insurance premium,-443.06,Business Checking,Insurance
+2025-05-04,Insurance premium,-636.31,Business Checking,Insurance
+2025-05-05,Invoice paid,8573.53,Operating Checking,Sales Income
+2025-05-05,Insurance premium,-206.49,Business Checking,Insurance
+2025-05-05,Meals,-65.89,Operating Checking,Meals
+2025-05-05,Invoice paid,1627.3,Operating Checking,Sales Income
+2025-05-06,Insurance premium,-257.04,Business Checking,Insurance
+2025-05-06,Project deposit,2994.86,Checking,Sales Income
+2025-05-06,Client payment,4297.16,Operating Checking,Sales Income
+2025-05-06,Gas,-66.8,Business Checking,Fuel
+2025-05-07,Project deposit,8385.07,Business Checking,Sales Income
+2025-05-08,Ads spend,-395.07,Checking,Marketing
+2025-05-08,Invoice paid,7786.98,Operating Checking,Sales Income
+2025-05-08,Ads spend,-353.32,Operating Checking,Marketing
+2025-05-08,Cloud services,-229.86,Checking,Hosting
+2025-05-09,Invoice paid,8674.14,Checking,Sales Income
+2025-05-09,Shop supplies,-68.92,Checking,Supplies
+2025-05-09,Fuel,-232.64,Operating Checking,Fuel
+2025-05-09,Project deposit,2001.88,Checking,Sales Income
+2025-05-09,Ads spend,-432.46,Operating Checking,Marketing
+2025-05-09,Wages,-2966.61,Checking,Payroll
+2025-05-10,Retainer payment,4818.83,Business Checking,Sales Income
+2025-05-10,Marketing,-164.65,Checking,Marketing
+2025-05-11,Insurance premium,-464.92,Operating Checking,Insurance
+2025-05-11,Team lunch,-67.16,Checking,Meals
+2025-05-12,Cloud services,-101.05,Checking,Hosting
+2025-05-12,Client payment,7941.15,Business Checking,Sales Income
+2025-05-12,Retainer payment,5833.82,Operating Checking,Sales Income
+2025-05-12,Ads spend,-105.64,Operating Checking,Marketing
+2025-05-13,Invoice paid,8290.59,Operating Checking,Sales Income
+2025-05-14,Hosting,-266.68,Checking,Hosting
+2025-05-14,Cloud services,-380.06,Business Checking,Hosting
+2025-05-14,Marketing,-163.15,Operating Checking,Marketing
+2025-05-15,Retainer payment,5552.11,Operating Checking,Sales Income
+2025-05-15,Insurance premium,-528.77,Operating Checking,Insurance
+2025-05-15,Fuel,-214.91,Business Checking,Fuel
+2025-05-15,Gas,-278.25,Operating Checking,Fuel
+2025-05-15,Project deposit,3810.26,Checking,Sales Income
+2025-05-16,Retainer payment,8748.03,Checking,Sales Income
+2025-05-16,Fuel,-56.6,Operating Checking,Fuel
+2025-05-16,Wages,-1955.99,Business Checking,Payroll
+2025-05-17,Project deposit,5559.59,Checking,Sales Income
+2025-05-18,Client payment,5166.21,Operating Checking,Sales Income
+2025-05-19,Materials,-571.92,Operating Checking,Supplies
+2025-05-19,Supplies,-155.26,Checking,Supplies
+2025-05-20,Software subscription,-267.85,Business Checking,Hosting
+2025-05-20,Ads spend,-78.31,Business Checking,Marketing
+2025-05-21,Project deposit,5365.29,Operating Checking,Sales Income
+2025-05-21,Fuel,-214.24,Operating Checking,Fuel
+2025-05-21,Retainer payment,3422.44,Checking,Sales Income
+2025-05-21,Supplies,-439.68,Operating Checking,Supplies
+2025-05-21,Shop supplies,-118.29,Business Checking,Supplies
+2025-05-22,Gas,-214.75,Operating Checking,Fuel
+2025-05-22,Retainer payment,7269.37,Checking,Sales Income
+2025-05-23,Wages,-3650.67,Checking,Payroll
+2025-05-23,Cloud services,-317.24,Business Checking,Hosting
+2025-05-23,Invoice paid,1854.23,Operating Checking,Sales Income
+2025-05-23,Software subscription,-343.22,Checking,Hosting
+2025-05-24,Ads spend,-160.51,Checking,Marketing
+2025-05-24,Project deposit,8957.3,Checking,Sales Income
+2025-05-24,Insurance premium,-161.54,Checking,Insurance
+2025-05-24,Materials,-494.6,Checking,Supplies
+2025-05-25,Project deposit,8460.44,Checking,Sales Income
+2025-05-26,Cloud services,-186.15,Business Checking,Hosting
+2025-05-27,Insurance premium,-599.97,Checking,Insurance
+2025-05-27,Fuel,-92.15,Business Checking,Fuel
+2025-05-27,Client payment,3053.59,Checking,Sales Income
+2025-05-27,Team lunch,-115.47,Checking,Meals
+2025-05-28,Insurance premium,-618.38,Checking,Insurance
+2025-05-29,Project deposit,6412.08,Checking,Sales Income
+2025-05-29,Marketing,-452.04,Business Checking,Marketing
+2025-05-29,Supplies,-192.48,Business Checking,Supplies
+2025-05-29,Gas,-98.75,Checking,Fuel
+2025-05-29,Client payment,8636.55,Operating Checking,Sales Income
+2025-05-30,Software subscription,-207.58,Business Checking,Hosting
+2025-05-30,Team lunch,-32.1,Checking,Meals
+2025-05-30,Fuel,-102.22,Operating Checking,Fuel
+2025-05-30,Payroll,-3819.99,Business Checking,Payroll
+2025-05-31,Marketing,-303.91,Business Checking,Marketing
+2025-05-31,Insurance premium,-885.04,Business Checking,Insurance
+2025-06-01,Hosting,-169.72,Checking,Hosting
+2025-06-01,Cloud services,-177.09,Business Checking,Hosting
+2025-06-01,Rent,-1905.52,Checking,Rent
+2025-06-01,Insurance premium,-802.36,Operating Checking,Insurance
+2025-06-02,Project deposit,2997.98,Operating Checking,Sales Income
+2025-06-02,Fuel,-116.64,Business Checking,Fuel
+2025-06-03,Marketing,-225.04,Business Checking,Marketing
+2025-06-03,Materials,-279.29,Operating Checking,Supplies
+2025-06-03,Team lunch,-78.8,Operating Checking,Meals
+2025-06-03,Invoice paid,1634.07,Business Checking,Sales Income
+2025-06-04,Gas,-55.97,Business Checking,Fuel
+2025-06-04,Gas,-104.6,Checking,Fuel
+2025-06-04,Project deposit,6182.24,Business Checking,Sales Income
+2025-06-04,Retainer payment,4196.24,Checking,Sales Income
+2025-06-05,Meals,-114.39,Checking,Meals
+2025-06-05,Invoice paid,1966.13,Business Checking,Sales Income
+2025-06-05,Fuel,-184.01,Checking,Fuel
+2025-06-05,Retainer payment,5840.18,Checking,Sales Income
+2025-06-05,Team lunch,-108.17,Business Checking,Meals
+2025-06-06,Client payment,3691.53,Business Checking,Sales Income
+2025-06-06,Retainer payment,2157.14,Operating Checking,Sales Income
+2025-06-06,Payroll run,-2069.09,Business Checking,Payroll
+2025-06-07,Ads spend,-292.69,Business Checking,Marketing
+2025-06-07,Client payment,2832.27,Checking,Sales Income
+2025-06-08,Invoice paid,6022.35,Business Checking,Sales Income
+2025-06-08,Insurance premium,-471.46,Operating Checking,Insurance
+2025-06-09,Team lunch,-149.6,Checking,Meals
+2025-06-09,Hosting,-117.2,Operating Checking,Hosting
+2025-06-10,Gas,-200.73,Operating Checking,Fuel
+2025-06-10,Cloud services,-341.9,Business Checking,Hosting
+2025-06-10,Shop supplies,-390.86,Business Checking,Supplies
+2025-06-11,Supplies,-431.52,Operating Checking,Supplies
+2025-06-11,Marketing,-196.36,Checking,Marketing
+2025-06-11,Retainer payment,5097.39,Business Checking,Sales Income
+2025-06-11,Client payment,1990.99,Checking,Sales Income
+2025-06-12,Retainer payment,5589.22,Operating Checking,Sales Income
+2025-06-12,Insurance premium,-809.72,Business Checking,Insurance
+2025-06-12,Insurance premium,-647.95,Checking,Insurance
+2025-06-13,Supplies,-246.38,Checking,Supplies
+2025-06-13,Invoice paid,3345.08,Operating Checking,Sales Income
+2025-06-13,Invoice paid,2154.17,Checking,Sales Income
+2025-06-13,Payroll run,-2916.29,Checking,Payroll
+2025-06-14,Software subscription,-155.45,Business Checking,Hosting
+2025-06-14,Gas,-61.35,Business Checking,Fuel
+2025-06-15,Marketing,-680.58,Checking,Marketing
+2025-06-15,Client payment,6994.56,Checking,Sales Income
+2025-06-17,Team lunch,-44.81,Business Checking,Meals
+2025-06-17,Team lunch,-18.0,Business Checking,Meals
+2025-06-17,Retainer payment,4470.27,Operating Checking,Sales Income
+2025-06-18,Hosting,-301.31,Operating Checking,Hosting
+2025-06-18,Insurance premium,-447.94,Operating Checking,Insurance
+2025-06-18,Ads spend,-141.98,Business Checking,Marketing
+2025-06-18,Invoice paid,7927.13,Operating Checking,Sales Income
+2025-06-19,Client payment,2777.0,Operating Checking,Sales Income
+2025-06-20,Payroll,-2293.91,Checking,Payroll
+2025-06-20,Retainer payment,7716.6,Checking,Sales Income
+2025-06-21,Gas,-254.2,Checking,Fuel
+2025-06-22,Insurance premium,-786.61,Business Checking,Insurance
+2025-06-22,Project deposit,1421.58,Operating Checking,Sales Income
+2025-06-22,Cloud services,-101.99,Business Checking,Hosting
+2025-06-22,Ads spend,-360.1,Operating Checking,Marketing
+2025-06-23,Shop supplies,-479.17,Operating Checking,Supplies
+2025-06-23,Project deposit,5023.95,Business Checking,Sales Income
+2025-06-23,Fuel,-159.5,Operating Checking,Fuel
+2025-06-23,Retainer payment,3105.98,Business Checking,Sales Income
+2025-06-23,Insurance premium,-364.89,Checking,Insurance
+2025-06-24,Client payment,3897.74,Checking,Sales Income
+2025-06-24,Cloud services,-203.17,Business Checking,Hosting
+2025-06-24,Fuel,-211.56,Business Checking,Fuel
+2025-06-24,Project deposit,1353.18,Operating Checking,Sales Income
+2025-06-24,Marketing,-233.81,Checking,Marketing
+2025-06-25,Insurance premium,-803.41,Business Checking,Insurance
+2025-06-25,Gas,-253.63,Checking,Fuel
+2025-06-25,Shop supplies,-336.24,Checking,Supplies
+2025-06-25,Retainer payment,4641.35,Business Checking,Sales Income
+2025-06-26,Team lunch,-29.78,Business Checking,Meals
+2025-06-26,Insurance premium,-680.66,Operating Checking,Insurance
+2025-06-26,Client payment,6673.22,Business Checking,Sales Income
+2025-06-27,Team lunch,-21.13,Checking,Meals
+2025-06-27,Invoice paid,6848.06,Checking,Sales Income
+2025-06-27,Retainer payment,5495.76,Checking,Sales Income
+2025-06-27,Wages,-2361.39,Business Checking,Payroll
+2025-06-29,Invoice paid,3282.12,Operating Checking,Sales Income
+2025-06-30,Invoice paid,1517.21,Business Checking,Sales Income
+2025-06-30,Project deposit,2535.54,Business Checking,Sales Income
+2025-06-30,Insurance premium,-460.28,Business Checking,Insurance
+2025-07-01,Rent,-1455.8,Operating Checking,Rent
+2025-07-01,Ads spend,-284.14,Business Checking,Marketing
+2025-07-01,Shop supplies,-260.38,Operating Checking,Supplies
+2025-07-01,Invoice paid,2429.69,Operating Checking,Sales Income
+2025-07-02,Team lunch,-44.28,Operating Checking,Meals
+2025-07-02,Project deposit,3528.6,Operating Checking,Sales Income
+2025-07-02,Materials,-509.72,Operating Checking,Supplies
+2025-07-03,Invoice paid,6825.01,Operating Checking,Sales Income
+2025-07-03,Retainer payment,5829.89,Operating Checking,Sales Income
+2025-07-04,Materials,-450.97,Business Checking,Supplies
+2025-07-04,Client payment,2986.78,Business Checking,Sales Income
+2025-07-04,Wages,-1193.58,Checking,Payroll
+2025-07-04,Invoice paid,6281.05,Checking,Sales Income
+2025-07-04,Insurance premium,-568.49,Checking,Insurance
+2025-07-06,Cloud services,-105.37,Business Checking,Hosting
+2025-07-06,Invoice paid,1785.83,Checking,Sales Income
+2025-07-07,Client payment,3083.62,Checking,Sales Income
+2025-07-07,Insurance premium,-566.33,Operating Checking,Insurance
+2025-07-07,Project deposit,2480.18,Operating Checking,Sales Income
+2025-07-08,Marketing,-543.61,Checking,Marketing
+2025-07-08,Invoice paid,7273.36,Checking,Sales Income
+2025-07-09,Insurance premium,-238.79,Checking,Insurance
+2025-07-09,Software subscription,-171.36,Checking,Hosting
+2025-07-09,Gas,-99.37,Checking,Fuel
+2025-07-09,Retainer payment,3401.4,Business Checking,Sales Income
+2025-07-09,Invoice paid,4365.51,Checking,Sales Income
+2025-07-10,Retainer payment,7090.15,Operating Checking,Sales Income
+2025-07-10,Client payment,4697.27,Operating Checking,Sales Income
+2025-07-10,Marketing,-500.22,Checking,Marketing
+2025-07-10,Team lunch,-41.15,Operating Checking,Meals
+2025-07-11,Insurance premium,-273.34,Operating Checking,Insurance
+2025-07-11,Retainer payment,5767.86,Operating Checking,Sales Income
+2025-07-11,Fuel,-254.69,Operating Checking,Fuel
+2025-07-11,Invoice paid,3604.06,Checking,Sales Income
+2025-07-11,Fuel,-170.42,Operating Checking,Fuel
+2025-07-11,Payroll,-2886.99,Checking,Payroll
+2025-07-12,Insurance premium,-589.62,Business Checking,Insurance
+2025-07-13,Insurance premium,-215.54,Operating Checking,Insurance
+2025-07-13,Fuel,-178.09,Checking,Fuel
+2025-07-13,Invoice paid,6396.6,Checking,Sales Income
+2025-07-14,Project deposit,4216.17,Checking,Sales Income
+2025-07-14,Client payment,7519.06,Checking,Sales Income
+2025-07-15,Invoice paid,4181.72,Business Checking,Sales Income
+2025-07-15,Client payment,5173.7,Business Checking,Sales Income
+2025-07-15,Marketing,-407.25,Operating Checking,Marketing
+2025-07-16,Software subscription,-222.99,Operating Checking,Hosting
+2025-07-16,Gas,-204.0,Operating Checking,Fuel
+2025-07-16,Insurance premium,-503.87,Business Checking,Insurance
+2025-07-17,Retainer payment,8002.68,Checking,Sales Income
+2025-07-17,Client payment,1527.59,Checking,Sales Income
+2025-07-17,Ads spend,-94.29,Operating Checking,Marketing
+2025-07-18,Gas,-59.79,Business Checking,Fuel
+2025-07-18,Payroll,-1855.14,Checking,Payroll
+2025-07-18,Gas,-268.3,Operating Checking,Fuel
+2025-07-18,Insurance premium,-371.7,Business Checking,Insurance
+2025-07-19,Invoice paid,4814.17,Checking,Sales Income
+2025-07-19,Cloud services,-323.81,Operating Checking,Hosting
+2025-07-20,Marketing,-562.09,Checking,Marketing
+2025-07-20,Software subscription,-82.73,Operating Checking,Hosting
+2025-07-20,Fuel,-68.5,Business Checking,Fuel
+2025-07-22,Client payment,5276.45,Checking,Sales Income
+2025-07-23,Invoice paid,4161.52,Checking,Sales Income
+2025-07-24,Marketing,-715.6,Business Checking,Marketing
+2025-07-24,Project deposit,3318.7,Checking,Sales Income
+2025-07-24,Invoice paid,3198.39,Business Checking,Sales Income
+2025-07-25,Project deposit,1409.13,Business Checking,Sales Income
+2025-07-25,Payroll run,-2487.38,Operating Checking,Payroll
+2025-07-25,Materials,-346.45,Business Checking,Supplies
+2025-07-25,Software subscription,-257.39,Business Checking,Hosting
+2025-07-26,Insurance premium,-277.16,Operating Checking,Insurance
+2025-07-26,Supplies,-177.69,Business Checking,Supplies
+2025-07-26,Ads spend,-260.15,Operating Checking,Marketing
+2025-07-27,Invoice paid,1729.1,Checking,Sales Income
+2025-07-27,Marketing,-135.51,Operating Checking,Marketing
+2025-07-27,Supplies,-193.41,Operating Checking,Supplies
+2025-07-27,Cloud services,-259.27,Business Checking,Hosting
+2025-07-28,Shop supplies,-438.91,Business Checking,Supplies
+2025-07-28,Project deposit,7183.71,Operating Checking,Sales Income
+2025-07-28,Retainer payment,5003.13,Checking,Sales Income
+2025-07-28,Insurance premium,-580.92,Checking,Insurance
+2025-07-30,Team lunch,-30.92,Checking,Meals
+2025-07-30,Project deposit,7504.19,Operating Checking,Sales Income
+2025-07-30,Invoice paid,5322.9,Operating Checking,Sales Income
+2025-07-31,Insurance premium,-482.62,Operating Checking,Insurance
+2025-07-31,Project deposit,7498.6,Operating Checking,Sales Income
+2025-07-31,Gas,-117.28,Operating Checking,Fuel
+2025-07-31,Software subscription,-339.34,Operating Checking,Hosting
+2025-08-01,Project deposit,4414.16,Operating Checking,Sales Income
+2025-08-01,Retainer payment,5390.16,Business Checking,Sales Income
+2025-08-01,Supplies,-151.59,Operating Checking,Supplies
+2025-08-01,Wages,-2685.97,Checking,Payroll
+2025-08-01,Rent,-2213.07,Checking,Rent
+2025-08-01,Ads spend,-826.18,Operating Checking,Marketing
+2025-08-02,Team lunch,-132.97,Operating Checking,Meals
+2025-08-02,Materials,-483.1,Checking,Supplies
+2025-08-02,Materials,-490.98,Checking,Supplies
+2025-08-05,Retainer payment,925.9,Checking,Sales Income
+2025-08-05,Supplies,-560.41,Checking,Supplies
+2025-08-05,Insurance premium,-452.21,Business Checking,Insurance
+2025-08-05,Meals,-43.91,Business Checking,Meals
+2025-08-06,Retainer payment,3582.1,Checking,Sales Income
+2025-08-06,Project deposit,4783.17,Checking,Sales Income
+2025-08-08,Gas,-116.43,Checking,Fuel
+2025-08-08,Payroll,-3050.47,Checking,Payroll
+2025-08-08,Gas,-318.14,Business Checking,Fuel
+2025-08-09,Fuel,-237.9,Business Checking,Fuel
+2025-08-10,Retainer payment,2910.78,Checking,Sales Income
+2025-08-11,Retainer payment,1775.75,Operating Checking,Sales Income
+2025-08-11,Project deposit,4361.19,Business Checking,Sales Income
+2025-08-12,Retainer payment,5760.95,Operating Checking,Sales Income
+2025-08-12,Invoice paid,5858.57,Checking,Sales Income
+2025-08-14,Fuel,-43.06,Business Checking,Fuel
+2025-08-14,Marketing,-519.9,Checking,Marketing
+2025-08-15,Wages,-3802.44,Operating Checking,Payroll
+2025-08-15,Invoice paid,1726.98,Business Checking,Sales Income
+2025-08-16,Meals,-193.34,Checking,Meals
+2025-08-16,Meals,-41.9,Business Checking,Meals
+2025-08-16,Team lunch,-179.22,Operating Checking,Meals
+2025-08-16,Client payment,2107.51,Operating Checking,Sales Income
+2025-08-17,Insurance premium,-327.74,Operating Checking,Insurance
+2025-08-17,Shop supplies,-457.41,Operating Checking,Supplies
+2025-08-17,Gas,-47.14,Operating Checking,Fuel
+2025-08-18,Project deposit,2967.34,Checking,Sales Income
+2025-08-18,Supplies,-478.54,Operating Checking,Supplies
+2025-08-18,Project deposit,1339.7,Operating Checking,Sales Income
+2025-08-18,Shop supplies,-267.85,Checking,Supplies
+2025-08-19,Insurance premium,-517.11,Checking,Insurance
+2025-08-19,Fuel,-68.3,Checking,Fuel
+2025-08-20,Project deposit,3866.04,Operating Checking,Sales Income
+2025-08-21,Client payment,3099.4,Business Checking,Sales Income
+2025-08-22,Invoice paid,2305.5,Checking,Sales Income
+2025-08-22,Meals,-85.6,Operating Checking,Meals
+2025-08-22,Payroll,-4293.75,Business Checking,Payroll
+2025-08-23,Insurance premium,-368.78,Operating Checking,Insurance
+2025-08-24,Gas,-313.74,Business Checking,Fuel
+2025-08-24,Marketing,-216.33,Checking,Marketing
+2025-08-24,Retainer payment,876.95,Operating Checking,Sales Income
+2025-08-25,Team lunch,-52.95,Checking,Meals
+2025-08-25,Ads spend,-167.3,Business Checking,Marketing
+2025-08-25,Project deposit,6129.24,Business Checking,Sales Income
+2025-08-25,Gas,-166.82,Business Checking,Fuel
+2025-08-26,Client payment,1822.4,Business Checking,Sales Income
+2025-08-26,Gas,-276.51,Operating Checking,Fuel
+2025-08-26,Hosting,-467.35,Business Checking,Hosting
+2025-08-26,Ads spend,-700.13,Operating Checking,Marketing
+2025-08-26,Invoice paid,3360.46,Operating Checking,Sales Income
+2025-08-27,Retainer payment,4436.3,Operating Checking,Sales Income
+2025-08-27,Team lunch,-29.05,Business Checking,Meals
+2025-08-27,Insurance premium,-251.42,Checking,Insurance
+2025-08-28,Retainer payment,6249.23,Business Checking,Sales Income
+2025-08-29,Materials,-443.43,Checking,Supplies
+2025-08-29,Wages,-2642.66,Business Checking,Payroll
+2025-08-29,Ads spend,-85.33,Business Checking,Marketing
+2025-08-29,Retainer payment,4185.22,Operating Checking,Sales Income
+2025-08-29,Marketing,-544.9,Checking,Marketing
+2025-08-29,Retainer payment,6112.81,Checking,Sales Income
+2025-08-31,Shop supplies,-350.5,Business Checking,Supplies
+2025-08-31,Invoice paid,2975.59,Operating Checking,Sales Income
+2025-08-31,Marketing,-622.32,Operating Checking,Marketing
+2025-09-01,Rent,-2396.55,Operating Checking,Rent
+2025-09-01,Client payment,4444.61,Checking,Sales Income
+2025-09-02,Gas,-117.65,Checking,Fuel
+2025-09-02,Retainer payment,4617.69,Operating Checking,Sales Income
+2025-09-02,Retainer payment,4966.82,Checking,Sales Income
+2025-09-03,Client payment,1548.53,Checking,Sales Income
+2025-09-04,Meals,-33.04,Business Checking,Meals
+2025-09-04,Retainer payment,5566.82,Checking,Sales Income
+2025-09-04,Shop supplies,-321.7,Checking,Supplies
+2025-09-05,Invoice paid,5990.03,Operating Checking,Sales Income
+2025-09-05,Retainer payment,5819.18,Checking,Sales Income
+2025-09-05,Wages,-3593.27,Checking,Payroll
+2025-09-05,Team lunch,-123.46,Checking,Meals
+2025-09-06,Shop supplies,-185.05,Checking,Supplies
+2025-09-07,Gas,-121.39,Checking,Fuel
+2025-09-07,Retainer payment,6431.47,Business Checking,Sales Income
+2025-09-08,Ads spend,-341.48,Business Checking,Marketing
+2025-09-08,Cloud services,-208.73,Business Checking,Hosting
+2025-09-09,Marketing,-492.63,Operating Checking,Marketing
+2025-09-09,Hosting,-168.27,Checking,Hosting
+2025-09-09,Retainer payment,6608.81,Operating Checking,Sales Income
+2025-09-10,Invoice paid,5391.56,Business Checking,Sales Income
+2025-09-10,Marketing,-337.78,Operating Checking,Marketing
+2025-09-10,Project deposit,2501.55,Checking,Sales Income
+2025-09-11,Fuel,-258.13,Operating Checking,Fuel
+2025-09-12,Insurance premium,-501.19,Business Checking,Insurance
+2025-09-12,Hosting,-374.48,Operating Checking,Hosting
+2025-09-12,Insurance premium,-654.06,Business Checking,Insurance
+2025-09-12,Payroll,-2653.83,Operating Checking,Payroll
+2025-09-13,Supplies,-334.12,Operating Checking,Supplies
+2025-09-13,Ads spend,-606.89,Business Checking,Marketing
+2025-09-14,Project deposit,7245.88,Business Checking,Sales Income
+2025-09-15,Invoice paid,1998.85,Operating Checking,Sales Income
+2025-09-15,Invoice paid,4642.66,Operating Checking,Sales Income
+2025-09-16,Client payment,3249.96,Operating Checking,Sales Income
+2025-09-18,Team lunch,-112.01,Business Checking,Meals
+2025-09-18,Invoice paid,6135.61,Business Checking,Sales Income
+2025-09-18,Invoice paid,2286.03,Checking,Sales Income
+2025-09-19,Project deposit,8366.4,Business Checking,Sales Income
+2025-09-19,Gas,-111.67,Business Checking,Fuel
+2025-09-19,Invoice paid,7558.41,Operating Checking,Sales Income
+2025-09-19,Wages,-3616.32,Operating Checking,Payroll
+2025-09-19,Ads spend,-454.08,Business Checking,Marketing
+2025-09-20,Retainer payment,7662.16,Operating Checking,Sales Income
+2025-09-20,Meals,-157.9,Checking,Meals
+2025-09-21,Client payment,1789.03,Operating Checking,Sales Income
+2025-09-21,Ads spend,-524.3,Operating Checking,Marketing
+2025-09-22,Team lunch,-169.5,Operating Checking,Meals
+2025-09-22,Insurance premium,-375.29,Business Checking,Insurance
+2025-09-23,Retainer payment,5707.88,Operating Checking,Sales Income
+2025-09-23,Team lunch,-124.58,Checking,Meals
+2025-09-23,Insurance premium,-329.46,Operating Checking,Insurance
+2025-09-23,Client payment,8174.41,Checking,Sales Income
+2025-09-23,Ads spend,-348.29,Checking,Marketing
+2025-09-24,Retainer payment,7314.34,Checking,Sales Income
+2025-09-24,Invoice paid,2169.05,Operating Checking,Sales Income
+2025-09-25,Team lunch,-165.05,Checking,Meals
+2025-09-25,Cloud services,-446.98,Checking,Hosting
+2025-09-25,Gas,-59.74,Operating Checking,Fuel
+2025-09-26,Invoice paid,6079.71,Operating Checking,Sales Income
+2025-09-26,Wages,-2315.53,Checking,Payroll
+2025-09-29,Meals,-88.44,Business Checking,Meals
+2025-09-29,Gas,-251.53,Business Checking,Fuel
+2025-09-29,Hosting,-129.1,Business Checking,Hosting
+2025-09-30,Supplies,-245.06,Business Checking,Supplies
+2025-09-30,Client payment,2314.25,Business Checking,Sales Income
+2025-09-30,Hosting,-164.71,Business Checking,Hosting
+2025-09-30,Cloud services,-118.18,Operating Checking,Hosting
+2025-09-30,Retainer payment,6270.16,Operating Checking,Sales Income
+2025-10-01,Rent,-1983.65,Business Checking,Rent
+2025-10-01,Insurance premium,-600.54,Checking,Insurance
+2025-10-03,Ads spend,-500.75,Business Checking,Marketing
+2025-10-03,Gas,-290.26,Checking,Fuel
+2025-10-03,Supplies,-184.26,Checking,Supplies
+2025-10-03,Wages,-3457.34,Business Checking,Payroll
+2025-10-04,Shop supplies,-322.71,Checking,Supplies
+2025-10-04,Invoice paid,4209.91,Operating Checking,Sales Income
+2025-10-04,Meals,-79.64,Checking,Meals
+2025-10-06,Gas,-69.98,Operating Checking,Fuel
+2025-10-06,Ads spend,-562.21,Checking,Marketing
+2025-10-08,Supplies,-47.9,Operating Checking,Supplies
+2025-10-08,Client payment,1852.06,Business Checking,Sales Income
+2025-10-08,Invoice paid,4337.76,Operating Checking,Sales Income
+2025-10-08,Ads spend,-264.87,Operating Checking,Marketing
+2025-10-09,Materials,-333.42,Business Checking,Supplies
+2025-10-09,Client payment,7153.15,Operating Checking,Sales Income
+2025-10-09,Invoice paid,6649.67,Checking,Sales Income
+2025-10-10,Meals,-123.58,Checking,Meals
+2025-10-10,Software subscription,-341.92,Checking,Hosting
+2025-10-10,Ads spend,-506.62,Business Checking,Marketing
+2025-10-10,Payroll run,-1933.44,Checking,Payroll
+2025-10-11,Gas,-173.6,Checking,Fuel
+2025-10-11,Hosting,-365.43,Operating Checking,Hosting
+2025-10-11,Gas,-68.64,Business Checking,Fuel
+2025-10-11,Client payment,3321.45,Operating Checking,Sales Income
+2025-10-12,Project deposit,4750.54,Checking,Sales Income
+2025-10-13,Marketing,-175.16,Operating Checking,Marketing
+2025-10-13,Software subscription,-410.88,Business Checking,Hosting
+2025-10-13,Software subscription,-164.51,Checking,Hosting
+2025-10-15,Invoice paid,4039.02,Checking,Sales Income
+2025-10-16,Retainer payment,7464.3,Checking,Sales Income
+2025-10-16,Retainer payment,3710.06,Business Checking,Sales Income
+2025-10-17,Payroll,-2159.81,Business Checking,Payroll
+2025-10-17,Hosting,-265.76,Checking,Hosting
+2025-10-17,Supplies,-487.49,Operating Checking,Supplies
+2025-10-18,Hosting,-284.64,Operating Checking,Hosting
+2025-10-18,Gas,-239.98,Operating Checking,Fuel
+2025-10-18,Materials,-192.67,Business Checking,Supplies
+2025-10-19,Gas,-191.8,Checking,Fuel
+2025-10-19,Client payment,6160.35,Operating Checking,Sales Income
+2025-10-19,Meals,-163.57,Checking,Meals
+2025-10-19,Hosting,-424.99,Checking,Hosting
+2025-10-20,Invoice paid,2800.52,Operating Checking,Sales Income
+2025-10-20,Project deposit,4134.94,Checking,Sales Income
+2025-10-21,Fuel,-59.65,Business Checking,Fuel
+2025-10-21,Retainer payment,2241.41,Checking,Sales Income
+2025-10-21,Hosting,-439.85,Business Checking,Hosting
+2025-10-21,Client payment,1862.24,Business Checking,Sales Income
+2025-10-21,Insurance premium,-666.66,Operating Checking,Insurance
+2025-10-22,Invoice paid,6367.06,Checking,Sales Income
+2025-10-23,Team lunch,-68.83,Operating Checking,Meals
+2025-10-23,Gas,-260.49,Business Checking,Fuel
+2025-10-24,Payroll,-1424.06,Checking,Payroll
+2025-10-26,Fuel,-157.79,Checking,Fuel
+2025-10-26,Fuel,-290.63,Operating Checking,Fuel
+2025-10-26,Insurance premium,-364.95,Business Checking,Insurance
+2025-10-27,Project deposit,5204.99,Operating Checking,Sales Income
+2025-10-27,Meals,-129.98,Checking,Meals
+2025-10-27,Fuel,-74.31,Operating Checking,Fuel
+2025-10-28,Invoice paid,1994.88,Checking,Sales Income
+2025-10-28,Client payment,5490.94,Operating Checking,Sales Income
+2025-10-28,Cloud services,-432.28,Business Checking,Hosting
+2025-10-30,Client payment,5771.73,Checking,Sales Income
+2025-10-30,Client payment,6116.32,Business Checking,Sales Income
+2025-10-30,Materials,-138.93,Operating Checking,Supplies
+2025-10-31,Ads spend,-374.87,Operating Checking,Marketing
+2025-10-31,Hosting,-428.64,Checking,Hosting
+2025-10-31,Payroll,-4191.48,Business Checking,Payroll
+2025-10-31,Materials,-77.89,Checking,Supplies
+2025-11-01,Invoice paid,5848.61,Checking,Sales Income
+2025-11-01,Rent,-1842.62,Operating Checking,Rent
+2025-11-01,Fuel,-114.87,Operating Checking,Fuel
+2025-11-02,Project deposit,2094.55,Operating Checking,Sales Income
+2025-11-02,Team lunch,-79.62,Business Checking,Meals
+2025-11-03,Insurance premium,-344.47,Business Checking,Insurance
+2025-11-03,Retainer payment,9249.75,Business Checking,Sales Income
+2025-11-03,Retainer payment,5001.34,Operating Checking,Sales Income
+2025-11-04,Invoice paid,6661.96,Checking,Sales Income
+2025-11-04,Ads spend,-267.83,Checking,Marketing
+2025-11-04,Insurance premium,-413.67,Operating Checking,Insurance
+2025-11-06,Retainer payment,9753.42,Operating Checking,Sales Income
+2025-11-06,Fuel,-220.53,Checking,Fuel
+2025-11-06,Invoice paid,10618.26,Checking,Sales Income
+2025-11-07,Ads spend,-88.94,Business Checking,Marketing
+2025-11-07,Payroll run,-2387.07,Business Checking,Payroll
+2025-11-07,Marketing,-195.72,Operating Checking,Marketing
+2025-11-07,Invoice paid,2380.01,Business Checking,Sales Income
+2025-11-07,Retainer payment,4513.27,Checking,Sales Income
+2025-11-08,Hosting,-343.48,Operating Checking,Hosting
+2025-11-09,Gas,-281.24,Checking,Fuel
+2025-11-10,Client payment,9891.53,Operating Checking,Sales Income
+2025-11-10,Marketing,-723.15,Checking,Marketing
+2025-11-10,Retainer payment,8369.25,Business Checking,Sales Income
+2025-11-11,Invoice paid,4442.21,Checking,Sales Income
+2025-11-12,Team lunch,-216.89,Checking,Meals
+2025-11-12,Meals,-140.22,Operating Checking,Meals
+2025-11-12,Project deposit,8656.45,Checking,Sales Income
+2025-11-12,Team lunch,-218.55,Checking,Meals
+2025-11-13,Team lunch,-19.12,Business Checking,Meals
+2025-11-14,Invoice paid,8767.1,Operating Checking,Sales Income
+2025-11-14,Payroll run,-2182.81,Business Checking,Payroll
+2025-11-14,Team lunch,-135.39,Checking,Meals
+2025-11-15,Supplies,-488.51,Business Checking,Supplies
+2025-11-15,Team lunch,-150.56,Operating Checking,Meals
+2025-11-16,Supplies,-210.61,Operating Checking,Supplies
+2025-11-16,Fuel,-304.45,Checking,Fuel
+2025-11-16,Retainer payment,5772.65,Checking,Sales Income
+2025-11-17,Meals,-175.14,Checking,Meals
+2025-11-17,Client payment,2218.67,Operating Checking,Sales Income
+2025-11-17,Insurance premium,-248.89,Business Checking,Insurance
+2025-11-17,Insurance premium,-1009.73,Business Checking,Insurance
+2025-11-18,Client payment,4046.0,Checking,Sales Income
+2025-11-19,Hosting,-353.01,Operating Checking,Hosting
+2025-11-19,Invoice paid,1802.18,Business Checking,Sales Income
+2025-11-19,Retainer payment,11106.44,Business Checking,Sales Income
+2025-11-19,Supplies,-669.45,Business Checking,Supplies
+2025-11-20,Materials,-69.74,Checking,Supplies
+2025-11-20,Shop supplies,-325.42,Business Checking,Supplies
+2025-11-20,Team lunch,-130.15,Operating Checking,Meals
+2025-11-21,Software subscription,-236.23,Business Checking,Hosting
+2025-11-21,Payroll run,-1859.68,Business Checking,Payroll
+2025-11-21,Supplies,-70.43,Operating Checking,Supplies
+2025-11-21,Marketing,-512.81,Checking,Marketing
+2025-11-22,Meals,-78.94,Operating Checking,Meals
+2025-11-23,Retainer payment,5101.67,Checking,Sales Income
+2025-11-23,Insurance premium,-609.17,Checking,Insurance
+2025-11-23,Meals,-130.98,Operating Checking,Meals
+2025-11-24,Marketing,-120.29,Checking,Marketing
+2025-11-24,Retainer payment,4851.97,Business Checking,Sales Income
+2025-11-24,Insurance premium,-603.43,Operating Checking,Insurance
+2025-11-24,Client payment,3718.25,Operating Checking,Sales Income
+2025-11-25,Invoice paid,3185.57,Checking,Sales Income
+2025-11-25,Supplies,-373.56,Operating Checking,Supplies
+2025-11-25,Ads spend,-706.63,Business Checking,Marketing
+2025-11-25,Meals,-25.91,Checking,Meals
+2025-11-26,Invoice paid,3468.71,Business Checking,Sales Income
+2025-11-26,Supplies,-61.92,Business Checking,Supplies
+2025-11-27,Insurance premium,-692.46,Operating Checking,Insurance
+2025-11-27,Retainer payment,7574.81,Checking,Sales Income
+2025-11-27,Client payment,5967.03,Business Checking,Sales Income
+2025-11-27,Fuel,-345.45,Checking,Fuel
+2025-11-28,Payroll,-3054.16,Business Checking,Payroll
+2025-11-29,Project deposit,9957.88,Operating Checking,Sales Income
+2025-11-30,Insurance premium,-788.42,Checking,Insurance
+2025-11-30,Project deposit,1878.13,Business Checking,Sales Income
+2025-11-30,Supplies,-229.2,Business Checking,Supplies
+2025-12-01,Retainer payment,10998.64,Operating Checking,Sales Income
+2025-12-01,Gas,-146.75,Business Checking,Fuel
+2025-12-01,Rent,-1570.46,Business Checking,Rent
+2025-12-01,Meals,-39.01,Checking,Meals
+2025-12-01,Fuel,-340.89,Operating Checking,Fuel
+2025-12-02,Project deposit,8905.06,Checking,Sales Income
+2025-12-02,Insurance premium,-356.11,Business Checking,Insurance
+2025-12-02,Meals,-104.71,Checking,Meals
+2025-12-03,Software subscription,-243.89,Operating Checking,Hosting
+2025-12-05,Cloud services,-311.11,Business Checking,Hosting
+2025-12-05,Payroll,-2222.86,Checking,Payroll
+2025-12-06,Gas,-316.54,Business Checking,Fuel
+2025-12-06,Invoice paid,7291.93,Operating Checking,Sales Income
+2025-12-06,Hosting,-415.04,Operating Checking,Hosting
+2025-12-07,Meals,-37.39,Operating Checking,Meals
+2025-12-07,Gas,-97.91,Business Checking,Fuel
+2025-12-08,Invoice paid,3694.84,Operating Checking,Sales Income
+2025-12-08,Client payment,7852.98,Business Checking,Sales Income
+2025-12-08,Marketing,-793.59,Checking,Marketing
+2025-12-09,Invoice paid,10387.28,Business Checking,Sales Income
+2025-12-11,Ads spend,-817.27,Business Checking,Marketing
+2025-12-11,Team lunch,-151.32,Operating Checking,Meals
+2025-12-11,Invoice paid,5975.23,Operating Checking,Sales Income
+2025-12-12,Project deposit,7745.8,Operating Checking,Sales Income
+2025-12-12,Ads spend,-158.42,Business Checking,Marketing
+2025-12-12,Team lunch,-141.22,Operating Checking,Meals
+2025-12-12,Wages,-2633.04,Business Checking,Payroll
+2025-12-12,Meals,-41.05,Operating Checking,Meals
+2025-12-13,Ads spend,-441.34,Business Checking,Marketing
+2025-12-13,Supplies,-139.01,Checking,Supplies
+2025-12-14,Project deposit,11225.32,Operating Checking,Sales Income
+2025-12-15,Team lunch,-165.88,Business Checking,Meals
+2025-12-15,Project deposit,2747.46,Business Checking,Sales Income
+2025-12-15,Insurance premium,-868.31,Operating Checking,Insurance
+2025-12-15,Fuel,-211.8,Business Checking,Fuel
+2025-12-15,Client payment,3266.07,Operating Checking,Sales Income
+2025-12-16,Meals,-204.29,Checking,Meals
+2025-12-16,Project deposit,3677.45,Operating Checking,Sales Income
+2025-12-17,Gas,-130.06,Operating Checking,Fuel
+2025-12-17,Client payment,10171.9,Business Checking,Sales Income
+2025-12-17,Client payment,10706.93,Operating Checking,Sales Income
+2025-12-17,Software subscription,-317.62,Business Checking,Hosting
+2025-12-18,Invoice paid,9908.34,Checking,Sales Income
+2025-12-18,Materials,-744.5,Operating Checking,Supplies
+2025-12-18,Ads spend,-899.54,Checking,Marketing
+2025-12-18,Marketing,-342.21,Checking,Marketing
+2025-12-19,Wages,-3328.43,Checking,Payroll
+2025-12-19,Supplies,-578.36,Business Checking,Supplies
+2025-12-19,Team lunch,-30.72,Operating Checking,Meals
+2025-12-20,Insurance premium,-543.31,Operating Checking,Insurance
+2025-12-20,Project deposit,10763.17,Business Checking,Sales Income
+2025-12-20,Cloud services,-159.85,Business Checking,Hosting
+2025-12-20,Hosting,-117.45,Business Checking,Hosting
+2025-12-21,Software subscription,-413.0,Business Checking,Hosting
+2025-12-22,Team lunch,-199.63,Checking,Meals
+2025-12-23,Marketing,-614.38,Checking,Marketing
+2025-12-23,Project deposit,11205.86,Operating Checking,Sales Income
+2025-12-23,Cloud services,-237.92,Operating Checking,Hosting
+2025-12-23,Invoice paid,5002.7,Checking,Sales Income
+2025-12-23,Team lunch,-126.06,Operating Checking,Meals
+2025-12-24,Software subscription,-205.64,Checking,Hosting
+2025-12-24,Shop supplies,-119.77,Business Checking,Supplies
+2025-12-24,Shop supplies,-558.87,Business Checking,Supplies
+2025-12-25,Cloud services,-419.01,Operating Checking,Hosting
+2025-12-25,Meals,-71.51,Business Checking,Meals
+2025-12-25,Software subscription,-406.16,Checking,Hosting
+2025-12-25,Project deposit,2705.05,Operating Checking,Sales Income
+2025-12-26,Payroll,-4132.01,Business Checking,Payroll
+2025-12-26,Client payment,5603.5,Business Checking,Sales Income
+2025-12-27,Marketing,-630.28,Operating Checking,Marketing
+2025-12-27,Client payment,2611.62,Operating Checking,Sales Income
+2025-12-27,Software subscription,-336.61,Checking,Hosting
+2025-12-28,Ads spend,-249.77,Business Checking,Marketing
+2025-12-29,Meals,-103.26,Checking,Meals
+2025-12-29,Client payment,4723.39,Checking,Sales Income
+2025-12-29,Marketing,-527.83,Business Checking,Marketing
+2025-12-31,Materials,-359.54,Operating Checking,Supplies
+2025-12-31,Shop supplies,-713.66,Checking,Supplies
+2025-12-31,Invoice paid,1988.28,Checking,Sales Income
+2025-12-31,Team lunch,-167.99,Business Checking,Meals
+2026-01-01,Software subscription,-375.48,Business Checking,Hosting
+2026-01-01,Rent,-2069.45,Operating Checking,Rent
+2026-01-01,Insurance premium,-661.26,Checking,Insurance
+2026-01-02,Payroll run,-2076.68,Business Checking,Payroll
+2026-01-02,Retainer payment,6252.18,Operating Checking,Sales Income
+2026-01-02,Team lunch,-28.82,Checking,Meals
+2026-01-02,Cloud services,-216.87,Operating Checking,Hosting
+2026-01-03,Software subscription,-122.58,Checking,Hosting
+2026-01-04,Retainer payment,7892.19,Business Checking,Sales Income
+2026-01-05,Insurance premium,-796.01,Operating Checking,Insurance
+2026-01-05,Software subscription,-379.2,Checking,Hosting
+2026-01-05,Project deposit,1480.65,Business Checking,Sales Income
+2026-01-05,Materials,-357.69,Business Checking,Supplies
+2026-01-06,Meals,-104.64,Business Checking,Meals
+2026-01-06,Client payment,4986.53,Operating Checking,Sales Income
+2026-01-06,Software subscription,-323.66,Business Checking,Hosting
+2026-01-07,Invoice paid,5907.58,Business Checking,Sales Income
+2026-01-07,Client payment,7750.18,Checking,Sales Income
+2026-01-07,Insurance premium,-370.2,Checking,Insurance
+2026-01-08,Gas,-93.89,Checking,Fuel
+2026-01-08,Ads spend,-206.18,Operating Checking,Marketing
+2026-01-08,Insurance premium,-758.24,Operating Checking,Insurance
+2026-01-09,Client payment,5208.82,Business Checking,Sales Income
+2026-01-09,Software subscription,-420.71,Business Checking,Hosting
+2026-01-09,Payroll run,-1364.67,Business Checking,Payroll
+2026-01-09,Cloud services,-112.08,Checking,Hosting
+2026-01-09,Cloud services,-377.09,Operating Checking,Hosting
+2026-01-09,Project deposit,8277.1,Business Checking,Sales Income
+2026-01-10,Team lunch,-119.5,Operating Checking,Meals
+2026-01-11,Client payment,6444.92,Checking,Sales Income
+2026-01-11,Insurance premium,-359.99,Business Checking,Insurance
+2026-01-12,Client payment,5007.91,Checking,Sales Income
+2026-01-12,Software subscription,-195.99,Operating Checking,Hosting
+2026-01-12,Retainer payment,7785.86,Checking,Sales Income
+2026-01-13,Hosting,-165.38,Checking,Hosting
+2026-01-13,Insurance premium,-724.99,Business Checking,Insurance
+2026-01-13,Cloud services,-402.97,Checking,Hosting
+2026-01-13,Retainer payment,1938.54,Checking,Sales Income
+2026-01-14,Invoice paid,4529.24,Operating Checking,Sales Income
+2026-01-15,Retainer payment,6595.35,Business Checking,Sales Income
+2026-01-15,Invoice paid,4718.53,Business Checking,Sales Income
+2026-01-16,Wages,-2788.88,Checking,Payroll
+2026-01-16,Project deposit,6012.24,Business Checking,Sales Income
+2026-01-17,Project deposit,7387.18,Business Checking,Sales Income
+2026-01-17,Insurance premium,-828.02,Operating Checking,Insurance
+2026-01-17,Shop supplies,-99.23,Business Checking,Supplies
+2026-01-17,Insurance premium,-839.81,Operating Checking,Insurance
+2026-01-18,Invoice paid,7966.03,Business Checking,Sales Income
+2026-01-18,Shop supplies,-138.31,Operating Checking,Supplies
+2026-01-19,Ads spend,-434.03,Business Checking,Marketing
+2026-01-20,Team lunch,-154.36,Operating Checking,Meals
+2026-01-20,Ads spend,-389.76,Business Checking,Marketing
+2026-01-22,Supplies,-52.74,Checking,Supplies
+2026-01-22,Client payment,2651.65,Operating Checking,Sales Income
+2026-01-22,Fuel,-222.11,Operating Checking,Fuel
+2026-01-22,Meals,-53.53,Business Checking,Meals
+2026-01-23,Payroll,-3459.97,Business Checking,Payroll
+2026-01-23,Team lunch,-115.69,Checking,Meals
+2026-01-23,Project deposit,6951.72,Business Checking,Sales Income
+2026-01-23,Retainer payment,6063.9,Operating Checking,Sales Income
+2026-01-24,Team lunch,-124.7,Business Checking,Meals
+2026-01-24,Team lunch,-53.65,Checking,Meals
+2026-01-24,Meals,-63.26,Checking,Meals
+2026-01-25,Fuel,-146.24,Checking,Fuel
+2026-01-26,Project deposit,1441.1,Business Checking,Sales Income
+2026-01-27,Fuel,-150.65,Checking,Fuel
+2026-01-27,Materials,-111.66,Checking,Supplies
+2026-01-28,Marketing,-439.49,Business Checking,Marketing
+2026-01-28,Invoice paid,5033.18,Business Checking,Sales Income
+2026-01-28,Ads spend,-83.73,Operating Checking,Marketing
+2026-01-29,Retainer payment,2320.94,Checking,Sales Income
+2026-01-29,Invoice paid,3729.08,Business Checking,Sales Income
+2026-01-30,Invoice paid,3703.91,Business Checking,Sales Income
+2026-01-30,Invoice paid,5687.53,Checking,Sales Income
+2026-01-30,Marketing,-425.48,Checking,Marketing
+2026-01-30,Payroll run,-2085.87,Operating Checking,Payroll
+2026-01-31,Gas,-169.25,Checking,Fuel
+2026-01-31,Insurance premium,-792.71,Operating Checking,Insurance
+2026-01-31,Retainer payment,4951.03,Operating Checking,Sales Income
+2026-02-01,Fuel,-178.89,Checking,Fuel
+2026-02-01,Rent,-1009.24,Business Checking,Rent
+2026-02-03,Meals,-88.82,Checking,Meals
+2026-02-03,Client payment,5034.5,Business Checking,Sales Income
+2026-02-03,Retainer payment,5096.72,Business Checking,Sales Income
+2026-02-04,Cloud services,-261.16,Checking,Hosting
+2026-02-06,Project deposit,5059.74,Operating Checking,Sales Income
+2026-02-06,Payroll run,-1812.01,Business Checking,Payroll
+2026-02-06,Retainer payment,2810.73,Operating Checking,Sales Income
+2026-02-07,Hosting,-234.2,Business Checking,Hosting
+2026-02-07,Software subscription,-331.61,Checking,Hosting
+2026-02-08,Client payment,5611.78,Operating Checking,Sales Income
+2026-02-09,Ads spend,-120.05,Operating Checking,Marketing
+2026-02-09,Insurance premium,-795.51,Operating Checking,Insurance
+2026-02-10,Invoice paid,3669.13,Checking,Sales Income
+2026-02-10,Shop supplies,-474.83,Operating Checking,Supplies
+2026-02-10,Project deposit,1545.32,Checking,Sales Income
+2026-02-12,Shop supplies,-274.08,Business Checking,Supplies
+2026-02-12,Shop supplies,-475.76,Operating Checking,Supplies
+2026-02-12,Marketing,-481.37,Operating Checking,Marketing
+2026-02-13,Project deposit,3649.11,Business Checking,Sales Income
+2026-02-13,Software subscription,-412.79,Operating Checking,Hosting
+2026-02-13,Shop supplies,-95.0,Business Checking,Supplies
+2026-02-13,Client payment,1147.41,Checking,Sales Income
+2026-02-13,Payroll,-1758.59,Business Checking,Payroll
+2026-02-14,Insurance premium,-492.72,Business Checking,Insurance
+2026-02-14,Fuel,-135.48,Checking,Fuel
+2026-02-14,Fuel,-208.13,Operating Checking,Fuel
+2026-02-15,Fuel,-302.05,Checking,Fuel
+2026-02-15,Fuel,-104.75,Business Checking,Fuel
+2026-02-15,Project deposit,2233.14,Checking,Sales Income
+2026-02-16,Insurance premium,-575.07,Business Checking,Insurance
+2026-02-16,Insurance premium,-502.67,Operating Checking,Insurance
+2026-02-16,Project deposit,1223.2,Checking,Sales Income
+2026-02-16,Invoice paid,5421.16,Operating Checking,Sales Income
+2026-02-17,Client payment,1189.1,Business Checking,Sales Income
+2026-02-17,Retainer payment,4074.25,Business Checking,Sales Income
+2026-02-18,Software subscription,-296.87,Business Checking,Hosting
+2026-02-18,Invoice paid,4189.82,Operating Checking,Sales Income
+2026-02-19,Invoice paid,1658.23,Operating Checking,Sales Income
+2026-02-19,Shop supplies,-561.77,Business Checking,Supplies
+2026-02-19,Fuel,-73.65,Operating Checking,Fuel
+2026-02-19,Fuel,-175.64,Business Checking,Fuel
+2026-02-19,Invoice paid,1623.89,Business Checking,Sales Income
+2026-02-20,Insurance premium,-314.3,Operating Checking,Insurance
+2026-02-20,Payroll run,-3548.83,Checking,Payroll
+2026-02-22,Project deposit,5128.48,Business Checking,Sales Income
+2026-02-22,Cloud services,-462.75,Checking,Hosting
+2026-02-22,Insurance premium,-508.23,Checking,Insurance
+2026-02-23,Invoice paid,2102.98,Business Checking,Sales Income
+2026-02-23,Client payment,5457.1,Business Checking,Sales Income
+2026-02-23,Insurance premium,-658.21,Business Checking,Insurance
+2026-02-24,Supplies,-290.45,Checking,Supplies
+2026-02-24,Gas,-262.89,Operating Checking,Fuel
+2026-02-24,Insurance premium,-848.53,Business Checking,Insurance
+2026-02-24,Invoice paid,4135.72,Checking,Sales Income
+2026-02-24,Project deposit,1767.48,Business Checking,Sales Income
+2026-02-25,Project deposit,1992.81,Business Checking,Sales Income
+2026-02-25,Retainer payment,1385.89,Operating Checking,Sales Income
+2026-02-26,Ads spend,-178.63,Checking,Marketing
+2026-02-27,Supplies,-404.4,Business Checking,Supplies
+2026-02-27,Wages,-1389.26,Business Checking,Payroll
+2026-03-01,Team lunch,-136.61,Checking,Meals
+2026-03-01,Materials,-311.62,Operating Checking,Supplies
+2026-03-01,Rent,-1416.13,Checking,Rent
+2026-03-01,Marketing,-854.63,Business Checking,Marketing
+2026-03-02,Insurance premium,-647.52,Business Checking,Insurance
+2026-03-02,Invoice paid,3628.99,Business Checking,Sales Income
+2026-03-02,Retainer payment,4583.33,Business Checking,Sales Income
+2026-03-04,Invoice paid,3473.04,Business Checking,Sales Income
+2026-03-04,Insurance premium,-245.44,Checking,Insurance
+2026-03-04,Ads spend,-764.16,Checking,Marketing
+2026-03-04,Client payment,1053.14,Checking,Sales Income
+2026-03-04,Ads spend,-134.45,Business Checking,Marketing
+2026-03-05,Retainer payment,4384.81,Operating Checking,Sales Income
+2026-03-05,Retainer payment,5616.54,Checking,Sales Income
+2026-03-06,Marketing,-718.81,Operating Checking,Marketing
+2026-03-06,Payroll run,-4416.79,Operating Checking,Payroll
+2026-03-06,Supplies,-188.48,Checking,Supplies
+2026-03-06,Retainer payment,4106.68,Operating Checking,Sales Income
+2026-03-07,Hosting,-376.62,Business Checking,Hosting
+2026-03-08,Project deposit,4413.82,Operating Checking,Sales Income
+2026-03-09,Gas,-114.67,Business Checking,Fuel
+2026-03-09,Software subscription,-150.99,Business Checking,Hosting
+2026-03-09,Retainer payment,4180.87,Checking,Sales Income
+2026-03-10,Gas,-206.89,Business Checking,Fuel
+2026-03-10,Ads spend,-701.63,Checking,Marketing
+2026-03-10,Gas,-201.48,Operating Checking,Fuel
+2026-03-11,Retainer payment,2010.94,Operating Checking,Sales Income
+2026-03-11,Invoice paid,2094.55,Checking,Sales Income
+2026-03-13,Wages,-2604.04,Checking,Payroll
+2026-03-14,Marketing,-414.19,Operating Checking,Marketing
+2026-03-14,Client payment,4725.37,Checking,Sales Income
+2026-03-14,Shop supplies,-262.05,Checking,Supplies
+2026-03-14,Team lunch,-86.26,Business Checking,Meals
+2026-03-15,Software subscription,-407.07,Business Checking,Hosting
+2026-03-15,Meals,-58.55,Business Checking,Meals
+2026-03-15,Insurance premium,-141.19,Checking,Insurance
+2026-03-16,Gas,-265.77,Business Checking,Fuel
+2026-03-16,Supplies,-441.8,Checking,Supplies
+2026-03-16,Invoice paid,3053.76,Business Checking,Sales Income
+2026-03-17,Project deposit,2393.34,Operating Checking,Sales Income
+2026-03-17,Client payment,4681.78,Business Checking,Sales Income
+2026-03-18,Insurance premium,-625.27,Checking,Insurance
+2026-03-18,Client payment,3604.06,Business Checking,Sales Income
+2026-03-18,Supplies,-411.02,Operating Checking,Supplies
+2026-03-19,Ads spend,-261.37,Operating Checking,Marketing
+2026-03-19,Gas,-314.56,Business Checking,Fuel
+2026-03-19,Invoice paid,3480.62,Operating Checking,Sales Income
+2026-03-19,Retainer payment,6088.36,Business Checking,Sales Income
+2026-03-20,Client payment,2195.49,Operating Checking,Sales Income
+2026-03-20,Wages,-2840.38,Checking,Payroll
+2026-03-20,Insurance premium,-951.77,Business Checking,Insurance
+2026-03-20,Cloud services,-192.93,Business Checking,Hosting
+2026-03-20,Supplies,-455.65,Operating Checking,Supplies
+2026-03-21,Gas,-141.56,Checking,Fuel
+2026-03-21,Hosting,-313.7,Operating Checking,Hosting
+2026-03-22,Meals,-52.74,Operating Checking,Meals
+2026-03-22,Supplies,-172.47,Business Checking,Supplies
+2026-03-22,Fuel,-83.97,Checking,Fuel
+2026-03-23,Gas,-181.57,Operating Checking,Fuel
+2026-03-23,Marketing,-60.46,Operating Checking,Marketing
+2026-03-23,Gas,-219.42,Business Checking,Fuel
+2026-03-24,Invoice paid,5537.78,Operating Checking,Sales Income
+2026-03-24,Project deposit,1017.79,Operating Checking,Sales Income
+2026-03-24,Cloud services,-301.97,Operating Checking,Hosting
+2026-03-25,Invoice paid,885.97,Operating Checking,Sales Income
+2026-03-25,Project deposit,3669.4,Business Checking,Sales Income
+2026-03-26,Project deposit,2814.35,Checking,Sales Income
+2026-03-27,Insurance premium,-312.64,Operating Checking,Insurance
+2026-03-27,Insurance premium,-371.92,Business Checking,Insurance
+2026-03-27,Marketing,-338.05,Operating Checking,Marketing
+2026-03-27,Payroll,-3130.26,Operating Checking,Payroll
+2026-03-28,Hosting,-381.37,Business Checking,Hosting
+2026-03-28,Invoice paid,5515.45,Checking,Sales Income
+2026-03-29,Insurance premium,-823.26,Operating Checking,Insurance
+2026-03-29,Project deposit,1574.22,Operating Checking,Sales Income
+2026-03-30,Hosting,-369.05,Checking,Hosting
+2026-03-30,Client payment,3441.91,Operating Checking,Sales Income
+2026-03-30,Fuel,-202.36,Operating Checking,Fuel
+2026-03-31,Gas,-143.72,Operating Checking,Fuel
+2026-03-31,Cloud services,-255.59,Business Checking,Hosting
+2026-03-31,Retainer payment,2778.9,Business Checking,Sales Income
+2026-03-31,Invoice paid,1926.31,Operating Checking,Sales Income
+2026-04-01,Team lunch,-116.03,Checking,Meals
+2026-04-01,Marketing,-264.89,Checking,Marketing
+2026-04-01,Rent,-1570.4,Checking,Rent
+2026-04-01,Team lunch,-148.27,Operating Checking,Meals
+2026-04-02,Gas,-95.48,Business Checking,Fuel
+2026-04-02,Retainer payment,6741.38,Operating Checking,Sales Income
+2026-04-03,Meals,-138.71,Checking,Meals
+2026-04-03,Client payment,2003.47,Operating Checking,Sales Income
+2026-04-03,Payroll run,-3863.08,Business Checking,Payroll
+2026-04-03,Team lunch,-53.71,Business Checking,Meals
+2026-04-03,Insurance premium,-250.51,Checking,Insurance
+2026-04-05,Fuel,-198.8,Business Checking,Fuel
+2026-04-05,Insurance premium,-361.31,Business Checking,Insurance
+2026-04-05,Invoice paid,4656.65,Checking,Sales Income
+2026-04-05,Marketing,-623.75,Checking,Marketing
+2026-04-06,Cloud services,-93.01,Operating Checking,Hosting
+2026-04-06,Project deposit,4844.11,Business Checking,Sales Income
+2026-04-07,Materials,-364.73,Business Checking,Supplies
+2026-04-07,Shop supplies,-582.49,Business Checking,Supplies
+2026-04-07,Team lunch,-119.92,Business Checking,Meals
+2026-04-07,Project deposit,6188.32,Operating Checking,Sales Income
+2026-04-07,Invoice paid,4956.88,Checking,Sales Income
+2026-04-08,Fuel,-37.8,Operating Checking,Fuel
+2026-04-08,Retainer payment,8586.27,Operating Checking,Sales Income
+2026-04-08,Gas,-131.93,Checking,Fuel
+2026-04-08,Fuel,-159.34,Business Checking,Fuel
+2026-04-09,Invoice paid,7424.13,Checking,Sales Income
+2026-04-10,Shop supplies,-322.05,Business Checking,Supplies
+2026-04-10,Insurance premium,-314.92,Operating Checking,Insurance
+2026-04-10,Client payment,2666.4,Checking,Sales Income
+2026-04-10,Materials,-176.21,Business Checking,Supplies
+2026-04-10,Project deposit,3320.55,Operating Checking,Sales Income
+2026-04-10,Payroll,-2844.64,Operating Checking,Payroll
+2026-04-11,Retainer payment,3322.65,Checking,Sales Income
+2026-04-11,Gas,-64.24,Business Checking,Fuel
+2026-04-12,Materials,-584.09,Operating Checking,Supplies
+2026-04-12,Software subscription,-136.3,Checking,Hosting
+2026-04-13,Client payment,6636.09,Operating Checking,Sales Income
+2026-04-13,Meals,-16.35,Checking,Meals
+2026-04-13,Cloud services,-262.62,Operating Checking,Hosting
+2026-04-13,Gas,-243.22,Operating Checking,Fuel
+2026-04-15,Client payment,7250.09,Business Checking,Sales Income
+2026-04-16,Invoice paid,8957.38,Operating Checking,Sales Income
+2026-04-16,Software subscription,-125.13,Checking,Hosting
+2026-04-16,Client payment,6935.52,Business Checking,Sales Income
+2026-04-16,Insurance premium,-721.56,Checking,Insurance
+2026-04-16,Materials,-135.51,Operating Checking,Supplies
+2026-04-17,Insurance premium,-618.05,Operating Checking,Insurance
+2026-04-17,Payroll,-3198.02,Operating Checking,Payroll
+2026-04-17,Meals,-135.16,Operating Checking,Meals
+2026-04-17,Team lunch,-173.6,Checking,Meals
+2026-04-18,Cloud services,-167.31,Operating Checking,Hosting
+2026-04-19,Gas,-189.94,Checking,Fuel
+2026-04-20,Retainer payment,7311.11,Business Checking,Sales Income
+2026-04-20,Project deposit,5850.46,Checking,Sales Income
+2026-04-21,Client payment,8460.62,Checking,Sales Income
+2026-04-21,Shop supplies,-312.45,Business Checking,Supplies
+2026-04-22,Insurance premium,-301.49,Operating Checking,Insurance
+2026-04-22,Project deposit,6850.31,Checking,Sales Income
+2026-04-22,Retainer payment,2705.13,Operating Checking,Sales Income
+2026-04-22,Meals,-40.4,Checking,Meals
+2026-04-23,Invoice paid,8332.9,Checking,Sales Income
+2026-04-23,Retainer payment,5342.87,Operating Checking,Sales Income
+2026-04-23,Team lunch,-87.19,Business Checking,Meals
+2026-04-23,Gas,-120.78,Operating Checking,Fuel
+2026-04-23,Meals,-95.87,Business Checking,Meals
+2026-04-24,Retainer payment,1694.07,Checking,Sales Income
+2026-04-24,Meals,-45.61,Business Checking,Meals
+2026-04-24,Retainer payment,5287.74,Business Checking,Sales Income
+2026-04-24,Fuel,-240.64,Operating Checking,Fuel
+2026-04-24,Wages,-3658.26,Operating Checking,Payroll
+2026-04-24,Software subscription,-367.09,Operating Checking,Hosting
+2026-04-25,Client payment,2061.62,Checking,Sales Income
+2026-04-25,Ads spend,-262.35,Business Checking,Marketing
+2026-04-26,Supplies,-527.26,Checking,Supplies
+2026-04-26,Client payment,2694.61,Business Checking,Sales Income
+2026-04-27,Retainer payment,1673.46,Operating Checking,Sales Income
+2026-04-27,Supplies,-402.06,Operating Checking,Supplies
+2026-04-27,Client payment,7395.15,Business Checking,Sales Income
+2026-04-27,Team lunch,-95.84,Checking,Meals
+2026-04-27,Fuel,-93.49,Checking,Fuel
+2026-04-28,Software subscription,-429.5,Checking,Hosting
+2026-04-28,Marketing,-80.49,Operating Checking,Marketing
+2026-04-29,Invoice paid,3140.35,Business Checking,Sales Income
+2026-04-29,Marketing,-339.0,Business Checking,Marketing
+2026-04-29,Retainer payment,7043.72,Business Checking,Sales Income
+2026-04-30,Retainer payment,5697.2,Business Checking,Sales Income
+2026-04-30,Client payment,6388.89,Checking,Sales Income
+2026-05-01,Rent,-1657.04,Business Checking,Rent
+2026-05-01,Ads spend,-798.83,Operating Checking,Marketing
+2026-05-01,Wages,-3577.38,Operating Checking,Payroll
+2026-05-01,Project deposit,5490.63,Operating Checking,Sales Income
+2026-05-02,Team lunch,-86.05,Business Checking,Meals
+2026-05-02,Retainer payment,4690.5,Checking,Sales Income
+2026-05-02,Ads spend,-744.61,Operating Checking,Marketing
+2026-05-02,Supplies,-348.81,Operating Checking,Supplies
+2026-05-03,Invoice paid,5846.95,Operating Checking,Sales Income
+2026-05-04,Invoice paid,8878.28,Operating Checking,Sales Income
+2026-05-05,Invoice paid,7614.23,Checking,Sales Income
+2026-05-05,Project deposit,1494.34,Checking,Sales Income
+2026-05-06,Fuel,-132.28,Checking,Fuel
+2026-05-06,Client payment,7526.38,Business Checking,Sales Income
+2026-05-07,Fuel,-245.12,Operating Checking,Fuel
+2026-05-07,Retainer payment,3543.07,Checking,Sales Income
+2026-05-07,Meals,-130.97,Business Checking,Meals
+2026-05-07,Project deposit,7284.95,Operating Checking,Sales Income
+2026-05-07,Marketing,-738.41,Business Checking,Marketing
+2026-05-08,Payroll run,-3839.38,Operating Checking,Payroll
+2026-05-09,Client payment,1622.2,Operating Checking,Sales Income
+2026-05-10,Fuel,-168.14,Checking,Fuel
+2026-05-11,Insurance premium,-707.22,Checking,Insurance
+2026-05-11,Insurance premium,-346.03,Checking,Insurance
+2026-05-11,Materials,-218.3,Business Checking,Supplies
+2026-05-11,Retainer payment,1863.62,Business Checking,Sales Income
+2026-05-11,Retainer payment,1584.63,Operating Checking,Sales Income
+2026-05-12,Supplies,-301.53,Operating Checking,Supplies
+2026-05-12,Invoice paid,6287.54,Business Checking,Sales Income
+2026-05-13,Materials,-66.2,Operating Checking,Supplies
+2026-05-13,Client payment,8408.28,Checking,Sales Income
+2026-05-13,Retainer payment,6439.63,Operating Checking,Sales Income
+2026-05-14,Retainer payment,7608.36,Business Checking,Sales Income
+2026-05-14,Client payment,2337.38,Checking,Sales Income
+2026-05-14,Hosting,-364.78,Operating Checking,Hosting
+2026-05-14,Shop supplies,-209.42,Business Checking,Supplies
+2026-05-15,Payroll run,-1799.06,Checking,Payroll
+2026-05-17,Project deposit,4875.28,Checking,Sales Income
+2026-05-17,Fuel,-38.64,Operating Checking,Fuel
+2026-05-18,Materials,-339.19,Business Checking,Supplies
+2026-05-18,Invoice paid,6059.73,Business Checking,Sales Income
+2026-05-19,Client payment,5747.44,Operating Checking,Sales Income
+2026-05-20,Software subscription,-185.09,Business Checking,Hosting
+2026-05-20,Client payment,1614.06,Checking,Sales Income
+2026-05-21,Shop supplies,-588.38,Business Checking,Supplies
+2026-05-21,Software subscription,-188.22,Operating Checking,Hosting
+2026-05-21,Team lunch,-59.77,Checking,Meals
+2026-05-22,Payroll run,-3911.62,Business Checking,Payroll
+2026-05-23,Marketing,-775.09,Checking,Marketing
+2026-05-24,Project deposit,3042.4,Checking,Sales Income
+2026-05-24,Fuel,-164.83,Checking,Fuel
+2026-05-24,Gas,-216.34,Business Checking,Fuel
+2026-05-25,Retainer payment,2270.63,Business Checking,Sales Income
+2026-05-25,Insurance premium,-814.51,Business Checking,Insurance
+2026-05-25,Invoice paid,8692.72,Operating Checking,Sales Income
+2026-05-25,Gas,-94.78,Operating Checking,Fuel
+2026-05-26,Invoice paid,4703.52,Checking,Sales Income
+2026-05-26,Ads spend,-164.56,Business Checking,Marketing
+2026-05-27,Invoice paid,6570.55,Operating Checking,Sales Income
+2026-05-27,Marketing,-456.02,Checking,Marketing
+2026-05-28,Meals,-168.95,Operating Checking,Meals
+2026-05-29,Wages,-2872.02,Checking,Payroll
+2026-05-29,Fuel,-257.47,Business Checking,Fuel
+2026-05-30,Insurance premium,-869.73,Operating Checking,Insurance
+2026-05-30,Team lunch,-169.07,Checking,Meals
+2026-06-01,Marketing,-427.75,Business Checking,Marketing
+2026-06-01,Supplies,-142.0,Operating Checking,Supplies
+2026-06-01,Rent,-1059.41,Business Checking,Rent
+2026-06-02,Insurance premium,-440.64,Checking,Insurance
+2026-06-02,Shop supplies,-282.45,Operating Checking,Supplies
+2026-06-02,Meals,-109.96,Operating Checking,Meals
+2026-06-03,Client payment,6447.06,Operating Checking,Sales Income
+2026-06-04,Insurance premium,-590.88,Checking,Insurance
+2026-06-04,Cloud services,-130.97,Business Checking,Hosting
+2026-06-04,Client payment,3922.16,Business Checking,Sales Income
+2026-06-04,Supplies,-406.67,Checking,Supplies
+2026-06-05,Payroll run,-3065.4,Business Checking,Payroll
+2026-06-05,Hosting,-222.39,Checking,Hosting
+2026-06-05,Insurance premium,-537.28,Business Checking,Insurance
+2026-06-05,Client payment,4855.84,Business Checking,Sales Income
+2026-06-05,Client payment,3799.53,Checking,Sales Income
+2026-06-06,Insurance premium,-387.42,Operating Checking,Insurance
+2026-06-06,Insurance premium,-224.87,Business Checking,Insurance
+2026-06-07,Insurance premium,-690.59,Checking,Insurance
+2026-06-08,Client payment,3350.7,Checking,Sales Income
+2026-06-08,Marketing,-678.04,Operating Checking,Marketing
+2026-06-09,Software subscription,-155.28,Business Checking,Hosting
+2026-06-09,Marketing,-650.22,Operating Checking,Marketing
+2026-06-09,Meals,-131.78,Checking,Meals
+2026-06-10,Invoice paid,7179.11,Business Checking,Sales Income
+2026-06-10,Team lunch,-67.4,Business Checking,Meals
+2026-06-10,Marketing,-458.15,Operating Checking,Marketing
+2026-06-10,Marketing,-301.91,Operating Checking,Marketing
+2026-06-10,Invoice paid,7196.56,Checking,Sales Income
+2026-06-11,Retainer payment,3242.6,Operating Checking,Sales Income
+2026-06-12,Cloud services,-279.31,Checking,Hosting
+2026-06-12,Retainer payment,4573.35,Business Checking,Sales Income
+2026-06-12,Payroll,-2771.42,Checking,Payroll
+2026-06-13,Retainer payment,2749.91,Operating Checking,Sales Income
+2026-06-14,Shop supplies,-99.22,Operating Checking,Supplies
+2026-06-14,Marketing,-232.73,Checking,Marketing
+2026-06-14,Insurance premium,-163.74,Checking,Insurance
+2026-06-15,Client payment,7541.1,Checking,Sales Income
+2026-06-15,Software subscription,-294.11,Operating Checking,Hosting
+2026-06-16,Meals,-116.19,Operating Checking,Meals
+2026-06-16,Materials,-105.99,Business Checking,Supplies
+2026-06-16,Meals,-99.48,Checking,Meals
+2026-06-16,Retainer payment,3346.21,Checking,Sales Income
+2026-06-17,Marketing,-324.29,Business Checking,Marketing
+2026-06-17,Cloud services,-303.31,Operating Checking,Hosting
+2026-06-17,Ads spend,-88.82,Checking,Marketing
+2026-06-19,Wages,-2622.69,Business Checking,Payroll
+2026-06-19,Project deposit,6163.0,Operating Checking,Sales Income
+2026-06-20,Ads spend,-424.78,Operating Checking,Marketing
+2026-06-20,Gas,-156.81,Checking,Fuel
+2026-06-21,Meals,-56.64,Checking,Meals
+2026-06-22,Client payment,5470.73,Business Checking,Sales Income
+2026-06-23,Ads spend,-719.32,Checking,Marketing
+2026-06-23,Invoice paid,3534.54,Checking,Sales Income
+2026-06-24,Meals,-55.32,Operating Checking,Meals
+2026-06-24,Project deposit,4636.96,Checking,Sales Income
+2026-06-25,Retainer payment,3419.65,Business Checking,Sales Income
+2026-06-25,Client payment,5073.83,Checking,Sales Income
+2026-06-26,Shop supplies,-347.08,Operating Checking,Supplies
+2026-06-26,Payroll run,-1603.84,Business Checking,Payroll
+2026-06-26,Insurance premium,-658.36,Business Checking,Insurance
+2026-06-26,Insurance premium,-667.67,Operating Checking,Insurance
+2026-06-27,Ads spend,-57.63,Operating Checking,Marketing
+2026-06-27,Ads spend,-534.35,Business Checking,Marketing
+2026-06-28,Gas,-232.02,Operating Checking,Fuel
+2026-06-29,Gas,-200.8,Operating Checking,Fuel
+2026-06-29,Materials,-330.51,Business Checking,Supplies
+2026-06-29,Hosting,-237.52,Operating Checking,Hosting
+2026-06-29,Project deposit,6902.79,Checking,Sales Income
+2026-06-30,Hosting,-219.78,Operating Checking,Hosting
+2026-06-30,Project deposit,6221.74,Operating Checking,Sales Income
+2026-06-30,Supplies,-80.58,Checking,Supplies
+2026-06-30,Project deposit,2161.63,Operating Checking,Sales Income
+2026-07-01,Materials,-397.47,Operating Checking,Supplies
+2026-07-01,Rent,-1003.45,Checking,Rent
+2026-07-01,Client payment,7150.97,Checking,Sales Income
+2026-07-01,Client payment,3263.09,Business Checking,Sales Income
+2026-07-02,Client payment,4357.47,Checking,Sales Income
+2026-07-03,Supplies,-188.56,Operating Checking,Supplies
+2026-07-03,Wages,-2485.56,Business Checking,Payroll
+2026-07-03,Retainer payment,4816.58,Business Checking,Sales Income
+2026-07-03,Cloud services,-264.33,Business Checking,Hosting
+2026-07-04,Project deposit,2128.23,Checking,Sales Income
+2026-07-06,Ads spend,-281.46,Operating Checking,Marketing
+2026-07-07,Marketing,-210.26,Operating Checking,Marketing
+2026-07-07,Ads spend,-647.26,Checking,Marketing
+2026-07-08,Client payment,7421.11,Checking,Sales Income
+2026-07-09,Cloud services,-100.68,Checking,Hosting
+2026-07-09,Fuel,-106.02,Business Checking,Fuel
+2026-07-09,Client payment,6761.28,Operating Checking,Sales Income
+2026-07-09,Client payment,5065.88,Business Checking,Sales Income
+2026-07-09,Team lunch,-102.02,Business Checking,Meals
+2026-07-10,Client payment,4262.05,Checking,Sales Income
+2026-07-10,Payroll run,-2344.34,Operating Checking,Payroll
+2026-07-10,Ads spend,-219.19,Operating Checking,Marketing
+2026-07-10,Insurance premium,-270.65,Checking,Insurance
+2026-07-10,Shop supplies,-384.55,Operating Checking,Supplies
+2026-07-11,Software subscription,-207.09,Checking,Hosting
+2026-07-11,Fuel,-214.65,Business Checking,Fuel
+2026-07-11,Client payment,4984.17,Operating Checking,Sales Income
+2026-07-11,Cloud services,-189.03,Checking,Hosting
+2026-07-12,Insurance premium,-522.56,Business Checking,Insurance
+2026-07-12,Software subscription,-185.46,Business Checking,Hosting
+2026-07-12,Materials,-306.06,Operating Checking,Supplies
+2026-07-12,Retainer payment,6585.88,Business Checking,Sales Income
+2026-07-13,Marketing,-513.54,Business Checking,Marketing
+2026-07-13,Team lunch,-25.07,Checking,Meals
+2026-07-13,Project deposit,5264.45,Business Checking,Sales Income
+2026-07-13,Retainer payment,1765.53,Checking,Sales Income
+2026-07-14,Insurance premium,-156.86,Business Checking,Insurance
+2026-07-14,Client payment,5607.82,Checking,Sales Income
+2026-07-14,Ads spend,-565.66,Operating Checking,Marketing
+2026-07-15,Shop supplies,-481.66,Checking,Supplies
+2026-07-16,Project deposit,7239.53,Business Checking,Sales Income
+2026-07-16,Invoice paid,4219.06,Business Checking,Sales Income
+2026-07-16,Insurance premium,-480.94,Business Checking,Insurance
+2026-07-17,Client payment,7125.96,Checking,Sales Income
+2026-07-17,Ads spend,-50.48,Checking,Marketing
+2026-07-17,Fuel,-46.38,Checking,Fuel
+2026-07-17,Project deposit,5011.41,Checking,Sales Income
+2026-07-17,Wages,-3224.74,Operating Checking,Payroll
+2026-07-17,Team lunch,-159.41,Checking,Meals
+2026-07-18,Team lunch,-101.14,Business Checking,Meals
+2026-07-18,Insurance premium,-393.03,Business Checking,Insurance
+2026-07-18,Materials,-365.34,Checking,Supplies
+2026-07-19,Meals,-32.14,Checking,Meals
+2026-07-19,Fuel,-231.83,Operating Checking,Fuel
+2026-07-19,Team lunch,-15.83,Business Checking,Meals
+2026-07-19,Invoice paid,7924.32,Checking,Sales Income
+2026-07-20,Retainer payment,4656.09,Operating Checking,Sales Income
+2026-07-20,Team lunch,-133.18,Business Checking,Meals
+2026-07-20,Invoice paid,7610.78,Operating Checking,Sales Income
+2026-07-21,Project deposit,2970.14,Checking,Sales Income
+2026-07-21,Marketing,-381.26,Business Checking,Marketing
+2026-07-21,Retainer payment,7947.2,Business Checking,Sales Income
+2026-07-21,Shop supplies,-118.65,Checking,Supplies
+2026-07-22,Software subscription,-265.23,Checking,Hosting
+2026-07-22,Shop supplies,-400.37,Operating Checking,Supplies
+2026-07-22,Client payment,4708.99,Checking,Sales Income
+2026-07-23,Software subscription,-372.89,Checking,Hosting
+2026-07-23,Team lunch,-93.57,Business Checking,Meals
+2026-07-23,Meals,-123.64,Business Checking,Meals
+2026-07-23,Retainer payment,4267.32,Business Checking,Sales Income
+2026-07-24,Payroll run,-3061.3,Operating Checking,Payroll
+2026-07-24,Gas,-71.45,Business Checking,Fuel
+2026-07-24,Ads spend,-220.8,Business Checking,Marketing
+2026-07-25,Client payment,6758.45,Operating Checking,Sales Income
+2026-07-26,Hosting,-114.23,Operating Checking,Hosting
+2026-07-26,Gas,-63.11,Operating Checking,Fuel
+2026-07-26,Fuel,-34.89,Business Checking,Fuel
+2026-07-27,Meals,-79.83,Operating Checking,Meals
+2026-07-27,Project deposit,7131.34,Checking,Sales Income
+2026-07-27,Invoice paid,2738.1,Business Checking,Sales Income
+2026-07-28,Marketing,-675.41,Operating Checking,Marketing
+2026-07-28,Invoice paid,6487.98,Business Checking,Sales Income
+2026-07-29,Meals,-108.18,Business Checking,Meals
+2026-07-29,Fuel,-211.68,Checking,Fuel
+2026-07-29,Meals,-138.51,Business Checking,Meals
+2026-07-30,Insurance premium,-442.31,Business Checking,Insurance
+2026-07-30,Gas,-66.12,Checking,Fuel
+2026-07-30,Retainer payment,7589.1,Operating Checking,Sales Income
+2026-07-30,Ads spend,-202.72,Operating Checking,Marketing
+2026-07-31,Wages,-2911.93,Business Checking,Payroll
+2026-08-01,Invoice paid,4796.65,Business Checking,Sales Income
+2026-08-01,Fuel,-105.78,Operating Checking,Fuel
+2026-08-01,Rent,-2276.57,Business Checking,Rent
+2026-08-01,Insurance premium,-596.18,Operating Checking,Insurance
+2026-08-02,Marketing,-303.05,Operating Checking,Marketing
+2026-08-04,Client payment,1962.05,Business Checking,Sales Income
+2026-08-05,Shop supplies,-44.57,Checking,Supplies
+2026-08-05,Software subscription,-427.25,Checking,Hosting
+2026-08-05,Client payment,6177.05,Checking,Sales Income
+2026-08-05,Gas,-93.15,Operating Checking,Fuel
+2026-08-05,Invoice paid,7880.24,Operating Checking,Sales Income
+2026-08-06,Cloud services,-337.39,Operating Checking,Hosting
+2026-08-06,Client payment,6351.73,Business Checking,Sales Income
+2026-08-07,Payroll run,-2560.33,Operating Checking,Payroll
+2026-08-07,Fuel,-77.92,Operating Checking,Fuel
+2026-08-07,Project deposit,8653.72,Checking,Sales Income
+2026-08-07,Cloud services,-221.64,Checking,Hosting
+2026-08-08,Hosting,-261.94,Business Checking,Hosting
+2026-08-08,Insurance premium,-259.18,Checking,Insurance
+2026-08-08,Materials,-335.86,Checking,Supplies
+2026-08-09,Cloud services,-291.4,Operating Checking,Hosting
+2026-08-09,Hosting,-411.71,Business Checking,Hosting
+2026-08-09,Meals,-57.73,Checking,Meals
+2026-08-10,Retainer payment,3772.68,Business Checking,Sales Income
+2026-08-10,Invoice paid,4245.77,Business Checking,Sales Income
+2026-08-11,Retainer payment,6719.32,Operating Checking,Sales Income
+2026-08-11,Client payment,4601.25,Business Checking,Sales Income
+2026-08-12,Software subscription,-222.24,Operating Checking,Hosting
+2026-08-13,Project deposit,7856.07,Checking,Sales Income
+2026-08-13,Project deposit,7761.22,Business Checking,Sales Income
+2026-08-13,Meals,-179.51,Operating Checking,Meals
+2026-08-13,Gas,-215.69,Checking,Fuel
+2026-08-14,Wages,-1809.36,Checking,Payroll
+2026-08-14,Meals,-87.27,Checking,Meals
+2026-08-14,Team lunch,-46.52,Checking,Meals
+2026-08-14,Team lunch,-128.66,Checking,Meals
+2026-08-15,Software subscription,-346.3,Checking,Hosting
+2026-08-15,Project deposit,4232.39,Operating Checking,Sales Income
+2026-08-16,Hosting,-93.71,Operating Checking,Hosting
+2026-08-16,Meals,-22.06,Checking,Meals
+2026-08-16,Team lunch,-125.11,Business Checking,Meals
+2026-08-17,Invoice paid,6670.12,Checking,Sales Income
+2026-08-17,Hosting,-93.64,Operating Checking,Hosting
+2026-08-17,Client payment,1348.69,Checking,Sales Income
+2026-08-18,Team lunch,-23.24,Checking,Meals
+2026-08-18,Client payment,5967.56,Checking,Sales Income
+2026-08-19,Invoice paid,5840.82,Checking,Sales Income
+2026-08-20,Insurance premium,-383.13,Operating Checking,Insurance
+2026-08-21,Client payment,2552.89,Checking,Sales Income
+2026-08-21,Wages,-4127.56,Business Checking,Payroll
+2026-08-21,Retainer payment,3336.37,Checking,Sales Income
+2026-08-21,Fuel,-256.65,Checking,Fuel
+2026-08-22,Software subscription,-129.35,Business Checking,Hosting
+2026-08-22,Marketing,-173.75,Business Checking,Marketing
+2026-08-22,Client payment,7265.76,Operating Checking,Sales Income
+2026-08-25,Project deposit,6283.7,Operating Checking,Sales Income
+2026-08-25,Retainer payment,6609.33,Business Checking,Sales Income
+2026-08-26,Invoice paid,4413.84,Business Checking,Sales Income
+2026-08-26,Materials,-107.28,Business Checking,Supplies
+2026-08-27,Retainer payment,2604.0,Business Checking,Sales Income
+2026-08-27,Project deposit,8612.32,Operating Checking,Sales Income
+2026-08-28,Invoice paid,7929.3,Operating Checking,Sales Income
+2026-08-28,Hosting,-445.04,Business Checking,Hosting
+2026-08-28,Wages,-2456.36,Checking,Payroll
+2026-08-29,Invoice paid,5080.62,Business Checking,Sales Income
+2026-08-29,Fuel,-49.06,Checking,Fuel
+2026-08-31,Ads spend,-653.87,Checking,Marketing
+2026-08-31,Gas,-90.54,Operating Checking,Fuel
+2026-09-01,Rent,-2010.63,Business Checking,Rent
+2026-09-01,Materials,-476.66,Business Checking,Supplies
+2026-09-03,Hosting,-200.67,Checking,Hosting
+2026-09-03,Team lunch,-126.68,Checking,Meals
+2026-09-03,Client payment,8152.65,Operating Checking,Sales Income
+2026-09-03,Ads spend,-484.82,Checking,Marketing
+2026-09-03,Invoice paid,4418.24,Operating Checking,Sales Income
+2026-09-04,Materials,-558.54,Checking,Supplies
+2026-09-04,Payroll,-2955.28,Operating Checking,Payroll
+2026-09-04,Retainer payment,4113.18,Business Checking,Sales Income
+2026-09-05,Team lunch,-74.17,Checking,Meals
+2026-09-05,Client payment,2192.25,Operating Checking,Sales Income
+2026-09-06,Cloud services,-395.11,Operating Checking,Hosting
+2026-09-07,Client payment,7869.03,Operating Checking,Sales Income
+2026-09-07,Meals,-172.21,Business Checking,Meals
+2026-09-07,Retainer payment,7884.4,Checking,Sales Income
+2026-09-07,Shop supplies,-534.69,Checking,Supplies
+2026-09-08,Retainer payment,1512.46,Business Checking,Sales Income
+2026-09-08,Retainer payment,8206.36,Checking,Sales Income
+2026-09-08,Materials,-167.5,Business Checking,Supplies
+2026-09-08,Insurance premium,-337.75,Business Checking,Insurance
+2026-09-08,Shop supplies,-537.8,Checking,Supplies
+2026-09-09,Retainer payment,5342.75,Business Checking,Sales Income
+2026-09-10,Client payment,5063.22,Business Checking,Sales Income
+2026-09-11,Wages,-3459.24,Business Checking,Payroll
+2026-09-11,Team lunch,-65.3,Business Checking,Meals
+2026-09-11,Retainer payment,7220.31,Checking,Sales Income
+2026-09-11,Materials,-101.31,Checking,Supplies
+2026-09-11,Retainer payment,5752.55,Operating Checking,Sales Income
+2026-09-11,Meals,-179.83,Operating Checking,Meals
+2026-09-12,Meals,-91.61,Business Checking,Meals
+2026-09-12,Software subscription,-222.41,Operating Checking,Hosting
+2026-09-13,Cloud services,-309.57,Business Checking,Hosting
+2026-09-13,Insurance premium,-707.25,Business Checking,Insurance
+2026-09-14,Invoice paid,6732.83,Checking,Sales Income
+2026-09-14,Cloud services,-121.06,Operating Checking,Hosting
+2026-09-14,Ads spend,-80.66,Checking,Marketing
+2026-09-14,Client payment,5558.57,Business Checking,Sales Income
+2026-09-15,Shop supplies,-335.29,Operating Checking,Supplies
+2026-09-15,Meals,-169.96,Business Checking,Meals
+2026-09-16,Cloud services,-103.45,Operating Checking,Hosting
+2026-09-16,Client payment,5111.31,Operating Checking,Sales Income
+2026-09-16,Gas,-272.95,Operating Checking,Fuel
+2026-09-17,Insurance premium,-604.34,Checking,Insurance
+2026-09-17,Insurance premium,-188.1,Checking,Insurance
+2026-09-17,Client payment,8674.4,Checking,Sales Income
+2026-09-18,Retainer payment,1376.98,Business Checking,Sales Income
+2026-09-18,Insurance premium,-237.39,Business Checking,Insurance
+2026-09-18,Payroll,-1694.3,Business Checking,Payroll
+2026-09-18,Invoice paid,5423.19,Operating Checking,Sales Income
+2026-09-19,Insurance premium,-466.21,Operating Checking,Insurance
+2026-09-19,Project deposit,4411.2,Business Checking,Sales Income
+2026-09-19,Supplies,-61.2,Business Checking,Supplies
+2026-09-20,Gas,-185.32,Checking,Fuel
+2026-09-20,Insurance premium,-582.82,Operating Checking,Insurance
+2026-09-20,Project deposit,2968.9,Operating Checking,Sales Income
+2026-09-22,Materials,-434.29,Checking,Supplies
+2026-09-22,Fuel,-155.82,Business Checking,Fuel
+2026-09-23,Client payment,2639.07,Business Checking,Sales Income
+2026-09-23,Project deposit,2186.49,Operating Checking,Sales Income
+2026-09-23,Supplies,-161.8,Operating Checking,Supplies
+2026-09-24,Gas,-74.21,Business Checking,Fuel
+2026-09-24,Supplies,-331.84,Checking,Supplies
+2026-09-24,Invoice paid,8462.34,Operating Checking,Sales Income
+2026-09-25,Ads spend,-550.17,Operating Checking,Marketing
+2026-09-25,Retainer payment,2076.06,Checking,Sales Income
+2026-09-25,Payroll,-3983.43,Checking,Payroll
+2026-09-25,Client payment,2287.5,Operating Checking,Sales Income
+2026-09-25,Team lunch,-131.4,Operating Checking,Meals
+2026-09-26,Invoice paid,6016.67,Operating Checking,Sales Income
+2026-09-27,Supplies,-360.47,Operating Checking,Supplies
+2026-09-27,Software subscription,-200.76,Business Checking,Hosting
+2026-09-29,Insurance premium,-271.67,Business Checking,Insurance
+2026-09-29,Retainer payment,4300.95,Operating Checking,Sales Income
+2026-09-29,Marketing,-433.67,Business Checking,Marketing
+2026-09-29,Meals,-125.81,Business Checking,Meals
+2026-09-30,Gas,-38.23,Operating Checking,Fuel
+2026-09-30,Fuel,-294.04,Checking,Fuel
+2026-09-30,Retainer payment,2477.56,Business Checking,Sales Income
+2026-09-30,Team lunch,-161.49,Operating Checking,Meals
+2026-10-01,Rent,-2244.64,Checking,Rent
+2026-10-02,Retainer payment,2564.17,Business Checking,Sales Income
+2026-10-02,Payroll run,-1823.35,Business Checking,Payroll
+2026-10-02,Software subscription,-82.45,Operating Checking,Hosting
+2026-10-02,Software subscription,-425.27,Operating Checking,Hosting
+2026-10-03,Materials,-131.95,Operating Checking,Supplies
+2026-10-03,Project deposit,1529.42,Business Checking,Sales Income
+2026-10-04,Hosting,-372.75,Operating Checking,Hosting
+2026-10-04,Retainer payment,8657.01,Checking,Sales Income
+2026-10-04,Insurance premium,-556.24,Checking,Insurance
+2026-10-05,Insurance premium,-259.91,Checking,Insurance
+2026-10-05,Cloud services,-362.95,Checking,Hosting
+2026-10-05,Retainer payment,7015.41,Business Checking,Sales Income
+2026-10-05,Project deposit,4601.33,Business Checking,Sales Income
+2026-10-06,Ads spend,-93.88,Operating Checking,Marketing
+2026-10-06,Team lunch,-109.92,Checking,Meals
+2026-10-06,Invoice paid,2256.88,Checking,Sales Income
+2026-10-06,Team lunch,-150.02,Business Checking,Meals
+2026-10-06,Retainer payment,3326.83,Business Checking,Sales Income
+2026-10-07,Software subscription,-187.25,Business Checking,Hosting
+2026-10-07,Software subscription,-270.13,Checking,Hosting
+2026-10-08,Ads spend,-291.96,Business Checking,Marketing
+2026-10-08,Project deposit,3317.38,Checking,Sales Income
+2026-10-09,Payroll run,-2803.26,Checking,Payroll
+2026-10-10,Gas,-241.38,Operating Checking,Fuel
+2026-10-10,Supplies,-83.89,Business Checking,Supplies
+2026-10-11,Marketing,-510.07,Operating Checking,Marketing
+2026-10-11,Client payment,8345.04,Checking,Sales Income
+2026-10-12,Project deposit,3916.04,Checking,Sales Income
+2026-10-13,Ads spend,-442.34,Checking,Marketing
+2026-10-13,Meals,-65.27,Checking,Meals
+2026-10-13,Supplies,-517.67,Business Checking,Supplies
+2026-10-14,Supplies,-145.66,Operating Checking,Supplies
+2026-10-14,Meals,-140.9,Checking,Meals
+2026-10-15,Meals,-99.72,Operating Checking,Meals
+2026-10-15,Hosting,-416.16,Checking,Hosting
+2026-10-15,Insurance premium,-153.16,Checking,Insurance
+2026-10-15,Client payment,6407.17,Checking,Sales Income
+2026-10-16,Supplies,-410.6,Checking,Supplies
+2026-10-16,Payroll,-3960.29,Business Checking,Payroll
+2026-10-17,Meals,-116.14,Checking,Meals
+2026-10-17,Marketing,-310.88,Business Checking,Marketing
+2026-10-18,Team lunch,-46.61,Checking,Meals
+2026-10-20,Meals,-173.03,Operating Checking,Meals
+2026-10-20,Fuel,-220.01,Operating Checking,Fuel
+2026-10-20,Insurance premium,-450.79,Operating Checking,Insurance
+2026-10-21,Insurance premium,-714.57,Business Checking,Insurance
+2026-10-21,Software subscription,-252.38,Checking,Hosting
+2026-10-21,Project deposit,2102.64,Operating Checking,Sales Income
+2026-10-21,Project deposit,1516.75,Operating Checking,Sales Income
+2026-10-22,Ads spend,-355.46,Checking,Marketing
+2026-10-22,Team lunch,-176.07,Checking,Meals
+2026-10-23,Shop supplies,-32.35,Operating Checking,Supplies
+2026-10-23,Team lunch,-32.35,Business Checking,Meals
+2026-10-23,Payroll run,-3884.26,Business Checking,Payroll
+2026-10-23,Client payment,6476.85,Checking,Sales Income
+2026-10-23,Client payment,4279.53,Business Checking,Sales Income
+2026-10-24,Hosting,-214.57,Operating Checking,Hosting
+2026-10-25,Insurance premium,-397.76,Operating Checking,Insurance
+2026-10-25,Retainer payment,2349.52,Checking,Sales Income
+2026-10-25,Insurance premium,-337.24,Business Checking,Insurance
+2026-10-25,Cloud services,-166.16,Business Checking,Hosting
+2026-10-26,Invoice paid,5016.86,Business Checking,Sales Income
+2026-10-27,Hosting,-116.85,Checking,Hosting
+2026-10-27,Invoice paid,6489.24,Operating Checking,Sales Income
+2026-10-28,Retainer payment,2775.07,Operating Checking,Sales Income
+2026-10-28,Shop supplies,-199.08,Checking,Supplies
+2026-10-28,Software subscription,-324.6,Operating Checking,Hosting
+2026-10-29,Insurance premium,-806.5,Operating Checking,Insurance
+2026-10-29,Marketing,-307.71,Checking,Marketing
+2026-10-29,Retainer payment,3653.56,Operating Checking,Sales Income
+2026-10-30,Retainer payment,6465.19,Operating Checking,Sales Income
+2026-10-30,Payroll,-2578.97,Checking,Payroll
+2026-10-30,Team lunch,-42.08,Checking,Meals
+2026-10-30,Invoice paid,5585.59,Business Checking,Sales Income
+2026-10-30,Gas,-224.67,Checking,Fuel
+2026-10-31,Retainer payment,3254.45,Business Checking,Sales Income
+2026-11-01,Fuel,-159.32,Business Checking,Fuel
+2026-11-01,Rent,-2393.41,Operating Checking,Rent
+2026-11-01,Hosting,-113.02,Checking,Hosting
+2026-11-01,Retainer payment,5210.59,Operating Checking,Sales Income
+2026-11-02,Project deposit,2138.63,Checking,Sales Income
+2026-11-02,Shop supplies,-497.06,Checking,Supplies
+2026-11-02,Client payment,4791.54,Business Checking,Sales Income
+2026-11-02,Insurance premium,-492.49,Checking,Insurance
+2026-11-03,Retainer payment,5182.94,Operating Checking,Sales Income
+2026-11-03,Cloud services,-313.17,Business Checking,Hosting
+2026-11-03,Client payment,6079.57,Operating Checking,Sales Income
+2026-11-03,Ads spend,-907.57,Checking,Marketing
+2026-11-04,Invoice paid,2475.55,Operating Checking,Sales Income
+2026-11-05,Ads spend,-823.24,Checking,Marketing
+2026-11-05,Insurance premium,-769.56,Business Checking,Insurance
+2026-11-05,Ads spend,-343.3,Checking,Marketing
+2026-11-06,Client payment,3544.96,Business Checking,Sales Income
+2026-11-06,Software subscription,-361.97,Operating Checking,Hosting
+2026-11-06,Payroll,-2577.58,Operating Checking,Payroll
+2026-11-06,Ads spend,-151.31,Operating Checking,Marketing
+2026-11-06,Supplies,-480.16,Business Checking,Supplies
+2026-11-07,Ads spend,-356.27,Operating Checking,Marketing
+2026-11-07,Retainer payment,7593.4,Business Checking,Sales Income
+2026-11-07,Ads spend,-816.37,Business Checking,Marketing
+2026-11-08,Software subscription,-390.38,Checking,Hosting
+2026-11-08,Retainer payment,3576.29,Operating Checking,Sales Income
+2026-11-09,Marketing,-743.7,Business Checking,Marketing
+2026-11-09,Client payment,4606.87,Business Checking,Sales Income
+2026-11-09,Supplies,-293.07,Checking,Supplies
+2026-11-09,Materials,-567.75,Operating Checking,Supplies
+2026-11-10,Insurance premium,-410.26,Business Checking,Insurance
+2026-11-11,Hosting,-169.36,Checking,Hosting
+2026-11-11,Retainer payment,6025.56,Operating Checking,Sales Income
+2026-11-11,Team lunch,-142.75,Checking,Meals
+2026-11-13,Payroll,-2097.59,Checking,Payroll
+2026-11-13,Fuel,-261.93,Business Checking,Fuel
+2026-11-13,Cloud services,-545.75,Checking,Hosting
+2026-11-14,Client payment,7365.6,Operating Checking,Sales Income
+2026-11-15,Meals,-154.35,Operating Checking,Meals
+2026-11-15,Meals,-192.57,Checking,Meals
+2026-11-16,Insurance premium,-1012.45,Business Checking,Insurance
+2026-11-16,Invoice paid,8688.05,Operating Checking,Sales Income
+2026-11-16,Client payment,3625.58,Checking,Sales Income
+2026-11-16,Cloud services,-457.6,Operating Checking,Hosting
+2026-11-17,Gas,-189.33,Business Checking,Fuel
+2026-11-18,Marketing,-413.79,Operating Checking,Marketing
+2026-11-18,Marketing,-459.79,Operating Checking,Marketing
+2026-11-18,Client payment,1705.47,Business Checking,Sales Income
+2026-11-18,Shop supplies,-292.15,Operating Checking,Supplies
+2026-11-19,Invoice paid,10445.21,Operating Checking,Sales Income
+2026-11-19,Project deposit,6889.1,Business Checking,Sales Income
+2026-11-20,Retainer payment,9952.79,Operating Checking,Sales Income
+2026-11-20,Retainer payment,1576.69,Operating Checking,Sales Income
+2026-11-20,Payroll run,-5094.31,Business Checking,Payroll
+2026-11-21,Retainer payment,10074.81,Checking,Sales Income
+2026-11-21,Supplies,-648.96,Operating Checking,Supplies
+2026-11-21,Hosting,-533.05,Operating Checking,Hosting
+2026-11-22,Client payment,10048.42,Checking,Sales Income
+2026-11-22,Team lunch,-103.92,Business Checking,Meals
+2026-11-22,Cloud services,-480.73,Operating Checking,Hosting
+2026-11-23,Retainer payment,7755.53,Business Checking,Sales Income
+2026-11-23,Team lunch,-186.52,Operating Checking,Meals
+2026-11-23,Client payment,1766.67,Business Checking,Sales Income
+2026-11-23,Ads spend,-124.72,Business Checking,Marketing
+2026-11-24,Client payment,7114.14,Checking,Sales Income
+2026-11-24,Software subscription,-285.31,Operating Checking,Hosting
+2026-11-25,Project deposit,5500.58,Operating Checking,Sales Income
+2026-11-25,Invoice paid,6164.06,Operating Checking,Sales Income
+2026-11-25,Marketing,-731.47,Business Checking,Marketing
+2026-11-26,Team lunch,-141.06,Operating Checking,Meals
+2026-11-27,Software subscription,-526.94,Business Checking,Hosting
+2026-11-27,Payroll run,-1816.5,Checking,Payroll
+2026-11-27,Insurance premium,-1071.14,Checking,Insurance
+2026-11-27,Meals,-65.92,Operating Checking,Meals
+2026-11-28,Meals,-194.44,Operating Checking,Meals
+2026-11-28,Ads spend,-464.6,Checking,Marketing
+2026-11-29,Invoice paid,2655.5,Checking,Sales Income
+2026-11-29,Supplies,-712.08,Checking,Supplies
+2026-11-29,Team lunch,-127.2,Business Checking,Meals
+2026-11-30,Gas,-291.01,Checking,Fuel
+2026-11-30,Retainer payment,8102.59,Checking,Sales Income
+2026-11-30,Invoice paid,5483.11,Checking,Sales Income
+2026-11-30,Insurance premium,-984.93,Operating Checking,Insurance
+2026-12-01,Marketing,-485.29,Operating Checking,Marketing
+2026-12-01,Retainer payment,8171.6,Checking,Sales Income
+2026-12-01,Invoice paid,1600.62,Operating Checking,Sales Income
+2026-12-01,Rent,-1669.11,Operating Checking,Rent
+2026-12-02,Insurance premium,-867.7,Checking,Insurance
+2026-12-02,Team lunch,-62.52,Business Checking,Meals
+2026-12-02,Hosting,-357.61,Operating Checking,Hosting
+2026-12-03,Fuel,-373.92,Checking,Fuel
+2026-12-03,Insurance premium,-804.48,Business Checking,Insurance
+2026-12-03,Gas,-210.88,Operating Checking,Fuel
+2026-12-04,Fuel,-82.45,Checking,Fuel
+2026-12-04,Fuel,-334.55,Checking,Fuel
+2026-12-04,Project deposit,9998.88,Business Checking,Sales Income
+2026-12-04,Payroll run,-3676.83,Checking,Payroll
+2026-12-04,Gas,-279.02,Checking,Fuel
+2026-12-05,Gas,-215.0,Checking,Fuel
+2026-12-05,Insurance premium,-425.85,Business Checking,Insurance
+2026-12-05,Retainer payment,8684.48,Checking,Sales Income
+2026-12-06,Materials,-57.03,Checking,Supplies
+2026-12-06,Meals,-115.1,Operating Checking,Meals
+2026-12-06,Hosting,-187.38,Checking,Hosting
+2026-12-07,Gas,-371.3,Operating Checking,Fuel
+2026-12-07,Insurance premium,-259.68,Checking,Insurance
+2026-12-07,Gas,-74.75,Checking,Fuel
+2026-12-08,Marketing,-897.71,Business Checking,Marketing
+2026-12-08,Software subscription,-343.28,Checking,Hosting
+2026-12-08,Invoice paid,10474.03,Operating Checking,Sales Income
+2026-12-09,Client payment,1753.13,Operating Checking,Sales Income
+2026-12-10,Project deposit,7915.56,Checking,Sales Income
+2026-12-10,Marketing,-933.58,Operating Checking,Marketing
+2026-12-10,Project deposit,6178.59,Business Checking,Sales Income
+2026-12-10,Materials,-52.0,Business Checking,Supplies
+2026-12-11,Client payment,9281.93,Business Checking,Sales Income
+2026-12-11,Shop supplies,-651.73,Operating Checking,Supplies
+2026-12-11,Payroll run,-3960.65,Operating Checking,Payroll
+2026-12-12,Insurance premium,-236.96,Checking,Insurance
+2026-12-12,Insurance premium,-910.01,Business Checking,Insurance
+2026-12-12,Hosting,-284.47,Checking,Hosting
+2026-12-13,Retainer payment,6285.74,Business Checking,Sales Income
+2026-12-14,Software subscription,-484.82,Checking,Hosting
+2026-12-14,Team lunch,-143.22,Business Checking,Meals
+2026-12-14,Retainer payment,5843.06,Operating Checking,Sales Income
+2026-12-15,Gas,-247.09,Business Checking,Fuel
+2026-12-15,Project deposit,2406.24,Operating Checking,Sales Income
+2026-12-15,Marketing,-625.32,Operating Checking,Marketing
+2026-12-16,Client payment,6065.14,Operating Checking,Sales Income
+2026-12-16,Meals,-160.29,Operating Checking,Meals
+2026-12-16,Client payment,7638.21,Operating Checking,Sales Income
+2026-12-17,Materials,-407.22,Business Checking,Supplies
+2026-12-17,Shop supplies,-738.63,Operating Checking,Supplies
+2026-12-18,Project deposit,7943.34,Operating Checking,Sales Income
+2026-12-18,Payroll,-3566.23,Business Checking,Payroll
+2026-12-18,Client payment,5642.91,Operating Checking,Sales Income
+2026-12-19,Retainer payment,1941.27,Business Checking,Sales Income
+2026-12-19,Marketing,-139.16,Checking,Marketing
+2026-12-19,Meals,-155.2,Checking,Meals
+2026-12-20,Gas,-238.26,Business Checking,Fuel
+2026-12-20,Insurance premium,-758.22,Operating Checking,Insurance
+2026-12-21,Shop supplies,-87.47,Operating Checking,Supplies
+2026-12-21,Client payment,5350.6,Checking,Sales Income
+2026-12-21,Client payment,2536.72,Checking,Sales Income
+2026-12-22,Team lunch,-217.4,Operating Checking,Meals
+2026-12-22,Insurance premium,-824.51,Operating Checking,Insurance
+2026-12-22,Ads spend,-824.81,Business Checking,Marketing
+2026-12-23,Supplies,-41.22,Checking,Supplies
+2026-12-23,Client payment,10962.57,Checking,Sales Income
+2026-12-23,Invoice paid,6190.89,Business Checking,Sales Income
+2026-12-24,Invoice paid,9004.78,Operating Checking,Sales Income
+2026-12-24,Insurance premium,-971.04,Checking,Insurance
+2026-12-25,Team lunch,-163.66,Operating Checking,Meals
+2026-12-25,Payroll,-3082.05,Checking,Payroll
+2026-12-26,Project deposit,8686.51,Checking,Sales Income
+2026-12-26,Team lunch,-193.57,Operating Checking,Meals
+2026-12-26,Insurance premium,-199.65,Checking,Insurance
+2026-12-26,Ads spend,-289.97,Business Checking,Marketing
+2026-12-27,Meals,-31.27,Operating Checking,Meals
+2026-12-27,Insurance premium,-623.95,Checking,Insurance
+2026-12-27,Client payment,10169.12,Operating Checking,Sales Income
+2026-12-27,Marketing,-358.61,Operating Checking,Marketing
+2026-12-28,Insurance premium,-830.08,Checking,Insurance
+2026-12-28,Invoice paid,3763.01,Business Checking,Sales Income
+2026-12-28,Gas,-284.31,Operating Checking,Fuel
+2026-12-29,Gas,-283.24,Operating Checking,Fuel
+2026-12-29,Invoice paid,9297.61,Business Checking,Sales Income
+2026-12-29,Project deposit,7861.88,Operating Checking,Sales Income
+2026-12-29,Ads spend,-862.61,Checking,Marketing
+2026-12-30,Fuel,-272.54,Business Checking,Fuel
+2026-12-30,Invoice paid,2758.69,Checking,Sales Income
+2026-12-31,Gas,-335.55,Business Checking,Fuel
+2026-12-31,Supplies,-181.78,Checking,Supplies
+2026-12-31,Cloud services,-466.99,Operating Checking,Hosting

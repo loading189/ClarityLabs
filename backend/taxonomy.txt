@@ -1,0 +1,348 @@
+1️⃣ TIMING & LIQUIDITY SIGNALS (the most important)
+
+These are existential signals.
+
+1.1 Cash Runway Compression
+
+What it measures
+“How many days of recent outflows could current cash support?”
+
+Data needed
+
+Cash balance (bank)
+
+Rolling average daily outflows
+
+Why it matters
+This is the cash equivalent of solvency.
+
+Yellow
+
+Runway shrinking >20% over 30–60 days
+
+Red
+
+Runway <30 days or shrinking rapidly week over week
+
+1.2 Cash Timing Mismatch
+
+What it measures
+“Are outflows consistently hitting before inflows?”
+
+Data needed
+
+Timestamps of deposits vs payroll / rent / fixed expenses
+
+Why it matters
+This is how profitable businesses still die.
+
+Yellow
+
+Payroll frequently precedes deposits
+
+Cash dips below prior lows on payroll days
+
+Red
+
+Repeated negative cash windows before deposits
+
+Increasing reliance on timing luck
+
+1.3 Deposit Delay Drift
+
+What it measures
+“Are deposits arriving later than they used to?”
+
+Data needed
+
+Sale timestamp vs deposit timestamp (Stripe, POS)
+
+Why it matters
+Deposit delays silently break cash planning.
+
+Yellow
+
+Average delay increasing vs baseline
+
+Red
+
+Long-tail delays appearing
+
+Delays coincide with high outflow periods
+
+2️⃣ REVENUE STABILITY SIGNALS
+
+These detect top-line fragility, not just decline.
+
+2.1 Revenue Velocity Deceleration
+
+What it measures
+“Is revenue growth slowing relative to its own trend?”
+
+Data needed
+
+Rolling revenue totals
+
+Why it matters
+Deceleration precedes decline.
+
+Yellow
+
+Growth rate flattening
+
+Positive but slowing slope
+
+Red
+
+Sustained negative slope
+
+2.2 Revenue Consistency Breakdown
+
+What it measures
+“How predictable are inflows?”
+
+Data needed
+
+Daily/weekly inflow variance
+
+Why it matters
+Unpredictable revenue is operational poison.
+
+Yellow
+
+Increasing variance without growth
+
+Red
+
+Few large days replacing many normal days
+
+2.3 Refund / Reversal Escalation
+
+What it measures
+“Are refunds rising relative to sales?”
+
+Data needed
+
+Refund events
+
+Gross sales events
+
+Why it matters
+Refunds are delayed revenue corrections.
+
+Yellow
+
+Refund rate trending upward
+
+Red
+
+Refund clustering
+
+Refunds wiping out recent sales
+
+3️⃣ COST & MARGIN SIGNALS
+
+These detect slow erosion, not sudden collapse.
+
+3.1 Expense Creep
+
+What it measures
+“Are expenses rising faster than revenue?”
+
+Data needed
+
+Expense totals
+
+Revenue totals
+
+Why it matters
+This kills businesses quietly.
+
+Yellow
+
+Expense/revenue ratio trending up
+
+Red
+
+Expenses rising while revenue flat/down
+
+3.2 Payroll Load Stress
+
+What it measures
+“How heavy payroll is relative to inflows.”
+
+Data needed
+
+Payroll runs
+
+Revenue deposits
+
+Why it matters
+Payroll is the least flexible cost.
+
+Yellow
+
+Payroll share creeping upward
+
+Red
+
+Payroll dominates outflows during slow periods
+
+3.3 Fee Leakage
+
+What it measures
+“How much value leaks to processors/platforms.”
+
+Data needed
+
+Fee transactions
+
+Gross inflows
+
+Why it matters
+Fees are invisible margin killers.
+
+Yellow
+
+Fee % rising slowly
+
+Red
+
+Fee spikes during revenue softness
+
+4️⃣ VOLATILITY & PREDICTABILITY SIGNALS
+
+These capture loss of control, not loss of profit.
+
+4.1 Cash Flow Volatility Spike
+
+What it measures
+“How wild daily net cash swings are.”
+
+Data needed
+
+Daily net cash delta
+
+Why it matters
+Volatility increases failure risk nonlinearly.
+
+Yellow
+
+Std dev increasing faster than revenue
+
+Red
+
+Sustained high volatility
+
+Frequent negative days
+
+4.2 Recovery Time Elongation
+
+What it measures
+“How long it takes to recover after a bad period.”
+
+Data needed
+
+Time between negative and positive streaks
+
+Why it matters
+Healthy businesses recover quickly.
+
+Yellow
+
+Recovery taking longer
+
+Red
+
+No recovery after shocks
+
+5️⃣ CONCENTRATION & DEPENDENCY SIGNALS
+
+These measure fragility, not performance.
+
+5.1 Revenue Source Concentration
+
+What it measures
+“How dependent revenue is on one source.”
+
+Data needed
+
+Source attribution (bank, processor, POS)
+
+Why it matters
+Single points of failure are deadly.
+
+Yellow
+
+One source >60% of inflows
+
+Red
+
+One source >80% or growing dominance
+
+5.2 Customer / Event Concentration
+
+What it measures
+“Are fewer events driving more revenue?”
+
+Data needed
+
+Transaction size distribution
+
+Why it matters
+Lumpiness hides risk.
+
+Yellow
+
+Median ticket shrinking, mean stable
+
+Red
+
+Outliers dominating revenue
+
+How this maps to your simulator (important)
+
+Each intervention should map to expected signals.
+
+Example:
+
+Intervention: revenue_drop
+Expected signals:
+
+Revenue Velocity Deceleration
+
+Cash Runway Compression
+
+Volatility Spike
+
+Intervention: deposit_delay
+Expected signals:
+
+Deposit Delay Drift
+
+Cash Timing Mismatch
+
+Intervention: expense_spike
+Expected signals:
+
+Expense Creep
+
+Payroll Load Stress
+
+Cash Runway Compression
+
+This gives you ground truth validation:
+
+“Did our system detect what we know we injected?”
+
+The advisor-facing magic
+
+An advisor never wants:
+
+“Your EBITDA is down 3.2%.”
+
+They want:
+
+“Your payroll is starting to hit before deposits, and your cash buffer is shrinking. If this continues, you’ll feel it in ~45 days.”
+
+Your signal taxonomy enables that exact sentence.
