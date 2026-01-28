@@ -37,7 +37,7 @@ export default function SignalGrid({ signals, selectedKey, onSelect }: Props) {
   }
 
   // Sort signals within dimension: severity desc, priority desc, key asc
-  for (const [d, arr] of byDim.entries()) {
+  for (const arr of byDim.values()) {
     arr.sort((a, b) => {
       const r = sevRank(b.severity) - sevRank(a.severity);
       if (r !== 0) return r;

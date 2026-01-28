@@ -1,12 +1,10 @@
-import "./App.css";
 import { useState } from "react";
 import { useDashboard } from "./hooks/useDashboard";
 import { useBusinessDetail } from "./hooks/useBusinessDetail";
 import DetailPanel from "./components/DetailPanel/DetailPanel";
 import DashboardGrid from "./components/DashboardGrid";
 import Onboarding from "./pages/Onboarding";
-
-import logo from "../public/logo.svg"; // <-- adjust filename if needed
+import styles from "./App.module.css";
 
 function OnboardingIcon() {
   // simple inline svg (no extra deps)
@@ -33,41 +31,44 @@ export default function App() {
   const { cards, err, loading } = useDashboard();
   const detailState = useBusinessDetail();
 
-  if (err) return <div className="page">Error: {err}</div>;
-  if (loading) return <div className="page">Loading…</div>;
+  if (err) return <div className={styles.page}>Error: {err}</div>;
+  if (loading) return <div className={styles.page}>Loading…</div>;
+
+  const navButtonClass = (active: boolean) =>
+    `${styles.navButton} ${active ? styles.navButtonActive : ""}`;
 
   return (
-    <div className="page">
-      <header className="header">
+    <div className={styles.page}>
+      <header className={styles.header}>
         {/* left brand (logo + name) */}
-        <div className="brandRow">
-          <img src={logo} alt="Clarity Labs" className="logo" />
-          <h1 style={{ margin: 0 }}>Clarity Labs</h1>
+        <div className={styles.brandRow}>
+          <img src="/logo.svg" alt="Clarity Labs" className={styles.logo} />
+          <h1 className={styles.brandTitle}>Clarity Labs</h1>
         </div>
 
         {/* right nav (single line) */}
-        <div className="navRow">
+        <div className={styles.navRow}>
           <button
-            className="closeBtn"
+            className={navButtonClass(tab === "dashboard")}
             onClick={() => setTab("dashboard")}
-            style={{ opacity: tab === "dashboard" ? 1 : 0.6 }}
+            type="button"
           >
             Dashboard
           </button>
 
           <button
-            className="closeBtn"
+            className={navButtonClass(tab === "onboarding")}
             onClick={() => setTab("onboarding")}
-            style={{ opacity: tab === "onboarding" ? 1 : 0.6, display: "flex", alignItems: "center", gap: 8 }}
             title="Onboarding"
             aria-label="Onboarding"
+            type="button"
           >
             <OnboardingIcon />
           </button>
         </div>
       </header>
 
-      <div className="shell">
+      <div className={styles.shell}>
         {tab === "onboarding" && <Onboarding />}
 
         <DetailPanel

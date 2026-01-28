@@ -265,7 +265,17 @@ function sortInterventionsStable(ivs: Intervention[], mode: "start_date" | "upda
   return arr;
 }
 
-export default function SimulatorTabV2({ businessId }: { businessId: string }) {
+export default function SimulatorTabV2({
+  businessId,
+  onAfterPulse,
+  onAfterSave,
+}: {
+  businessId: string;
+  onAfterPulse?: () => void;
+  onAfterSave?: () => void;
+}) {
+  void onAfterPulse;
+  void onAfterSave;
   const [catalog, setCatalog] = useState<ScenarioCatalog | null>(null);
   const [templates, setTemplates] = useState<InterventionTemplate[]>([]);
   const [plan, setPlan] = useState<SimPlanOut | null>(null);

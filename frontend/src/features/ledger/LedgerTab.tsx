@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useLedger } from "../../hooks/useLedger";
+import styles from "./LedgerTab.module.css";
 
 function fmtMoney(n: number) {
   const sign = n < 0 ? "-" : "";
@@ -8,21 +9,7 @@ function fmtMoney(n: number) {
 }
 
 function Chip({ label }: { label: string }) {
-  return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        padding: "2px 8px",
-        borderRadius: 999,
-        background: "#f5f5f5",
-        border: "1px solid #e9e9e9",
-        fontSize: 12,
-      }}
-    >
-      {label}
-    </span>
-  );
+  return <span className={styles.chip}>{label}</span>;
 }
 
 function StatCard({
@@ -35,12 +22,12 @@ function StatCard({
   subtitle?: string;
 }) {
   return (
-    <div style={{ border: "1px solid #e5e5e5", borderRadius: 10, padding: 12 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-        <div style={{ fontWeight: 600 }}>{title}</div>
-        {subtitle ? <small style={{ opacity: 0.7 }}>{subtitle}</small> : null}
+    <div className={styles.statCard}>
+      <div className={styles.statHeader}>
+        <div className={styles.statTitle}>{title}</div>
+        {subtitle ? <small className={styles.statSubtitle}>{subtitle}</small> : null}
       </div>
-      <div style={{ marginTop: 10, fontSize: 22, fontWeight: 700 }}>{value}</div>
+      <div className={styles.statValue}>{value}</div>
     </div>
   );
 }
@@ -61,45 +48,49 @@ export function LedgerTab({ businessId }: { businessId: string }) {
     return { inflow, outflow, net: inflow - outflow, count: arr.length };
   }, [lines]);
 
-  if (loading && !lines) return <div style={{ padding: 12 }}>Loading ledger…</div>;
+  if (loading && !lines) return <div className={styles.loadingState}>Loading ledger…</div>;
   if (err)
     return (
-      <div style={{ padding: 12 }}>
-        <div style={{ marginBottom: 8 }}>Error: {err}</div>
-        <button onClick={refresh}>Retry</button>
+      <div className={styles.errorState}>
+        <div className={styles.errorMessage}>Error: {err}</div>
+        <button onClick={refresh} className={styles.button} type="button">
+          Retry
+        </button>
       </div>
     );
 
   const rows = lines ?? [];
 
   return (
-    <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 12 }}>
+    <div className={styles.container}>
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <div style={{ fontWeight: 600 }}>Ledger</div>
+      <div className={styles.headerRow}>
+        <div className={styles.title}>Ledger</div>
 
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          <small style={{ opacity: 0.75 }}>
-            Range {start_date} → {end_date} · <span style={{ fontVariantNumeric: "tabular-nums" }}>{totals.count}</span>{" "}
-            lines
+        <div className={styles.controls}>
+          <small className={styles.meta}>
+            Range {start_date} → {end_date} ·{" "}
+            <span className={styles.tabularNums}>{totals.count}</span> lines
           </small>
 
           <select
             value={days}
             onChange={(e) => setDays(Number(e.target.value))}
-            style={{ padding: "6px 8px", borderRadius: 8, border: "1px solid #e5e5e5" }}
+            className={styles.select}
           >
             <option value={30}>Last 30 days</option>
             <option value={90}>Last 90 days</option>
             <option value={365}>Last 12 months</option>
           </select>
 
-          <button onClick={refresh}>Refresh</button>
+          <button onClick={refresh} className={styles.button} type="button">
+            Refresh
+          </button>
         </div>
       </div>
 
       {/* Summary cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 12 }}>
+      <div className={styles.summaryGrid}>
         <StatCard title="Cash In" value={fmtMoney(totals.inflow)} subtitle="Posted lines" />
         <StatCard title="Cash Out" value={fmtMoney(-totals.outflow)} subtitle="Posted lines" />
         <StatCard title="Net Cash Flow" value={fmtMoney(totals.net)} subtitle="Posted lines" />
@@ -111,121 +102,112 @@ export function LedgerTab({ businessId }: { businessId: string }) {
       </div>
 
       {/* Statements (compact) */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }}>
-        <div style={{ border: "1px solid #e5e5e5", borderRadius: 10, padding: 12 }}>
-          <div style={{ fontWeight: 600, marginBottom: 8 }}>Income Statement</div>
+      <div className={styles.statementsGrid}>
+        <div className={styles.statementCard}>
+          <div className={styles.statementTitle}>Income Statement</div>
           {incomeStatement ? (
             <>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <small style={{ opacity: 0.75 }}>Revenue</small>
-                <div style={{ fontVariantNumeric: "tabular-nums" }}>{fmtMoney(incomeStatement.revenue_total)}</div>
+              <div className={styles.statementRow}>
+                <small>Revenue</small>
+                <div className={styles.statementValue}>{fmtMoney(incomeStatement.revenue_total)}</div>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <small style={{ opacity: 0.75 }}>Expenses</small>
-                <div style={{ fontVariantNumeric: "tabular-nums" }}>{fmtMoney(-incomeStatement.expense_total)}</div>
+              <div className={styles.statementRow}>
+                <small>Expenses</small>
+                <div className={styles.statementValue}>{fmtMoney(-incomeStatement.expense_total)}</div>
               </div>
-              <div style={{ height: 8 }} />
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <small style={{ opacity: 0.75 }}>Net Income</small>
-                <div style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-                  {fmtMoney(incomeStatement.net_income)}
-                </div>
+              <div className={styles.statementRow}>
+                <small>Net Income</small>
+                <div className={styles.statementValueStrong}>{fmtMoney(incomeStatement.net_income)}</div>
               </div>
             </>
           ) : (
-            <small style={{ opacity: 0.75 }}>Not available yet.</small>
+            <small className={styles.meta}>Not available yet.</small>
           )}
         </div>
 
-        <div style={{ border: "1px solid #e5e5e5", borderRadius: 10, padding: 12 }}>
-          <div style={{ fontWeight: 600, marginBottom: 8 }}>Cash Flow</div>
+        <div className={styles.statementCard}>
+          <div className={styles.statementTitle}>Cash Flow</div>
           {cashFlow ? (
             <>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <small style={{ opacity: 0.75 }}>Cash In</small>
-                <div style={{ fontVariantNumeric: "tabular-nums" }}>{fmtMoney(cashFlow.cash_in)}</div>
+              <div className={styles.statementRow}>
+                <small>Cash In</small>
+                <div className={styles.statementValue}>{fmtMoney(cashFlow.cash_in)}</div>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <small style={{ opacity: 0.75 }}>Cash Out</small>
-                <div style={{ fontVariantNumeric: "tabular-nums" }}>{fmtMoney(-cashFlow.cash_out)}</div>
+              <div className={styles.statementRow}>
+                <small>Cash Out</small>
+                <div className={styles.statementValue}>{fmtMoney(-cashFlow.cash_out)}</div>
               </div>
-              <div style={{ height: 8 }} />
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <small style={{ opacity: 0.75 }}>Net</small>
-                <div style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-                  {fmtMoney(cashFlow.net_cash_flow)}
-                </div>
+              <div className={styles.statementRow}>
+                <small>Net</small>
+                <div className={styles.statementValueStrong}>{fmtMoney(cashFlow.net_cash_flow)}</div>
               </div>
             </>
           ) : (
-            <small style={{ opacity: 0.75 }}>Not available yet.</small>
+            <small className={styles.meta}>Not available yet.</small>
           )}
         </div>
 
-        <div style={{ border: "1px solid #e5e5e5", borderRadius: 10, padding: 12 }}>
-          <div style={{ fontWeight: 600, marginBottom: 8 }}>Balance Sheet (V1)</div>
+        <div className={styles.statementCard}>
+          <div className={styles.statementTitle}>Balance Sheet (V1)</div>
           {balanceSheet ? (
             <>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <small style={{ opacity: 0.75 }}>Assets</small>
-                <div style={{ fontVariantNumeric: "tabular-nums" }}>{fmtMoney(balanceSheet.assets_total)}</div>
+              <div className={styles.statementRow}>
+                <small>Assets</small>
+                <div className={styles.statementValue}>{fmtMoney(balanceSheet.assets_total)}</div>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <small style={{ opacity: 0.75 }}>Liabilities</small>
-                <div style={{ fontVariantNumeric: "tabular-nums" }}>{fmtMoney(balanceSheet.liabilities_total)}</div>
+              <div className={styles.statementRow}>
+                <small>Liabilities</small>
+                <div className={styles.statementValue}>{fmtMoney(balanceSheet.liabilities_total)}</div>
               </div>
-              <div style={{ height: 8 }} />
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <small style={{ opacity: 0.75 }}>Equity</small>
-                <div style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
-                  {fmtMoney(balanceSheet.equity_total)}
-                </div>
+              <div className={styles.statementRow}>
+                <small>Equity</small>
+                <div className={styles.statementValueStrong}>{fmtMoney(balanceSheet.equity_total)}</div>
               </div>
             </>
           ) : (
-            <small style={{ opacity: 0.75 }}>Not available yet.</small>
+            <small className={styles.meta}>Not available yet.</small>
           )}
         </div>
       </div>
 
       {/* Ledger table */}
-      <div style={{ border: "1px solid #e5e5e5", borderRadius: 8, overflow: "hidden" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <div className={styles.tableCard}>
+        <table className={styles.table}>
           <thead>
-            <tr style={{ textAlign: "left", background: "#fafafa" }}>
-              <th style={{ padding: "10px 12px" }}>When</th>
-              <th style={{ padding: "10px 12px" }}>Description</th>
-              <th style={{ padding: "10px 12px" }}>Account</th>
-              <th style={{ padding: "10px 12px" }}>Category</th>
-              <th style={{ padding: "10px 12px" }}>Type</th>
-              <th style={{ padding: "10px 12px", textAlign: "right" }}>Amount</th>
+            <tr className={styles.tableHead}>
+              <th className={styles.tableCell}>When</th>
+              <th className={styles.tableCell}>Description</th>
+              <th className={styles.tableCell}>Account</th>
+              <th className={styles.tableCell}>Category</th>
+              <th className={styles.tableCell}>Type</th>
+              <th className={`${styles.tableCell} ${styles.tableCellRight}`}>Amount</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((l) => (
-              <tr key={l.source_event_id} style={{ borderTop: "1px solid #eee" }}>
-                <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>
+              <tr key={l.source_event_id}>
+                <td className={`${styles.tableCell} ${styles.tableCellNoWrap}`}>
                   {new Date(l.occurred_at).toLocaleString()}
                 </td>
 
-                <td style={{ padding: "10px 12px" }}>
-                  <div style={{ fontWeight: 500 }}>{l.description}</div>
-                  <small style={{ opacity: 0.75 }}>
+                <td className={styles.tableCell}>
+                  <div className={styles.tableTitle}>{l.description}</div>
+                  <small className={styles.tableSub}>
                     event {l.source_event_id.slice(-6)} · <Chip label={l.direction} />
                   </small>
                 </td>
 
-                <td style={{ padding: "10px 12px" }}>{l.account_name}</td>
-                <td style={{ padding: "10px 12px" }}>{l.category_name}</td>
+                <td className={styles.tableCell}>{l.account_name}</td>
+                <td className={styles.tableCell}>{l.category_name}</td>
 
-                <td style={{ padding: "10px 12px" }}>
-                  <small style={{ opacity: 0.85 }}>
+                <td className={styles.tableCell}>
+                  <small className={styles.meta}>
                     {l.account_type}
                     {l.account_subtype ? ` · ${l.account_subtype}` : ""}
                   </small>
                 </td>
 
-                <td style={{ padding: "10px 12px", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                <td className={`${styles.tableCell} ${styles.tableCellRight}`}>
                   {fmtMoney(l.signed_amount)}
                 </td>
               </tr>
@@ -233,7 +215,7 @@ export function LedgerTab({ businessId }: { businessId: string }) {
 
             {rows.length === 0 && (
               <tr>
-                <td colSpan={6} style={{ padding: 12, opacity: 0.75 }}>
+                <td colSpan={6} className={styles.emptyState}>
                   No posted ledger lines yet. Categorize a few transactions first.
                 </td>
               </tr>

@@ -41,11 +41,11 @@
 
 /* Severity colors */
 .signal-green {
-  background: var(--green);
+  background: var(--success);
 }
 .signal-yellow {
-  background: var(--yellow);
+  background: var(--warning);
 }
 .signal-red {
-  background: var(--red);
+  background: var(--danger);
 }

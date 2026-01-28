@@ -12,12 +12,12 @@
 
 .track {
   fill: none;
-  stroke: rgba(6, 118, 71, 0.12); /* soft green track */
+  stroke: rgba(6, 118, 71, 0.12);
 }
 
 .progress {
   fill: none;
-  stroke: var(--green);
+  stroke: var(--success);
   stroke-linecap: round;
   transition: stroke-dasharray 350ms ease;
 }
@@ -47,9 +47,9 @@
   margin-top: 6px;
   font-size: 13px;
   font-weight: 800;
-  color: var(--green);
-  background: var(--green-bg);
-  border: 1px solid var(--green-border);
+  color: var(--success);
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
   padding: 5px 10px;
   border-radius: 999px;
 }

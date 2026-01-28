@@ -7,6 +7,7 @@ import CoaTab from "./CoaTab";
 import { LedgerTab } from "../../features/ledger";
 import { deleteBusiness } from "../../api/admin"; // ✅ add this (adjust path if needed)
 import { TrendsTab } from "../../features/trends";
+import styles from "./DetailPanel.module.css";
 
 type PanelMode = "simulator" |"coa" | "transactions" | "categorize" | "ledger" | "signals" | "trends";
 
@@ -50,9 +51,9 @@ export default function DetailPanel({
 
   const TabButton = ({ label, value }: { label: string; value: PanelMode }) => (
     <button
-      className="closeBtn"
+      className={`${styles.tabButton} ${mode === value ? styles.tabButtonActive : ""}`}
       onClick={() => setMode(value)}
-      style={{ opacity: mode === value ? 1 : 0.6 }}
+      type="button"
     >
       {label}
     </button>
@@ -87,15 +88,15 @@ export default function DetailPanel({
   }
 
   return (
-    <div className="panel">
-      <div className="panelHeader">
+    <div className={styles.panel}>
+      <div className={styles.panelHeader}>
         <div>
-          <div className="panelTitle">{detail?.name ?? selectedId}</div>
-          <div className="panelSub">
+          <div className={styles.panelTitle}>{detail?.name ?? selectedId}</div>
+          <div className={styles.panelSub}>
             Score: <strong>{detail?.health_score ?? "—"}</strong>
           </div>
 
-          <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+          <div className={styles.tabRow}>
             <TabButton label="Simulator" value="simulator" />
             <TabButton label="COA" value="coa" />
             <TabButton label="Transactions" value="transactions" />
@@ -106,19 +107,14 @@ export default function DetailPanel({
 
             {/* ✅ Delete button lives here */}
             <button
-              className="closeBtn"
+              className={`${styles.tabButton} ${styles.dangerButton}`}
               onClick={() => {
                 setDangerOpen((v) => !v);
                 setDeleteErr(null);
               }}
-              style={{
-                marginLeft: 8,
-                border: "1px solid #ef4444",
-                color: "#991b1b",
-                opacity: deleting ? 0.6 : 0.9,
-              }}
               disabled={deleting}
               title="Delete this business and all associated data"
+              type="button"
             >
               Delete…
             </button>
@@ -126,21 +122,12 @@ export default function DetailPanel({
 
           {/* ✅ Danger zone inline confirm */}
           {dangerOpen && (
-            <div
-              style={{
-                marginTop: 10,
-                padding: 10,
-                borderRadius: 12,
-                border: "1px solid #fecaca",
-                background: "rgba(254, 202, 202, 0.15)",
-                maxWidth: 520,
-              }}
-            >
-              <div style={{ fontSize: 12, color: "#991b1b", marginBottom: 6 }}>
+            <div className={styles.dangerZone}>
+              <div className={styles.dangerText}>
                 Danger zone: this permanently deletes the business and all associated data.
               </div>
 
-              <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 8 }}>
+              <div className={styles.dangerHint}>
                 Type <strong>{confirmPhrase}</strong> to confirm.
               </div>
 
@@ -149,42 +136,32 @@ export default function DetailPanel({
                 onChange={(e) => setTyped(e.target.value)}
                 placeholder={confirmPhrase}
                 disabled={deleting}
-                style={{
-                  width: "100%",
-                  padding: 10,
-                  borderRadius: 10,
-                  border: "1px solid #e5e7eb",
-                  marginBottom: 8,
-                }}
+                className={styles.dangerInput}
               />
 
               {deleteErr && (
-                <div style={{ color: "#b91c1c", fontSize: 12, marginBottom: 8 }}>
-                  {deleteErr}
-                </div>
+                <div className={styles.dangerError}>{deleteErr}</div>
               )}
 
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <div className={styles.dangerActions}>
                 <button
-                  className="closeBtn"
+                  className={`${styles.tabButton} ${styles.dangerButton}`}
                   onClick={onDelete}
                   disabled={!canDelete || deleting}
-                  style={{
-                    border: "1px solid #ef4444",
-                    opacity: !canDelete || deleting ? 0.6 : 1,
-                  }}
+                  type="button"
                 >
                   {deleting ? "Deleting…" : "Confirm delete"}
                 </button>
 
                 <button
-                  className="closeBtn"
+                  className={styles.tabButton}
                   onClick={() => {
                     setDangerOpen(false);
                     setTyped("");
                     setDeleteErr(null);
                   }}
                   disabled={deleting}
+                  type="button"
                 >
                   Cancel
                 </button>
@@ -193,17 +170,17 @@ export default function DetailPanel({
           )}
         </div>
 
-        <button className="closeBtn" onClick={close} disabled={deleting}>
+        <button className={styles.closeButton} onClick={close} disabled={deleting} type="button">
           Close
         </button>
       </div>
 
       {/* Body */}
-      {loading && <div>Loading…</div>}
-      {error && <div style={{ color: "#b91c1c" }}>Error: {error}</div>}
+      {loading && <div className={styles.panelStatus}>Loading…</div>}
+      {error && <div className={styles.panelError}>Error: {error}</div>}
 
       {!loading && !error && (
-        <div style={{ paddingTop: 8 }}>
+        <div className={styles.panelBody}>
           {mode === "simulator" && (
             <SimulatorTab
               businessId={selectedId}

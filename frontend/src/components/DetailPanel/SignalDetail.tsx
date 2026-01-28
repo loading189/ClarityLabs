@@ -122,7 +122,9 @@ export default function SignalDetail({ businessId, signal, onNavigate }: Props) 
               <tbody>
                 {(data.transactions ?? []).map((t) => (
                   <tr key={t.id}>
-                    <td className={styles.noWrap}>{new Date(t.occurred_at).toLocaleString()}</td>
+                    <td className={styles.noWrap}>
+                      {t.occurred_at ? new Date(t.occurred_at).toLocaleString() : "—"}
+                    </td>
                     <td>
                       <div className={styles.tableTitle}>{t.description}</div>
                       <small className={styles.tableSub}>event {String(t.source_event_id).slice(-6)}</small>
