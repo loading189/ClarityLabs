@@ -29,10 +29,12 @@ from backend.app.analytics.monthly_trends import build_monthly_trends_payload
 from backend.app.clarity.scoring import compute_business_score
 from backend.app.clarity.signals import compute_signals
 from backend.app.db import get_db
-from backend.app.models import Business, RawEvent
+from backend.app.models import Business, RawEvent, TxnCategorization
+from backend.app.norma.category_engine import suggest_category
 from backend.app.norma.facts import compute_facts, facts_to_dict
 from backend.app.norma.from_events import raw_event_to_txn
 from backend.app.norma.ledger import build_cash_ledger
+from backend.app.norma.merchant import merchant_key
 
 router = APIRouter(prefix="/demo", tags=["demo"])
 
@@ -304,6 +306,19 @@ def demo_transactions_by_business(
     newest_first = list(reversed(pairs))
     id_set = _parse_id_set(source_event_ids)
 
+    source_event_ids = [e.source_event_id for e, _t in pairs]
+    categorization_rows = (
+        db.execute(
+            select(TxnCategorization).where(
+                TxnCategorization.business_id == biz.id,
+                TxnCategorization.source_event_id.in_(source_event_ids),
+            )
+        )
+        .scalars()
+        .all()
+    )
+    categorization_map = {row.source_event_id: row for row in categorization_rows}
+
     items: List[dict] = []
     for e, t in newest_first:
         if id_set and e.source_event_id not in id_set:
@@ -312,6 +327,25 @@ def demo_transactions_by_business(
             continue
         if direction and t.direction != direction:
             continue
+
+        suggestion_source: Optional[str] = None
+        confidence: Optional[float] = None
+        reason: Optional[str] = None
+
+        manual = categorization_map.get(e.source_event_id)
+        if manual:
+            suggestion_source = manual.source
+            confidence = manual.confidence
+            reason = manual.note
+        elif (t.category or "").strip().lower() == "uncategorized":
+            suggested = suggest_category(db, t, business_id=biz.id)
+            cat_obj = getattr(suggested, "categorization", None)
+            if cat_obj:
+                candidate = (cat_obj.category or "").strip().lower()
+                if candidate and candidate != "uncategorized":
+                    suggestion_source = cat_obj.source
+                    confidence = float(cat_obj.confidence or 0.0)
+                    reason = cat_obj.reason
 
         items.append(
             {
@@ -325,6 +359,10 @@ def demo_transactions_by_business(
                 "account": t.account,
                 "category": t.category,
                 "counterparty_hint": t.counterparty_hint,
+                "merchant_key": merchant_key(t.description),
+                "suggestion_source": suggestion_source,
+                "confidence": confidence,
+                "reason": reason,
             }
         )
 

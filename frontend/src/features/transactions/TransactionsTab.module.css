@@ -293,6 +293,144 @@
   color: #374151;
 }
 
+.provenanceCard {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  display: grid;
+  gap: 6px;
+}
+
+.provenanceRow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #4b5563;
+}
+
+.provenanceValue {
+  font-weight: 600;
+  color: #111827;
+}
+
+.provenanceReason {
+  font-size: 12px;
+  color: #374151;
+}
+
+.vendorRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+
+.vendorKey {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.vendorPanel {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+  display: grid;
+  gap: 12px;
+  background: #f9fafb;
+}
+
+.vendorPanelHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.vendorPanelTitle {
+  font-weight: 600;
+}
+
+.vendorPanelSub {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 4px;
+}
+
+.vendorEmpty {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.vendorGrid {
+  display: grid;
+  gap: 10px;
+}
+
+.vendorLabel {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.vendorValue {
+  font-size: 14px;
+  color: #111827;
+}
+
+.vendorMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 12px;
+  color: #4b5563;
+}
+
+.vendorAliases {
+  display: grid;
+  gap: 6px;
+}
+
+.vendorAliasList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.vendorAlias {
+  background: #e0f2fe;
+  color: #0369a1;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+}
+
+.vendorControls {
+  display: grid;
+  gap: 8px;
+}
+
+.checkboxRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  color: #4b5563;
+}
+
+.vendorActions {
+  display: grid;
+  gap: 8px;
+}
+
+.textInput {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+}
+
 .drawerActions {
   display: grid;
   gap: 10px;
