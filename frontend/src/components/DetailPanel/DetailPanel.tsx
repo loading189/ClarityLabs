@@ -28,7 +28,7 @@ export default function DetailPanel({
   const [deleting, setDeleting] = useState(false);
   const [deleteErr, setDeleteErr] = useState<string | null>(null);
 
-  // When you open a new business, default back to Signals
+  // When you open a new business, default back to Health
   useEffect(() => {
     if (selectedId) {
       setMode("signals");
@@ -98,7 +98,7 @@ export default function DetailPanel({
             <TabButton label="Categorize" value="categorize" />
             <TabButton label="Ledger" value="ledger" />
             <TabButton label="Trends" value="trends" />
-            <TabButton label="Signals" value="signals" />
+            <TabButton label="Health" value="signals" />
 
             {/* ✅ Delete button lives here */}
             <button
@@ -229,7 +229,9 @@ export default function DetailPanel({
           {mode === "ledger" && (
             <LedgerTab key={`led-${selectedId}-${refreshKey}`} businessId={selectedId} />
           )}
-          {mode === "signals" && detail && <SignalsTab detail={detail} />}  
+          {mode === "signals" && detail && (
+            <SignalsTab detail={detail} onNavigate={(target) => setMode(target)} />
+          )}
       
           {mode === "trends" && (
             <TrendsTab key={`trends-${selectedId}-${refreshKey}`} businessId={selectedId} />

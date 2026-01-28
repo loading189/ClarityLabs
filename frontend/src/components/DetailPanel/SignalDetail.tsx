@@ -2,10 +2,12 @@
 import { useMemo } from "react";
 import type { Signal } from "../../types";
 import { useTransactions } from "../../hooks/useTransactions";
+import styles from "../../features/signals/HealthTab.module.css";
 
 type Props = {
   businessId: string;
   signal: Signal;
+  onNavigate?: (target: "transactions" | "trends") => void;
 };
 
 function extractSourceEventIds(signal: Signal): string[] {
@@ -16,7 +18,7 @@ function extractSourceEventIds(signal: Signal): string[] {
   return Array.from(new Set(ids));
 }
 
-export default function SignalDetail({ businessId, signal }: Props) {
+export default function SignalDetail({ businessId, signal, onNavigate }: Props) {
   const sourceEventIds = useMemo(() => extractSourceEventIds(signal), [signal]);
 
   // Only fetch if we actually have refs
@@ -28,95 +30,112 @@ export default function SignalDetail({ businessId, signal }: Props) {
   );
 
   return (
-    <div className="signalDetail">
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+    <div className={styles.signalDetail}>
+      <div className={styles.signalDetailHeader}>
         <div>
-          <div style={{ fontWeight: 700 }}>{signal.title}</div>
-          <div style={{ fontSize: 12, opacity: 0.75 }}>
-            {signal.dimension} · {String(signal.severity).toUpperCase()} · priority {signal.priority}
+          <div className={styles.signalDetailTitle}>{signal.title}</div>
+          <div className={styles.signalDetailMeta}>
+            <span className={`${styles.pill} ${styles.pillSoft}`}>{signal.dimension ?? "other"}</span>
+            <span
+              className={`${styles.pill} ${
+                signal.severity === "red"
+                  ? styles.pillRed
+                  : signal.severity === "yellow"
+                  ? styles.pillYellow
+                  : styles.pillGreen
+              }`}
+            >
+              {String(signal.severity ?? "green").toUpperCase()}
+            </span>
+            <span className={styles.pill}>Priority {signal.priority ?? 0}</span>
           </div>
         </div>
 
         {shouldFetch && (
-          <button onClick={refresh} disabled={loading}>
+          <button className={styles.actionButton} onClick={refresh} disabled={loading}>
             {loading ? "Loading…" : "Refresh"}
           </button>
         )}
       </div>
 
-      <div style={{ marginTop: 10 }}>{signal.message}</div>
+      <div className={styles.signalDetailMessage}>{signal.message}</div>
 
       {signal.why && (
-        <div style={{ marginTop: 10 }}>
-          <strong>Why:</strong> {signal.why}
+        <div className={styles.signalDetailBlock}>
+          <div className={styles.signalDetailLabel}>Why</div>
+          <div className={styles.signalDetailBody}>{signal.why}</div>
         </div>
       )}
 
       {signal.how_to_fix && (
-        <div style={{ marginTop: 10 }}>
-          <strong>Next:</strong> {signal.how_to_fix}
+        <div className={styles.signalDetailBlock}>
+          <div className={styles.signalDetailLabel}>Next step</div>
+          <div className={styles.signalDetailBody}>{signal.how_to_fix}</div>
         </div>
       )}
 
       {signal.evidence && (
-        <details style={{ marginTop: 10 }}>
+        <details className={styles.signalDetailDetails}>
           <summary>Evidence</summary>
-          <pre style={{ marginTop: 8 }}>{JSON.stringify(signal.evidence, null, 2)}</pre>
+          <pre>{JSON.stringify(signal.evidence, null, 2)}</pre>
         </details>
       )}
 
+      <div className={styles.signalActions}>
+        <button className={styles.actionButton} onClick={() => onNavigate?.("transactions")}>
+          View transactions
+        </button>
+        <button className={styles.actionButton} onClick={() => onNavigate?.("trends")}>
+          View trend
+        </button>
+      </div>
+
       {/* Drilldown transactions */}
-      <div style={{ marginTop: 14 }}>
-        <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 6 }}>
+      <div className={styles.signalDetailBlock}>
+        <div className={styles.signalDetailLabel}>
           Related transactions {shouldFetch ? `(${sourceEventIds.length} refs)` : "(no refs)"}
         </div>
 
         {!shouldFetch && (
-          <div style={{ opacity: 0.7 }}>
+          <div className={styles.inlineMuted}>
             This signal doesn’t yet include transaction references (evidence_refs).
           </div>
         )}
 
-        {shouldFetch && err && (
-          <div style={{ padding: 10, border: "1px solid #eee", borderRadius: 8 }}>
-            Error loading transactions: {err}
-          </div>
-        )}
+        {shouldFetch && err && <div className={styles.inlineError}>Error loading transactions: {err}</div>}
 
-        {shouldFetch && loading && !data && <div style={{ opacity: 0.7 }}>Loading…</div>}
+        {shouldFetch && loading && !data && <div className={styles.inlineMuted}>Loading…</div>}
 
         {shouldFetch && data && (
-          <div style={{ border: "1px solid #e5e5e5", borderRadius: 8, overflow: "hidden" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <div className={styles.signalTableWrap}>
+            <table className={styles.signalTable}>
               <thead>
-                <tr style={{ textAlign: "left", background: "#fafafa" }}>
-                  <th style={{ padding: "10px 12px" }}>When</th>
-                  <th style={{ padding: "10px 12px" }}>Description</th>
-                  <th style={{ padding: "10px 12px" }}>Account</th>
-                  <th style={{ padding: "10px 12px" }}>Category</th>
-                  <th style={{ padding: "10px 12px", textAlign: "right" }}>Amount</th>
+                <tr>
+                  <th>When</th>
+                  <th>Description</th>
+                  <th>Account</th>
+                  <th>Category</th>
+                  <th className={styles.alignRight}>Amount</th>
                 </tr>
               </thead>
               <tbody>
                 {(data.transactions ?? []).map((t) => (
-                  <tr key={t.id} style={{ borderTop: "1px solid #eee" }}>
-                    <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>
-                      {new Date(t.occurred_at).toLocaleString()}
+                  <tr key={t.id}>
+                    <td className={styles.noWrap}>{new Date(t.occurred_at).toLocaleString()}</td>
+                    <td>
+                      <div className={styles.tableTitle}>{t.description}</div>
+                      <small className={styles.tableSub}>event {String(t.source_event_id).slice(-6)}</small>
                     </td>
-                    <td style={{ padding: "10px 12px" }}>
-                      <div style={{ fontWeight: 500 }}>{t.description}</div>
-                      <small style={{ opacity: 0.75 }}>event {String(t.source_event_id).slice(-6)}</small>
-                    </td>
-                    <td style={{ padding: "10px 12px" }}>{t.account}</td>
-                    <td style={{ padding: "10px 12px" }}>{t.category}</td>
-                    <td style={{ padding: "10px 12px", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                    <td>{t.account}</td>
+                    <td>{t.category}</td>
+                    <td className={styles.alignRight}>
                       {t.amount < 0 ? "-" : ""}${Math.abs(t.amount).toFixed(2)}
                     </td>
                   </tr>
                 ))}
                 {(data.transactions ?? []).length === 0 && (
                   <tr>
-                    <td colSpan={5} style={{ padding: 12, opacity: 0.75 }}>
+                    <td colSpan={5} className={styles.emptyCell}>
                       No matching transactions returned for these refs.
                     </td>
                   </tr>

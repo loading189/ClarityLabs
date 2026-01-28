@@ -1,0 +1,512 @@
+.healthTab {
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.healthHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.healthTitle {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.healthSubtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.healthActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.summaryPanel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--panel-bg);
+  padding: 14px;
+  box-shadow: var(--shadow-soft);
+}
+
+.summaryHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.summaryTitle {
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
+.summarySub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.summaryStatus {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.summaryTile {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card-bg);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 96px;
+}
+
+.tileLabel {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tileValue {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.tileHint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.tileAction {
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+  width: fit-content;
+}
+
+.tileAction:hover {
+  text-decoration: underline;
+}
+
+.signalDashboardLayout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 900px) {
+  .signalDashboardLayout {
+    grid-template-columns: 1.15fr 0.85fr;
+    align-items: start;
+  }
+}
+
+.signalGridWrap {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--panel-bg);
+  padding: 12px;
+  box-shadow: var(--shadow-soft);
+}
+
+.signalGridHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+
+.signalGridTitle {
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
+.signalGridHint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.signalGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.signalGroup {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card-bg);
+  padding: 10px;
+}
+
+.signalGroupHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.signalGroupTitle {
+  font-weight: 900;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.signalGroupCounts {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  background: #fff;
+}
+
+.chipRed {
+  color: var(--red);
+  background: var(--red-bg);
+  border-color: var(--red-border);
+}
+
+.chipYellow {
+  color: var(--yellow);
+  background: var(--yellow-bg);
+  border-color: var(--yellow-border);
+}
+
+.chipGreen {
+  color: var(--green);
+  background: var(--green-bg);
+  border-color: var(--green-border);
+}
+
+.signalLights {
+  display: grid;
+  gap: 8px;
+}
+
+.signalLight {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel-bg);
+  padding: 10px;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  gap: 10px;
+  align-items: center;
+  text-align: left;
+  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+}
+
+.signalLight:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-soft);
+  border-color: var(--border-strong);
+}
+
+.signalLightActive {
+  box-shadow: 0 0 0 4px var(--focus);
+  border-color: rgba(247, 204, 47, 0.55);
+}
+
+.signalLightDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.signalLightRed .signalLightDot {
+  background: var(--red);
+}
+
+.signalLightYellow .signalLightDot {
+  background: var(--yellow);
+}
+
+.signalLightGreen .signalLightDot {
+  background: var(--green);
+}
+
+.signalLightTitle {
+  font-weight: 900;
+  font-size: 13px;
+  letter-spacing: -0.01em;
+}
+
+.signalLightText {
+  display: flex;
+  flex-direction: column;
+}
+
+.signalLightSub {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.signalDetail {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--panel-bg);
+  padding: 12px;
+  box-shadow: var(--shadow-soft);
+  position: sticky;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.signalDetailHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.signalDetailTitle {
+  font-weight: 900;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+}
+
+.signalDetailMeta {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.pill {
+  font-size: 11px;
+  font-weight: 900;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text-muted);
+}
+
+.pillSoft {
+  background: var(--code-bg);
+  border-color: var(--code-border);
+  color: var(--text-muted);
+}
+
+.pillRed {
+  color: var(--red);
+  background: var(--red-bg);
+  border-color: var(--red-border);
+}
+
+.pillYellow {
+  color: var(--yellow);
+  background: var(--yellow-bg);
+  border-color: var(--yellow-border);
+}
+
+.pillGreen {
+  color: var(--green);
+  background: var(--green-bg);
+  border-color: var(--green-border);
+}
+
+.signalDetailMessage {
+  color: var(--text);
+}
+
+.signalDetailBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.signalDetailLabel {
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--text);
+}
+
+.signalDetailBody {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.signalDetailDetails summary {
+  cursor: pointer;
+  font-weight: 800;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.signalDetailDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.signalDetailDetails pre {
+  margin: 8px 0 0;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: var(--code-bg);
+  color: var(--code-text);
+  border: 1px solid var(--code-border);
+  overflow: auto;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.signalActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.actionButton {
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  cursor: pointer;
+  color: var(--text);
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+
+.actionButton:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-soft);
+  transform: translateY(-1px);
+}
+
+.actionButton:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px var(--focus);
+}
+
+.inlineMuted {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.inlineError {
+  font-size: 12px;
+  color: #b91c1c;
+  padding: 10px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+}
+
+.signalTableWrap {
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.signalTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.signalTable th {
+  text-align: left;
+  background: #fafafa;
+  padding: 10px 12px;
+}
+
+.signalTable td {
+  padding: 10px 12px;
+  border-top: 1px solid #eee;
+}
+
+.tableTitle {
+  font-weight: 500;
+}
+
+.tableSub {
+  opacity: 0.75;
+}
+
+.alignRight {
+  text-align: right;
+}
+
+.noWrap {
+  white-space: nowrap;
+}
+
+.emptyCell {
+  padding: 12px;
+  opacity: 0.75;
+}
+
+.ledgerPreview {
+  margin-top: 4px;
+}
+
+.ledgerTitle {
+  font-size: 12px;
+  opacity: 0.8;
+  margin-bottom: 6px;
+}
+
+.ledgerTable {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.ledgerRow {
+  display: grid;
+  grid-template-columns: 140px 1fr 120px;
+  gap: 10px;
+  padding: 10px;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 12px;
+}
+
+.ledgerDesc {
+  opacity: 0.85;
+}
+
+.emptyState {
+  opacity: 0.7;
+}
