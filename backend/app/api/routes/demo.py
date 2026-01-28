@@ -22,19 +22,22 @@ from datetime import datetime, timezone
 from typing import Any, List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from backend.app.analytics.monthly_trends import build_monthly_trends_payload
 from backend.app.clarity.scoring import compute_business_score
 from backend.app.clarity.signals import compute_signals
 from backend.app.db import get_db
-from backend.app.models import Business, RawEvent, TxnCategorization
+from backend.app.models import Business, CategoryRule, RawEvent, TxnCategorization
 from backend.app.norma.category_engine import suggest_category
 from backend.app.norma.facts import compute_facts, facts_to_dict
 from backend.app.norma.from_events import raw_event_to_txn
 from backend.app.norma.ledger import build_cash_ledger
 from backend.app.norma.merchant import merchant_key
+from backend.app.norma.categorize_brain import brain
+from backend.app.services import categorize_service
+from backend.app.clarity.health_v1 import build_health_v1_signals
 
 router = APIRouter(prefix="/demo", tags=["demo"])
 
@@ -131,7 +134,7 @@ def _compute_health_from_txns(txns: List[Any]):
     signals_dicts = [asdict(s) for s in signals]       # score expects dict-ish inputs
     breakdown = compute_business_score(scoring_input, signals_dicts)
 
-    return facts_obj, facts_json, scoring_input, signals, signals_dicts, breakdown
+    return facts_obj, facts_json, scoring_input, signals, signals_dicts, breakdown, ledger
 
 
 def _attach_signal_refs(signals_dicts: List[dict], pairs: List[Tuple[RawEvent, Any]]) -> List[dict]:
@@ -182,10 +185,9 @@ def demo_monthly_trends_by_business(
     txns = [t for _e, t in pairs]
 
     # compute facts_json
-    _facts_obj, facts_json, _scoring_input, _signals, _signals_dicts, _breakdown = _compute_health_from_txns(txns)
+    _facts_obj, facts_json, _scoring_input, _signals, _signals_dicts, _breakdown, ledger = _compute_health_from_txns(txns)
 
     # build full ledger rows for cash_end
-    ledger = build_cash_ledger(txns, opening_balance=0.0)
     ledger_rows = [
         {
             "occurred_at": r.occurred_at.isoformat(),
@@ -228,7 +230,7 @@ def demo_dashboard(db: Session = Depends(get_db)):
             chronological=True,
         )
         txns = [t for _e, t in pairs]
-        _facts_obj, _facts_json, _scoring_input, signals, _signals_dicts, breakdown = _compute_health_from_txns(txns)
+        _facts_obj, _facts_json, _scoring_input, signals, _signals_dicts, breakdown, _ledger = _compute_health_from_txns(txns)
 
         cards.append(
             {
@@ -255,8 +257,37 @@ def demo_health_by_business(business_id: str, db: Session = Depends(get_db)):
     )
     txns = [t for _e, t in pairs]
 
-    _facts_obj, facts_json, scoring_input, signals, signals_dicts, breakdown = _compute_health_from_txns(txns)
+    _facts_obj, facts_json, scoring_input, signals, signals_dicts, breakdown, ledger = _compute_health_from_txns(txns)
     sig_out = _attach_signal_refs(signals_dicts, pairs)
+
+    ledger_rows = [
+        {
+            "occurred_at": r.occurred_at.isoformat(),
+            "date": r.date.isoformat(),
+            "amount": float(r.amount),
+            "balance": float(r.balance),
+            "source_event_id": r.source_event_id,
+        }
+        for r in ledger
+    ]
+
+    categorization_metrics = categorize_service.categorization_metrics(db, biz.id)
+    rule_count = db.execute(
+        select(func.count()).select_from(CategoryRule).where(CategoryRule.business_id == biz.id)
+    ).scalar_one()
+
+    def _is_known_vendor(key: str) -> bool:
+        return brain.lookup_label(business_id=biz.id, alias_key=key) is not None
+
+    health_signals = build_health_v1_signals(
+        facts_json=facts_json,
+        ledger_rows=ledger_rows,
+        txns=txns,
+        updated_at=None if not last_event_occurred_at else last_event_occurred_at.isoformat(),
+        categorization_metrics=categorization_metrics,
+        rule_count=int(rule_count or 0),
+        is_known_vendor=_is_known_vendor,
+    )
 
     return {
         "business_id": str(biz.id),
@@ -272,6 +303,7 @@ def demo_health_by_business(business_id: str, db: Session = Depends(get_db)):
         },
         "highlights": [s.title for s in signals[:3]],
         "signals": sig_out,
+        "health_signals": health_signals,
         "facts": scoring_input,
         "facts_full": facts_json,  # ✅ fixed
         "ledger_preview": facts_json.get("last_10_ledger_rows", []),
