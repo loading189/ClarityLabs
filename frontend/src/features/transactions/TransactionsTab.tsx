@@ -590,7 +590,7 @@ export function TransactionsTab({
     }
   }, [businessId, selectedTxn]);
 
-  if (loading && !data) return <div style={{ padding: 12 }}>Loading transactions…</div>;
+  if (loading && !data) return <div className={styles.loading}>Loading transactions…</div>;
 
   const hasFilters = Boolean(
     filters.search.trim() ||

@@ -1,20 +1,9 @@
 import { useMemo, useState } from "react";
 import { useMonthlyTrends } from "../../hooks/useMonthlyTrends";
+import styles from "./TrendsTab.module.css";
 
-function Chip({ label }: { label: string }) {
-  return (
-    <span
-      style={{
-        fontSize: 12,
-        padding: "4px 8px",
-        borderRadius: 999,
-        border: "1px solid #e5e7eb",
-        background: "#fafafa",
-      }}
-    >
-      {label}
-    </span>
-  );
+function Chip({ label, className }: { label: string; className?: string }) {
+  return <span className={`${styles.statusChip} ${className ?? ""}`}>{label}</span>;
 }
 
 function formatMoney(x: number) {
@@ -62,23 +51,17 @@ function BandChart({
   return (
     <svg
       viewBox={`0 0 ${w} ${h}`}
-      style={{
-        width: "100%",
-        height: "auto",
-        display: "block",
-        borderRadius: 12,
-        border: "1px solid #e5e7eb",
-      }}
+      className={styles.chart}
     >
       {/* band */}
-      <rect x={pad} y={bandY} width={w - pad * 2} height={bandH} fill="rgba(0,0,0,0.06)" />
+      <rect x={pad} y={bandY} width={w - pad * 2} height={bandH} className={styles.chartBand} />
       {/* center line */}
-      <line x1={pad} x2={w - pad} y1={yTo(band.center)} y2={yTo(band.center)} stroke="rgba(0,0,0,0.25)" />
+      <line x1={pad} x2={w - pad} y1={yTo(band.center)} y2={yTo(band.center)} className={styles.chartCenter} />
       {/* value line */}
-      <path d={linePath} fill="none" stroke="black" strokeWidth={2} />
+      <path d={linePath} fill="none" strokeWidth={2} className={styles.chartLine} />
       {/* last point */}
       {series.length > 0 && (
-        <circle cx={xTo(series.length - 1)} cy={yTo(series[series.length - 1].value)} r={4} fill="black" />
+        <circle cx={xTo(series.length - 1)} cy={yTo(series[series.length - 1].value)} r={4} className={styles.chartPoint} />
       )}
     </svg>
   );
@@ -129,23 +112,31 @@ export default function TrendsTab({ businessId }: { businessId: string }) {
   const currentCash = cash?.current_cash != null ? Number(cash.current_cash) : null;
 
   const metricMeta = METRICS.find((m) => m.key === metric)!;
+  const statusClass =
+    status === "below_band"
+      ? styles.statusChipWarning
+      : status === "above_band"
+      ? styles.statusChipPositive
+      : status === "in_band"
+      ? styles.statusChipNeutral
+      : styles.statusChipMuted;
 
   return (
-    <div style={{ paddingTop: 8 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+    <div className={styles.container}>
+      <div className={styles.headerRow}>
         <div>
-          <h3 style={{ marginTop: 0 }}>Trends</h3>
-          <div style={{ fontSize: 12, opacity: 0.75 }}>
+          <h3 className={styles.title}>Trends</h3>
+          <div className={styles.subtitle}>
             {metricMeta.label}: {metricMeta.subtitle}. Baseline band uses median ± k·MAD.
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <Chip label={statusToLabel(status)} />
+        <div className={styles.controls}>
+          <Chip label={statusToLabel(status)} className={statusClass} />
 
-          <label style={{ fontSize: 12, display: "flex", gap: 6, alignItems: "center" }}>
+          <label className={styles.controlLabel}>
             Metric
-            <select value={metric} onChange={(e) => setMetric(e.target.value as MetricKey)}>
+            <select value={metric} onChange={(e) => setMetric(e.target.value as MetricKey)} className={styles.select}>
               {METRICS.map((m) => (
                 <option key={m.key} value={m.key}>
                   {m.label}
@@ -154,9 +145,9 @@ export default function TrendsTab({ businessId }: { businessId: string }) {
             </select>
           </label>
 
-          <label style={{ fontSize: 12, display: "flex", gap: 6, alignItems: "center" }}>
+          <label className={styles.controlLabel}>
             Lookback
-            <select value={lookbackMonths} onChange={(e) => setLookbackMonths(Number(e.target.value))}>
+            <select value={lookbackMonths} onChange={(e) => setLookbackMonths(Number(e.target.value))} className={styles.select}>
               <option value={6}>6 mo</option>
               <option value={12}>12 mo</option>
               <option value={18}>18 mo</option>
@@ -164,9 +155,9 @@ export default function TrendsTab({ businessId }: { businessId: string }) {
             </select>
           </label>
 
-          <label style={{ fontSize: 12, display: "flex", gap: 6, alignItems: "center" }}>
+          <label className={styles.controlLabel}>
             Band (k)
-            <select value={k} onChange={(e) => setK(Number(e.target.value))}>
+            <select value={k} onChange={(e) => setK(Number(e.target.value))} className={styles.select}>
               <option value={1.5}>1.5</option>
               <option value={2.0}>2.0</option>
               <option value={2.5}>2.5</option>
@@ -174,95 +165,91 @@ export default function TrendsTab({ businessId }: { businessId: string }) {
             </select>
           </label>
 
-          <button onClick={refresh} disabled={loading}>
+          <button onClick={refresh} disabled={loading} className={styles.button} type="button">
             {loading ? "Loading…" : "Refresh"}
           </button>
         </div>
       </div>
 
-      {err && <div style={{ marginTop: 10, color: "#b91c1c" }}>Error: {err}</div>}
-      {loading && !data && <div style={{ marginTop: 10, opacity: 0.7 }}>Loading…</div>}
+      {err && <div className={styles.error}>Error: {err}</div>}
+      {loading && !data && <div className={styles.loading}>Loading…</div>}
 
       {data && (
-        <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
+        <div className={styles.content}>
           {/* Chart */}
           {series.length > 1 && band && <BandChart series={series} band={band} />}
 
           {/* Summary cards */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
-            <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 12 }}>
-              <div style={{ fontSize: 12, opacity: 0.75 }}>Current ({metricMeta.label})</div>
-              <div style={{ fontSize: 22, fontWeight: 700 }}>
-                {current ? formatMoney(Number(current.value)) : "—"}
-              </div>
-              <div style={{ fontSize: 12, opacity: 0.75, marginTop: 4 }}>{current?.month ?? ""}</div>
+          <div className={styles.summaryGrid}>
+            <div className={styles.summaryCard}>
+              <div className={styles.summaryLabel}>Current ({metricMeta.label})</div>
+              <div className={styles.summaryValue}>{current ? formatMoney(Number(current.value)) : "—"}</div>
+              <div className={styles.summaryMeta}>{current?.month ?? ""}</div>
             </div>
 
-            <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 12 }}>
-              <div style={{ fontSize: 12, opacity: 0.75 }}>Baseline center</div>
-              <div style={{ fontSize: 22, fontWeight: 700 }}>{formatMoney(Number(band?.center ?? 0))}</div>
-              <div style={{ fontSize: 12, opacity: 0.75, marginTop: 4 }}>
+            <div className={styles.summaryCard}>
+              <div className={styles.summaryLabel}>Baseline center</div>
+              <div className={styles.summaryValue}>{formatMoney(Number(band?.center ?? 0))}</div>
+              <div className={styles.summaryMeta}>
                 Band: {formatMoney(Number(band?.lower ?? 0))} to {formatMoney(Number(band?.upper ?? 0))}
               </div>
             </div>
 
-            <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 12 }}>
-              <div style={{ fontSize: 12, opacity: 0.75 }}>Burn & runway</div>
-              <div style={{ fontSize: 14, fontWeight: 700 }}>
+            <div className={styles.summaryCard}>
+              <div className={styles.summaryLabel}>Burn & runway</div>
+              <div className={styles.summaryStrong}>
                 Burn (3m): {burn > 0 ? formatMoney(burn) + "/mo" : "—"}
               </div>
-              <div style={{ fontSize: 12, opacity: 0.75, marginTop: 6 }}>
-                Runway: {formatMonths(runway)}
-              </div>
-              <div style={{ fontSize: 12, opacity: 0.75, marginTop: 6 }}>
+              <div className={styles.summaryMeta}>Runway: {formatMonths(runway)}</div>
+              <div className={styles.summaryMeta}>
                 Current cash: {currentCash == null ? "—" : formatMoney(currentCash)}
               </div>
             </div>
 
-            <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 12 }}>
-              <div style={{ fontSize: 12, opacity: 0.75 }}>Method</div>
-              <div style={{ fontSize: 14, fontWeight: 700 }}>
+            <div className={styles.summaryCard}>
+              <div className={styles.summaryLabel}>Method</div>
+              <div className={styles.summaryStrong}>
                 {String(data?.experiment?.band_method ?? "mad").toUpperCase()}
               </div>
-              <div style={{ fontSize: 12, opacity: 0.75, marginTop: 6 }}>
+              <div className={styles.summaryMeta}>
                 lookback {lookbackMonths} · k {k}
               </div>
             </div>
           </div>
 
           {/* Table (audit) */}
-          <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, overflow: "hidden" }}>
-            <div style={{ padding: 10, fontSize: 12, background: "#fafafa", display: "flex", gap: 10 }}>
+          <div className={styles.tableCard}>
+            <div className={styles.tableHeader}>
               <strong>Monthly series</strong>
-              <span style={{ opacity: 0.7 }}>month / inflow / outflow / net / cash_end</span>
+              <span className={styles.subtitle}>month / inflow / outflow / net / cash_end</span>
             </div>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+            <table className={styles.table}>
               <thead>
-                <tr style={{ textAlign: "left", background: "#fafafa" }}>
-                  <th style={{ padding: "8px 10px" }}>Month</th>
-                  <th style={{ padding: "8px 10px", textAlign: "right" }}>Inflow</th>
-                  <th style={{ padding: "8px 10px", textAlign: "right" }}>Outflow</th>
-                  <th style={{ padding: "8px 10px", textAlign: "right" }}>Net</th>
-                  <th style={{ padding: "8px 10px", textAlign: "right" }}>Cash end</th>
+                <tr className={styles.tableHead}>
+                  <th className={styles.tableCell}>Month</th>
+                  <th className={`${styles.tableCell} ${styles.tableCellRight}`}>Inflow</th>
+                  <th className={`${styles.tableCell} ${styles.tableCellRight}`}>Outflow</th>
+                  <th className={`${styles.tableCell} ${styles.tableCellRight}`}>Net</th>
+                  <th className={`${styles.tableCell} ${styles.tableCellRight}`}>Cash end</th>
                 </tr>
               </thead>
               <tbody>
                 {(metricObj?.series ?? []).slice().reverse().map((r: any) => (
-                  <tr key={r.month} style={{ borderTop: "1px solid #eee" }}>
-                    <td style={{ padding: "8px 10px" }}>{r.month}</td>
-                    <td style={{ padding: "8px 10px", textAlign: "right" }}>{formatMoney(Number(r.inflow))}</td>
-                    <td style={{ padding: "8px 10px", textAlign: "right" }}>{formatMoney(Number(r.outflow))}</td>
-                    <td style={{ padding: "8px 10px", textAlign: "right", fontWeight: 600 }}>
+                  <tr key={r.month}>
+                    <td className={styles.tableCell}>{r.month}</td>
+                    <td className={`${styles.tableCell} ${styles.tableCellRight}`}>{formatMoney(Number(r.inflow))}</td>
+                    <td className={`${styles.tableCell} ${styles.tableCellRight}`}>{formatMoney(Number(r.outflow))}</td>
+                    <td className={`${styles.tableCell} ${styles.tableCellRight} ${styles.tableCellStrong}`}>
                       {formatMoney(Number(r.net))}
                     </td>
-                    <td style={{ padding: "8px 10px", textAlign: "right", fontWeight: 600 }}>
+                    <td className={`${styles.tableCell} ${styles.tableCellRight} ${styles.tableCellStrong}`}>
                       {formatMoney(Number(r.cash_end))}
                     </td>
                   </tr>
                 ))}
                 {(metricObj?.series ?? []).length === 0 && (
                   <tr>
-                    <td colSpan={5} style={{ padding: 10, opacity: 0.7 }}>
+                    <td colSpan={5} className={styles.emptyState}>
                       No monthly data.
                     </td>
                   </tr>
