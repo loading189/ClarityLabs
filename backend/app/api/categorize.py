@@ -615,12 +615,7 @@ def bulk_apply_categorization(
     for source_event_id in matching_ids:
         row = existing_map.get(source_event_id)
         if row:
-            row.category_id = req.category_id
-            row.source = req.source
-            row.confidence = req.confidence
-            row.note = req.note
-            db.add(row)
-            updated += 1
+            continue
         else:
             row = TxnCategorization(
                 business_id=business_id,

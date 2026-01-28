@@ -124,7 +124,7 @@ def _make_event(business_id: str, source_event_id: str, description: str):
     )
 
 
-def test_bulk_apply_updates_matching_rows(db_session, brain_store):
+def test_bulk_apply_creates_for_uncategorized(db_session, brain_store):
     biz = _create_business(db_session)
     category_a = _create_category(db_session, biz.id, "Software", "software")
     category_b = _create_category(db_session, biz.id, "Meals", "meals")
@@ -153,7 +153,7 @@ def test_bulk_apply_updates_matching_rows(db_session, brain_store):
 
     assert res["matched_events"] == 2
     assert res["created"] == 1
-    assert res["updated"] == 1
+    assert res["updated"] == 0
 
     rows = (
         db_session.query(TxnCategorization)
@@ -161,7 +161,7 @@ def test_bulk_apply_updates_matching_rows(db_session, brain_store):
         .all()
     )
     by_event = {r.source_event_id: r.category_id for r in rows}
-    assert by_event["evt_1"] == category_b.id
+    assert by_event["evt_1"] == category_a.id
     assert by_event["evt_2"] == category_b.id
     assert "evt_3" not in by_event
 
