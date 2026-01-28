@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import SimulatorTab from "./simulatorTab";
 import { SignalsTab } from "../../features/signals";
-import { CategorizeTab } from "../../features/categorize";
+import { CategorizeTab, type CategorizeDrilldown } from "../../features/categorize";
 import { TransactionsTab, type TransactionsDrilldown } from "../../features/transactions";
 import CoaTab from "./CoaTab";
-import { LedgerTab } from "../../features/ledger";
+import { LedgerTab, type LedgerDrilldown } from "../../features/ledger";
 import { deleteBusiness } from "../../api/admin"; // ✅ add this (adjust path if needed)
-import { TrendsTab } from "../../features/trends";
+import { TrendsTab, type TrendsDrilldown } from "../../features/trends";
 import styles from "./DetailPanel.module.css";
+import { logRefresh } from "../../utils/refreshLog";
 
 type PanelMode = "simulator" |"coa" | "transactions" | "categorize" | "ledger" | "signals" | "trends";
 
@@ -25,6 +26,12 @@ export default function DetailPanel({
   const [transactionsDrilldown, setTransactionsDrilldown] = useState<TransactionsDrilldown | null>(
     null
   );
+  const [categorizeDrilldown, setCategorizeDrilldown] = useState<CategorizeDrilldown | null>(null);
+  const [ledgerDrilldown, setLedgerDrilldown] = useState<LedgerDrilldown | null>(null);
+  const [trendsDrilldown, setTrendsDrilldown] = useState<TrendsDrilldown | null>(null);
+  const [ledgerRefreshToken, setLedgerRefreshToken] = useState(0);
+  const [trendsRefreshToken, setTrendsRefreshToken] = useState(0);
+  const [signalsRefreshToken, setSignalsRefreshToken] = useState(0);
 
   // ✅ delete UI state
   const [dangerOpen, setDangerOpen] = useState(false);
@@ -38,6 +45,12 @@ export default function DetailPanel({
       setMode("signals");
       setRefreshKey((k) => k + 1); // force tabs to re-load when business changes
       setTransactionsDrilldown(null);
+      setCategorizeDrilldown(null);
+      setLedgerDrilldown(null);
+      setTrendsDrilldown(null);
+      setLedgerRefreshToken(0);
+      setTrendsRefreshToken(0);
+      setSignalsRefreshToken(0);
 
       // ✅ reset delete UI when switching businesses
       setDangerOpen(false);
@@ -65,9 +78,12 @@ export default function DetailPanel({
 
   function handleCategorizationChange() {
     if (selectedId) {
+      logRefresh("health", "detail-refresh");
       refreshDetail?.(selectedId);
     }
-    bumpRefresh();
+    setLedgerRefreshToken((value) => value + 1);
+    setTrendsRefreshToken((value) => value + 1);
+    setSignalsRefreshToken((value) => value + 1);
     onAfterPulse?.();
   }
 
@@ -221,19 +237,37 @@ export default function DetailPanel({
             <CategorizeTab
               key={`cat-${selectedId}-${refreshKey}`}
               businessId={selectedId}
+              drilldown={categorizeDrilldown}
+              onClearDrilldown={() => setCategorizeDrilldown(null)}
               onCategorizationChange={handleCategorizationChange}
             />
           )}
 
           {mode === "ledger" && (
-            <LedgerTab key={`led-${selectedId}-${refreshKey}`} businessId={selectedId} />
+            <LedgerTab
+              key={`led-${selectedId}-${refreshKey}`}
+              businessId={selectedId}
+              drilldown={ledgerDrilldown}
+              refreshToken={ledgerRefreshToken}
+              onClearDrilldown={() => setLedgerDrilldown(null)}
+            />
           )}
           {mode === "signals" && detail && (
             <SignalsTab
               detail={detail}
+              refreshToken={signalsRefreshToken}
               onNavigate={(target, drilldown) => {
                 if (target === "transactions") {
-                  setTransactionsDrilldown(drilldown ?? null);
+                  setTransactionsDrilldown((drilldown ?? null) as TransactionsDrilldown | null);
+                }
+                if (target === "categorize") {
+                  setCategorizeDrilldown((drilldown ?? null) as CategorizeDrilldown | null);
+                }
+                if (target === "ledger") {
+                  setLedgerDrilldown((drilldown ?? null) as LedgerDrilldown | null);
+                }
+                if (target === "trends") {
+                  setTrendsDrilldown((drilldown ?? null) as TrendsDrilldown | null);
                 }
                 setMode(target);
               }}
@@ -241,7 +275,13 @@ export default function DetailPanel({
           )}
       
           {mode === "trends" && (
-            <TrendsTab key={`trends-${selectedId}-${refreshKey}`} businessId={selectedId} />
+            <TrendsTab
+              key={`trends-${selectedId}-${refreshKey}`}
+              businessId={selectedId}
+              drilldown={trendsDrilldown}
+              refreshToken={trendsRefreshToken}
+              onClearDrilldown={() => setTrendsDrilldown(null)}
+            />
           )}
 
         </div>

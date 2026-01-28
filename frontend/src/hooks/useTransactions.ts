@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { fetchTransactions } from "../api/transactions";
 import type { TransactionsResponse } from "../api/transactions";
+import { logRefresh } from "../utils/refreshLog";
 
 export function useTransactions(
   businessId: string | null,
@@ -17,6 +18,7 @@ export function useTransactions(
     setLoading(true);
     setErr(null);
     try {
+      logRefresh("transactions", "refresh");
       const res = await fetchTransactions(businessId, limit, sourceEventIds);
       setData(res);
     } catch (e: any) {

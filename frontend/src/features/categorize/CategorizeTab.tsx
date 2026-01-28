@@ -10,12 +10,32 @@ import {
   type NormalizedTxn,
 } from "../../api/categorize";
 import styles from "./CategorizeTab.module.css";
+import { logRefresh } from "../../utils/refreshLog";
+
+export type CategorizeDrilldown = {
+  merchant_key?: string;
+  direction?: "inflow" | "outflow";
+  search?: string;
+  date_preset?: "7d" | "30d" | "90d";
+};
+
+type DatePreset = "7d" | "30d" | "90d";
+
+const DATE_PRESET_DAYS: Record<DatePreset, number> = {
+  "7d": 7,
+  "30d": 30,
+  "90d": 90,
+};
 
 export default function CategorizeTab({
   businessId,
+  drilldown,
+  onClearDrilldown,
   onCategorizationChange,
 }: {
   businessId: string;
+  drilldown?: CategorizeDrilldown | null;
+  onClearDrilldown?: () => void;
   onCategorizationChange?: () => void;
 }) {
   const [txns, setTxns] = useState<NormalizedTxn[]>([]);
@@ -126,6 +146,7 @@ export default function CategorizeTab({
     setMsg(null);
 
     try {
+      logRefresh("categorize", "reload");
       const [t, c, m] = await Promise.all([
         getTxnsToCategorize(businessId, 50),
         getCategories(businessId),
@@ -162,6 +183,56 @@ export default function CategorizeTab({
     },
     [cats, pickBestCategoryId]
   );
+
+  const activeDrilldown = useMemo(() => {
+    if (!drilldown) return null;
+    return {
+      direction: drilldown.direction ?? null,
+      merchantKey: drilldown.merchant_key ?? "",
+      search: drilldown.search ?? "",
+      datePreset: drilldown.date_preset ?? null,
+    };
+  }, [drilldown]);
+
+  const drilldownSummary = useMemo(() => {
+    if (!drilldown) return "";
+    const parts = [];
+    if (drilldown.direction) parts.push(`Direction: ${drilldown.direction}`);
+    if (drilldown.merchant_key) parts.push(`Merchant: ${drilldown.merchant_key}`);
+    if (drilldown.search) parts.push(`Search: "${drilldown.search}"`);
+    if (drilldown.date_preset) parts.push(`Range: ${drilldown.date_preset}`);
+    return parts.join(" · ");
+  }, [drilldown]);
+
+  const filteredTxns = useMemo(() => {
+    if (!activeDrilldown) return txns;
+    const search = activeDrilldown.search.trim().toLowerCase();
+    const merchantKey = activeDrilldown.merchantKey.trim().toLowerCase();
+    const now = Date.now();
+    const days = activeDrilldown.datePreset
+      ? DATE_PRESET_DAYS[activeDrilldown.datePreset as DatePreset]
+      : null;
+    const cutoff = days ? now - days * 24 * 60 * 60 * 1000 : null;
+
+    return txns.filter((t) => {
+      if (activeDrilldown.direction && t.direction !== activeDrilldown.direction) {
+        return false;
+      }
+      if (search) {
+        const haystack = `${t.description ?? ""} ${t.category_hint ?? ""}`.toLowerCase();
+        if (!haystack.includes(search)) return false;
+      }
+      if (merchantKey) {
+        const candidate = (t.merchant_key ?? "").toLowerCase();
+        if (!candidate.includes(merchantKey)) return false;
+      }
+      if (cutoff) {
+        const occurredAt = t.occurred_at ? Date.parse(t.occurred_at) : Number.NaN;
+        if (Number.isFinite(occurredAt) && occurredAt < cutoff) return false;
+      }
+      return true;
+    });
+  }, [activeDrilldown, txns]);
 
   const doSave = useCallback(
     async (categoryId: string, source: "manual" | "rule" | "ml") => {
@@ -247,6 +318,16 @@ export default function CategorizeTab({
     load();
   }, [load]);
 
+  useEffect(() => {
+    if (!selectedTxn) return;
+    const stillVisible = filteredTxns.some(
+      (txn) => txn.source_event_id === selectedTxn.source_event_id
+    );
+    if (!stillVisible) {
+      setSelectedTxn(filteredTxns[0] ?? null);
+    }
+  }, [filteredTxns, selectedTxn]);
+
   if (loading) return <div className={styles.loading}>Loading…</div>;
 
   return (
@@ -259,6 +340,22 @@ export default function CategorizeTab({
             Reload
           </button>
         </div>
+
+        {drilldown && (
+          <div className={styles.drilldownBanner}>
+            <span className={styles.drilldownLabel}>Active drilldown</span>
+            <span className={styles.drilldownText}>
+              {drilldownSummary || "Filters applied from Health."}
+            </span>
+            <button
+              className={styles.drilldownClear}
+              onClick={() => onClearDrilldown?.()}
+              type="button"
+            >
+              Clear
+            </button>
+          </div>
+        )}
 
         {loadErr && <div className={styles.error}>Load error: {loadErr}</div>}
 
@@ -291,11 +388,11 @@ export default function CategorizeTab({
           </div>
         )}
 
-        {txns.length === 0 ? (
+        {filteredTxns.length === 0 ? (
           <div className={styles.emptyState}>No uncategorized transactions.</div>
         ) : (
           <div className={styles.txnList}>
-            {txns.map((t) => (
+            {filteredTxns.map((t) => (
               <button
                 key={t.source_event_id}
                 onClick={() => pickTxn(t)}

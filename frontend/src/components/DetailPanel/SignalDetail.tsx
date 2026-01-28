@@ -1,6 +1,5 @@
 // src/components/detail/SignalDetail.tsx
 import type { HealthSignal } from "../../types";
-import type { TransactionsDrilldown } from "../../features/transactions";
 import styles from "../../features/signals/HealthTab.module.css";
 
 type Props = {
@@ -8,7 +7,7 @@ type Props = {
   signal: HealthSignal;
   onNavigate?: (
     target: "transactions" | "trends" | "categorize" | "ledger",
-    drilldown?: TransactionsDrilldown | null
+    drilldown?: Record<string, any> | null
   ) => void;
 };
 
@@ -22,7 +21,7 @@ export default function SignalDetail({ businessId, signal, onNavigate }: Props) 
       <button
         key={`${d.target}-${idx}`}
         className={styles.actionButton}
-        onClick={() => onNavigate?.(d.target, payload as TransactionsDrilldown | null)}
+        onClick={() => onNavigate?.(d.target, payload as Record<string, any> | null)}
         type="button"
       >
         {label}

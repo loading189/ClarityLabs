@@ -230,7 +230,13 @@ def build_health_v1_signals(
             short_summary=summary,
             why_it_matters="Uncategorized transactions weaken the accuracy of ledger-derived trends and signals.",
             evidence=[evidence_uncat],
-            drilldowns=[SignalDrilldown(target="categorize", label="Review uncategorized")],
+            drilldowns=[
+                SignalDrilldown(
+                    target="categorize",
+                    label="Review uncategorized",
+                    payload={"date_preset": "30d"},
+                )
+            ],
         )
     )
 
@@ -274,8 +280,12 @@ def build_health_v1_signals(
             why_it_matters="Runway estimates how long cash can cover recent burn without new inflows.",
             evidence=[evidence_runway],
             drilldowns=[
-                SignalDrilldown(target="trends", label="View cash trend"),
-                SignalDrilldown(target="ledger", label="Open ledger"),
+                SignalDrilldown(
+                    target="trends",
+                    label="View cash trend",
+                    payload={"metric": "cash_end", "lookback_months": 12},
+                ),
+                SignalDrilldown(target="ledger", label="Open ledger", payload={"date_preset": "90d"}),
             ],
         )
     )
@@ -328,7 +338,11 @@ def build_health_v1_signals(
                     label="Review outflows",
                     payload={"direction": "outflow", "date_preset": "30d"},
                 ),
-                SignalDrilldown(target="trends", label="View outflow trend"),
+                SignalDrilldown(
+                    target="trends",
+                    label="View outflow trend",
+                    payload={"metric": "outflow", "lookback_months": 12},
+                ),
             ],
         )
     )
@@ -381,7 +395,11 @@ def build_health_v1_signals(
                     label="Review inflows",
                     payload={"direction": "inflow", "date_preset": "30d"},
                 ),
-                SignalDrilldown(target="trends", label="View inflow trend"),
+                SignalDrilldown(
+                    target="trends",
+                    label="View inflow trend",
+                    payload={"metric": "inflow", "lookback_months": 12},
+                ),
             ],
         )
     )
@@ -510,7 +528,11 @@ def build_health_v1_signals(
                 )
             ],
             drilldowns=[
-                SignalDrilldown(target="categorize", label="Label vendors"),
+                SignalDrilldown(
+                    target="categorize",
+                    label="Label vendors",
+                    payload={"direction": "outflow", "date_preset": "30d"},
+                ),
                 SignalDrilldown(
                     target="transactions",
                     label="View recent outflows",
@@ -574,7 +596,11 @@ def build_health_v1_signals(
                 )
             ],
             drilldowns=[
-                SignalDrilldown(target="categorize", label="Create rules"),
+                SignalDrilldown(
+                    target="categorize",
+                    label="Create rules",
+                    payload={"direction": "outflow", "date_preset": "90d"},
+                ),
                 SignalDrilldown(
                     target="transactions",
                     label="Review repeats",
@@ -625,7 +651,9 @@ def build_health_v1_signals(
                     examples=overdraft_examples,
                 )
             ],
-            drilldowns=[SignalDrilldown(target="ledger", label="Open ledger")],
+            drilldowns=[
+                SignalDrilldown(target="ledger", label="Open ledger", payload={"date_preset": "90d"})
+            ],
         )
     )
 

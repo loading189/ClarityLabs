@@ -1,6 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMonthlyTrends } from "../../hooks/useMonthlyTrends";
 import styles from "./TrendsTab.module.css";
+
+export type TrendsDrilldown = {
+  metric?: "net" | "inflow" | "outflow" | "cash_end";
+  lookback_months?: number;
+  k?: number;
+};
 
 function Chip({ label, className }: { label: string; className?: string }) {
   return <span className={`${styles.statusChip} ${className ?? ""}`}>{label}</span>;
@@ -86,12 +92,39 @@ function statusToLabel(status: string) {
     : "No data";
 }
 
-export default function TrendsTab({ businessId }: { businessId: string }) {
+export default function TrendsTab({
+  businessId,
+  drilldown,
+  refreshToken,
+  onClearDrilldown,
+}: {
+  businessId: string;
+  drilldown?: TrendsDrilldown | null;
+  refreshToken?: number;
+  onClearDrilldown?: () => void;
+}) {
   const [lookbackMonths, setLookbackMonths] = useState(12);
   const [k, setK] = useState(2.0);
   const [metric, setMetric] = useState<MetricKey>("cash_end");
 
   const { data, loading, err, refresh } = useMonthlyTrends(businessId, lookbackMonths, k);
+
+  useEffect(() => {
+    if (!drilldown) {
+      setMetric("cash_end");
+      setLookbackMonths(12);
+      setK(2.0);
+      return;
+    }
+    if (drilldown.metric) setMetric(drilldown.metric);
+    if (drilldown.lookback_months) setLookbackMonths(drilldown.lookback_months);
+    if (drilldown.k) setK(drilldown.k);
+  }, [drilldown]);
+
+  useEffect(() => {
+    if (!refreshToken) return;
+    refresh();
+  }, [refreshToken, refresh]);
 
   const metricObj = (data?.metrics?.[metric] ?? null) as any;
   const series = useMemo(() => {
@@ -121,13 +154,25 @@ export default function TrendsTab({ businessId }: { businessId: string }) {
       ? styles.statusChipNeutral
       : styles.statusChipMuted;
 
+  const drilldownSummary = useMemo(() => {
+    if (!drilldown) return "";
+    const parts = [];
+    if (drilldown.metric) {
+      const label = METRICS.find((m) => m.key === drilldown.metric)?.label ?? drilldown.metric;
+      parts.push(`Metric: ${label}`);
+    }
+    if (drilldown.lookback_months) parts.push(`Lookback: ${drilldown.lookback_months} mo`);
+    if (drilldown.k) parts.push(`k: ${drilldown.k}`);
+    return parts.join(" · ");
+  }, [drilldown]);
+
   return (
     <div className={styles.container}>
       <div className={styles.headerRow}>
         <div>
           <h3 className={styles.title}>Trends</h3>
           <div className={styles.subtitle}>
-            {metricMeta.label}: {metricMeta.subtitle}. Baseline band uses median ± k·MAD.
+            {metricMeta.label}: {metricMeta.subtitle}. Values are ledger-derived. Baseline band uses median ± k·MAD.
           </div>
         </div>
 
@@ -171,24 +216,53 @@ export default function TrendsTab({ businessId }: { businessId: string }) {
         </div>
       </div>
 
+      {drilldown && (
+        <div className={styles.drilldownBanner}>
+          <span className={styles.drilldownLabel}>Active drilldown</span>
+          <span className={styles.drilldownText}>
+            {drilldownSummary || "Filters applied from Health."}
+          </span>
+          <button
+            className={styles.drilldownClear}
+            onClick={() => onClearDrilldown?.()}
+            type="button"
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
       {err && <div className={styles.error}>Error: {err}</div>}
       {loading && !data && <div className={styles.loading}>Loading…</div>}
 
       {data && (
         <div className={styles.content}>
           {/* Chart */}
-          {series.length > 1 && band && <BandChart series={series} band={band} />}
+          {series.length > 1 && band && (
+            <>
+              <BandChart series={series} band={band} />
+              <div className={styles.chartLegend}>
+                <span title="Baseline band (median ± k·MAD).">Baseline band</span>
+                <span title="Median center line for the selected metric.">Median line</span>
+                <span title="Ledger-derived monthly series.">Ledger series</span>
+              </div>
+            </>
+          )}
 
           {/* Summary cards */}
           <div className={styles.summaryGrid}>
             <div className={styles.summaryCard}>
-              <div className={styles.summaryLabel}>Current ({metricMeta.label})</div>
+              <div className={styles.summaryLabel} title="Most recent month in the series.">
+                Current ({metricMeta.label})
+              </div>
               <div className={styles.summaryValue}>{current ? formatMoney(Number(current.value)) : "—"}</div>
               <div className={styles.summaryMeta}>{current?.month ?? ""}</div>
             </div>
 
             <div className={styles.summaryCard}>
-              <div className={styles.summaryLabel}>Baseline center</div>
+              <div className={styles.summaryLabel} title="Median of the selected metric across the lookback window.">
+                Baseline center
+              </div>
               <div className={styles.summaryValue}>{formatMoney(Number(band?.center ?? 0))}</div>
               <div className={styles.summaryMeta}>
                 Band: {formatMoney(Number(band?.lower ?? 0))} to {formatMoney(Number(band?.upper ?? 0))}
@@ -196,7 +270,9 @@ export default function TrendsTab({ businessId }: { businessId: string }) {
             </div>
 
             <div className={styles.summaryCard}>
-              <div className={styles.summaryLabel}>Burn & runway</div>
+              <div className={styles.summaryLabel} title="Derived from ledger cash series.">
+                Burn & runway
+              </div>
               <div className={styles.summaryStrong}>
                 Burn (3m): {burn > 0 ? formatMoney(burn) + "/mo" : "—"}
               </div>
@@ -207,7 +283,9 @@ export default function TrendsTab({ businessId }: { businessId: string }) {
             </div>
 
             <div className={styles.summaryCard}>
-              <div className={styles.summaryLabel}>Method</div>
+              <div className={styles.summaryLabel} title="Baseline band method applied to ledger-derived data.">
+                Method
+              </div>
               <div className={styles.summaryStrong}>
                 {String(data?.experiment?.band_method ?? "mad").toUpperCase()}
               </div>
@@ -221,7 +299,9 @@ export default function TrendsTab({ businessId }: { businessId: string }) {
           <div className={styles.tableCard}>
             <div className={styles.tableHeader}>
               <strong>Monthly series</strong>
-              <span className={styles.subtitle}>month / inflow / outflow / net / cash_end</span>
+              <span className={styles.subtitle} title="All values are derived from posted ledger lines.">
+                month / inflow / outflow / net / cash_end
+              </span>
             </div>
             <table className={styles.table}>
               <thead>
