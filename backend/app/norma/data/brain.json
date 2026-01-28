@@ -39,6 +39,11 @@
       "merchant_id": "4b5141f1-161f-44f2-992e-9bfbab5a6c81",
       "canonical_name": "Office Depot",
       "updated_at": "2026-01-28T00:56:09.776880+00:00"
+    },
+    {
+      "merchant_id": "c0c60fe8-2509-4962-8e79-f9b7ede1803c",
+      "canonical_name": "Clover Deposits",
+      "updated_at": "2026-01-28T17:19:29.598699+00:00"
     }
   ],
   "aliases": [
@@ -97,6 +102,13 @@
       "match_type": "exact",
       "evidence_count": 3,
       "updated_at": "2026-01-28T00:56:09.776880+00:00"
+    },
+    {
+      "alias_key": "clover deposits",
+      "merchant_id": "c0c60fe8-2509-4962-8e79-f9b7ede1803c",
+      "match_type": "exact",
+      "evidence_count": 5,
+      "updated_at": "2026-01-28T17:19:29.598699+00:00"
     }
   ],
   "labels": {
@@ -202,6 +214,16 @@
         "confidence": 1.0,
         "evidence_count": 1,
         "updated_at": "2026-01-28T00:57:06.422050+00:00"
+      }
+    },
+    "be71b5d8-7d3e-42bc-acd0-44b3c55cef85": {
+      "c0c60fe8-2509-4962-8e79-f9b7ede1803c": {
+        "business_id": "be71b5d8-7d3e-42bc-acd0-44b3c55cef85",
+        "merchant_id": "c0c60fe8-2509-4962-8e79-f9b7ede1803c",
+        "system_key": "sales",
+        "confidence": 1.0,
+        "evidence_count": 5,
+        "updated_at": "2026-01-28T17:19:29.598699+00:00"
       }
     }
   }
