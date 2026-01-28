@@ -20,7 +20,8 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
   const selectedTxnRef = useRef<NormalizedTxn | null>(null);
 
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [loadErr, setLoadErr] = useState<string | null>(null);
+  const [actionErr, setActionErr] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
   // Prevent stale-load races when businessId changes quickly
@@ -40,7 +41,7 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
   const formatAmount = useCallback(
     (txn: NormalizedTxn): string => {
       const direction = (txn.direction || "").toLowerCase();
-      const sign = direction === "inflow" ? "+" : "-";
+      const sign = direction === "inflow" ? "+" : direction === "outflow" ? "-" : "";
       const amount = Number.isFinite(txn.amount) ? Math.abs(txn.amount) : 0;
       return `${sign}${currencyFormatter.format(amount)}`;
     },
@@ -50,6 +51,14 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
   const isUncategorized = useCallback((value?: string | null) => {
     return (value ?? "").trim().toLowerCase() === "uncategorized";
   }, []);
+
+  const isCategoryUncategorized = useCallback(
+    (category?: CategoryOut | null) => {
+      if (!category) return false;
+      return isUncategorized(category.system_key) || isUncategorized(category.name);
+    },
+    [isUncategorized]
+  );
 
   const pickBestCategoryId = useCallback(
     (txn: NormalizedTxn | null, categories: CategoryOut[]): string => {
@@ -68,9 +77,11 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
   );
 
   const suggestedCategory = useMemo(() => {
-    if (!suggestedCategoryId || isUncategorized(selectedTxn?.suggested_system_key)) return null;
-    return catsById.get(suggestedCategoryId) ?? null;
-  }, [catsById, isUncategorized, selectedTxn, suggestedCategoryId]);
+    if (!suggestedCategoryId) return null;
+    const category = catsById.get(suggestedCategoryId) ?? null;
+    if (!category || isCategoryUncategorized(category)) return null;
+    return category;
+  }, [catsById, isCategoryUncategorized, suggestedCategoryId]);
 
   const suggestedName = useMemo(() => {
     if (!suggestedCategory) return "No suggestion";
@@ -86,6 +97,12 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
     return !!suggestedCategory;
   }, [suggestedCategory]);
 
+  const bulkCategoryId = suggestedIdIsValid ? suggestedCategoryId : selectedCategoryId;
+  const bulkCategoryIsValid = useMemo(() => {
+    if (!bulkCategoryId) return false;
+    return !isCategoryUncategorized(catsById.get(bulkCategoryId));
+  }, [bulkCategoryId, catsById, isCategoryUncategorized]);
+
   const metricsSuggestionPercent = useMemo(() => {
     if (!metrics) return 0;
     const denom = metrics.uncategorized || metrics.total_events || 0;
@@ -99,7 +116,7 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
     const seq = ++loadSeq.current;
 
     setLoading(true);
-    setErr(null);
+    setLoadErr(null);
     setMsg(null);
 
     try {
@@ -124,7 +141,7 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
       setSelectedCategoryId(pickBestCategoryId(nextTxn, c));
     } catch (e: any) {
       if (seq !== loadSeq.current) return;
-      setErr(e?.message ?? "Failed to load categorization");
+      setLoadErr(e?.message ?? "Failed to load categorization");
     } finally {
       if (seq === loadSeq.current) setLoading(false);
     }
@@ -135,7 +152,7 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
       setSelectedTxn(t);
       setSelectedCategoryId(pickBestCategoryId(t, cats));
       setMsg(null);
-      setErr(null);
+      setActionErr(null);
     },
     [cats, pickBestCategoryId]
   );
@@ -144,7 +161,7 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
     async (categoryId: string, source: "manual" | "rule" | "ml") => {
       if (!selectedTxn) return;
 
-      setErr(null);
+      setActionErr(null);
       setMsg(null);
 
       try {
@@ -163,7 +180,7 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
 
         await load(); // ✅ ensures next txn shows updated suggestions
       } catch (e: any) {
-        setErr(e?.message ?? "Save failed");
+        setActionErr(e?.message ?? "Save failed");
       }
     },
     [businessId, selectedTxn, load]
@@ -174,11 +191,11 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
       if (!selectedTxn) return;
 
       if (!selectedTxn.merchant_key) {
-        setErr("No merchant key available for this vendor.");
+        setActionErr("No merchant key available for this vendor.");
         return;
       }
 
-      setErr(null);
+      setActionErr(null);
       setMsg(null);
 
       try {
@@ -194,7 +211,7 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
         );
         await load();
       } catch (e: any) {
-        setErr(e?.message ?? "Failed to apply vendor categorization");
+        setActionErr(e?.message ?? "Failed to apply vendor categorization");
       }
     },
     [businessId, load, selectedTxn]
@@ -223,7 +240,6 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
   }, [load]);
 
   if (loading) return <div className={styles.loading}>Loading…</div>;
-  if (err) return <div className={styles.error}>Error: {err}</div>;
 
   return (
     <div className={styles.container}>
@@ -231,10 +247,12 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
       <div className={styles.panel}>
         <div className={styles.headerRow}>
           <h3 className={styles.title}>To categorize</h3>
-          <button className="closeBtn" onClick={load}>
+          <button className={styles.buttonSecondary} onClick={load}>
             Reload
           </button>
         </div>
+
+        {loadErr && <div className={styles.error}>Load error: {loadErr}</div>}
 
         {metrics && (
           <div className={styles.metricsPanel}>
@@ -277,7 +295,7 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
                 aria-label={`Select transaction ${t.description}`}
                 className={`${styles.txnItem} ${
                   selectedTxn?.source_event_id === t.source_event_id ? styles.txnItemActive : ""
-                } closeBtn`}
+                }`}
               >
                 <div className={styles.txnTitle}>{t.description}</div>
                 <div className={styles.txnMeta}>
@@ -287,7 +305,7 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
 
                 {t.suggested_category_id &&
                   catsById.has(t.suggested_category_id) &&
-                  !isUncategorized(t.suggested_system_key) && (
+                  !isCategoryUncategorized(catsById.get(t.suggested_category_id)) && (
                     <div className={styles.suggestionLine}>
                       Suggestion: <strong>{catsById.get(t.suggested_category_id)?.name}</strong> •{" "}
                       {Math.round(Number(t.confidence ?? 0) * 100)}%
@@ -304,7 +322,7 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
         <h3 className={styles.assignHeader}>Assign category</h3>
 
         {msg && <div className={styles.message}>{msg}</div>}
-        {err && <div className={styles.error}>Error: {err}</div>}
+        {actionErr && <div className={styles.error}>Error: {actionErr}</div>}
 
         {!selectedTxn ? (
           <div className={styles.noSelection}>Select a transaction.</div>
@@ -333,7 +351,7 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
 
               <div className={styles.buttonRow}>
                 <button
-                  className="closeBtn"
+                  className={styles.buttonSecondary}
                   disabled={!suggestedIdIsValid}
                   onClick={() => {
                     if (!suggestedIdIsValid) return;
@@ -345,17 +363,17 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
                 </button>
 
                 <button
-                  className="closeBtn"
+                  className={styles.buttonPrimary}
                   disabled={
                     !selectedTxn.merchant_key ||
-                    (!suggestedIdIsValid && !selectedCategoryId) ||
-                    isUncategorized(selectedTxn.suggested_system_key)
+                    !bulkCategoryIsValid
                   }
-                  onClick={() =>
-                    doBulkApply(suggestedIdIsValid ? suggestedCategoryId : selectedCategoryId)
-                  }
+                  onClick={() => {
+                    if (!bulkCategoryIsValid) return;
+                    doBulkApply(bulkCategoryId);
+                  }}
                 >
-                  Always use this for this vendor
+                  Apply to vendor (uncategorized only)
                 </button>
               </div>
             </div>
@@ -386,7 +404,7 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
 
               <div className={styles.buttonRow}>
                 <button
-                  className="closeBtn"
+                  className={styles.buttonPrimary}
                   disabled={!selectedCategoryId}
                   onClick={() => doSave(selectedCategoryId, "manual")}
                 >
@@ -394,9 +412,12 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
                 </button>
 
                 <button
-                  className="closeBtn"
+                  className={styles.buttonSecondary}
                   disabled={!suggestedIdIsValid}
-                  onClick={() => doSave(suggestedCategoryId, "rule")}
+                  onClick={() => {
+                    if (!suggestedIdIsValid) return;
+                    doSave(suggestedCategoryId, "rule");
+                  }}
                 >
                   Save using suggestion
                 </button>
