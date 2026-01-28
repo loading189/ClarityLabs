@@ -25,6 +25,7 @@ from datetime import date, timedelta
 from typing import Dict, Iterable, List, Optional, Tuple
 
 from .ledger import LedgerRow
+from .ledger_series import monthly_cashflow_from_ledger
 from .normalize import NormalizedTransaction
 
 
@@ -207,25 +208,17 @@ def _sum_inflow_outflow(txns: Iterable[NormalizedTransaction]) -> Tuple[float, f
     return inflow, outflow
 
 
-def compute_monthly_cashflow(txns: Iterable[NormalizedTransaction]) -> List[MonthlyCashflow]:
-    monthly: Dict[str, Dict[str, float]] = {}
-
-    for t in txns:
-        k = month_key(t.date)
-        if k not in monthly:
-            monthly[k] = {"inflow": 0.0, "outflow": 0.0}
-
-        if t.direction == "inflow":
-            monthly[k]["inflow"] += t.amount
-        else:
-            monthly[k]["outflow"] += t.amount
-
+def compute_monthly_cashflow(ledger: Iterable[LedgerRow]) -> List[MonthlyCashflow]:
     rows: List[MonthlyCashflow] = []
-    for k in sorted(monthly.keys()):
-        inflow = monthly[k]["inflow"]
-        outflow = monthly[k]["outflow"]
-        rows.append(MonthlyCashflow(month=k, inflow=inflow, outflow=outflow, net=inflow - outflow))
-
+    for row in monthly_cashflow_from_ledger(ledger):
+        rows.append(
+            MonthlyCashflow(
+                month=row["month"],
+                inflow=row["inflow"],
+                outflow=row["outflow"],
+                net=row["net"],
+            )
+        )
     return rows
 
 
@@ -304,7 +297,7 @@ def compute_facts(txns: List[NormalizedTransaction], ledger: List[LedgerRow]) ->
     - as_of is derived from the last ledger row date if available, else last txn date, else None.
     - windows are computed deterministically from transaction dates.
     """
-    monthly_rows = compute_monthly_cashflow(txns)
+    monthly_rows = compute_monthly_cashflow(ledger)
     cat_rows = compute_category_totals(txns)
 
     current_cash = ledger[-1].balance if ledger else 0.0

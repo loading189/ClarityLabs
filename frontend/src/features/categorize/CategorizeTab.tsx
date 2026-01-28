@@ -11,7 +11,13 @@ import {
 } from "../../api/categorize";
 import styles from "./CategorizeTab.module.css";
 
-export default function CategorizeTab({ businessId }: { businessId: string }) {
+export default function CategorizeTab({
+  businessId,
+  onCategorizationChange,
+}: {
+  businessId: string;
+  onCategorizationChange?: () => void;
+}) {
   const [txns, setTxns] = useState<NormalizedTxn[]>([]);
   const [cats, setCats] = useState<CategoryOut[]>([]);
   const [metrics, setMetrics] = useState<CategorizeMetricsOut | null>(null);
@@ -179,11 +185,12 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
         );
 
         await load(); // ✅ ensures next txn shows updated suggestions
+        onCategorizationChange?.();
       } catch (e: any) {
         setActionErr(e?.message ?? "Save failed");
       }
     },
-    [businessId, selectedTxn, load]
+    [businessId, selectedTxn, load, onCategorizationChange]
   );
 
   const doBulkApply = useCallback(
@@ -210,11 +217,12 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
           `Applied to ${res.matched_events} events (${res.created} new, ${res.updated} updated). Reloading…`
         );
         await load();
+        onCategorizationChange?.();
       } catch (e: any) {
         setActionErr(e?.message ?? "Failed to apply vendor categorization");
       }
     },
-    [businessId, load, selectedTxn]
+    [businessId, load, selectedTxn, onCategorizationChange]
   );
 
 

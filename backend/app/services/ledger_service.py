@@ -77,7 +77,7 @@ def ledger_lines(
         .join(Category, Category.id == TxnCategorization.category_id)
         .join(Account, Account.id == Category.account_id)
         .where(TxnCategorization.business_id == business_id)
-        .order_by(RawEvent.occurred_at.desc())
+        .order_by(RawEvent.occurred_at.desc(), RawEvent.source_event_id.desc())
         .limit(limit)
     )
 
@@ -135,7 +135,7 @@ def income_statement(
         .join(Category, Category.id == TxnCategorization.category_id)
         .join(Account, Account.id == Category.account_id)
         .where(TxnCategorization.business_id == business_id)
-        .order_by(RawEvent.occurred_at.asc())
+        .order_by(RawEvent.occurred_at.asc(), RawEvent.source_event_id.asc())
     )
 
     rows = db.execute(stmt).all()
@@ -206,7 +206,7 @@ def cash_flow(
             RawEvent.source_event_id == TxnCategorization.source_event_id,
         ))
         .where(TxnCategorization.business_id == business_id)
-        .order_by(RawEvent.occurred_at.asc())
+        .order_by(RawEvent.occurred_at.asc(), RawEvent.source_event_id.asc())
     )
     rows = db.execute(stmt).all()
 
@@ -254,7 +254,7 @@ def cash_series(
             RawEvent.source_event_id == TxnCategorization.source_event_id,
         ))
         .where(TxnCategorization.business_id == business_id)
-        .order_by(RawEvent.occurred_at.asc())
+        .order_by(RawEvent.occurred_at.asc(), RawEvent.source_event_id.asc())
     )
     rows = db.execute(stmt).all()
 
