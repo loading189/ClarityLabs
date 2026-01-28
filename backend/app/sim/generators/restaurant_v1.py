@@ -52,7 +52,7 @@ def _plaid_transaction(
     extra: str = "",
     is_income: bool = False,
 ) -> Dict[str, Any]:
-    signed_amount = -abs(amount) if is_income else abs(amount)
+    signed_amount = abs(amount) if is_income else -abs(amount)
     event_id = _stable_event_id(seed, stream, when, extra)
 
     payload = {
