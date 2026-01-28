@@ -5,6 +5,8 @@ from typing import Any, Dict, List, Literal, Optional
 import statistics
 from datetime import datetime
 
+from backend.app.norma.ledger_series import monthly_cashflow_from_ledger_rows
+
 Status = Literal["no_data", "in_band", "below_band", "above_band"]
 
 @dataclass(frozen=True)
@@ -148,7 +150,9 @@ def build_monthly_trends_payload(
     Output: net + inflow + outflow + cash_end trends, each with baseline band and status.
     """
 
-    rows = facts_json.get("monthly_inflow_outflow") or []
+    rows = monthly_cashflow_from_ledger_rows(ledger_rows) if ledger_rows else []
+    if not rows:
+        rows = facts_json.get("monthly_inflow_outflow") or []
     if not isinstance(rows, list) or len(rows) == 0:
         return {
             "experiment": {"granularity": "month", "lookback_months": lookback_months, "band_method": "mad", "k": k},

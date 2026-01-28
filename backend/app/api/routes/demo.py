@@ -189,6 +189,8 @@ def demo_monthly_trends_by_business(
     ledger_rows = [
         {
             "occurred_at": r.occurred_at.isoformat(),
+            "date": r.date.isoformat(),
+            "amount": float(r.amount),
             "balance": float(r.balance),
             "source_event_id": r.source_event_id,
         }

@@ -107,10 +107,12 @@ export function TransactionsTab({
   businessId,
   drilldown,
   onClearDrilldown,
+  onCategorizationChange,
 }: {
   businessId: string;
   drilldown?: TransactionsDrilldown | null;
   onClearDrilldown?: () => void;
+  onCategorizationChange?: () => void;
 }) {
   const { data, loading, err, refresh } = useTransactions(businessId, 50);
   const [filters, setFilters] = useState<TransactionFilters>(DEFAULT_FILTERS);
@@ -526,6 +528,7 @@ export function TransactionsTab({
       });
       setActionMsg("Categorization saved. Refreshing transactions…");
       await refresh();
+      onCategorizationChange?.();
     } catch (e: any) {
       setActionErr(e?.message ?? "Failed to save categorization");
     } finally {
@@ -538,6 +541,7 @@ export function TransactionsTab({
     selectedCategoryId,
     selectedCategoryValid,
     selectedTxn,
+    onCategorizationChange,
   ]);
 
   const handleBulkApply = useCallback(async () => {
@@ -564,12 +568,13 @@ export function TransactionsTab({
         `Applied to ${res.matched_events} events (${res.created} new, ${res.updated} updated). Refreshing…`
       );
       await refresh();
+      onCategorizationChange?.();
     } catch (e: any) {
       setActionErr(e?.message ?? "Failed to apply vendor categorization");
     } finally {
       setBulkLoading(false);
     }
-  }, [businessId, refresh, selectedCategoryId, selectedCategoryValid, selectedTxn]);
+  }, [businessId, refresh, selectedCategoryId, selectedCategoryValid, selectedTxn, onCategorizationChange]);
 
   const toggleVendorPanel = useCallback(async () => {
     if (vendorPanelOpen) {
@@ -613,6 +618,7 @@ export function TransactionsTab({
       }
       setVendorActionMsg(message);
       await refresh();
+      onCategorizationChange?.();
     } catch (e: any) {
       setVendorActionErr(e?.message ?? "Failed to update vendor memory");
     } finally {
@@ -625,6 +631,7 @@ export function TransactionsTab({
     selectedTxn,
     vendorCategoryId,
     vendorCanonicalName,
+    onCategorizationChange,
   ]);
 
   const handleVendorForget = useCallback(async () => {

@@ -63,6 +63,14 @@ export default function DetailPanel({
     setRefreshKey((k) => k + 1);
   }
 
+  function handleCategorizationChange() {
+    if (selectedId) {
+      refreshDetail?.(selectedId);
+    }
+    bumpRefresh();
+    onAfterPulse?.();
+  }
+
   // ✅ typed confirmation phrase
   const confirmPhrase = `delete ${detail?.name ?? selectedId}`;
   const canDelete = typed.trim().toLowerCase() === confirmPhrase.toLowerCase();
@@ -205,11 +213,16 @@ export default function DetailPanel({
               businessId={selectedId}
               drilldown={transactionsDrilldown}
               onClearDrilldown={() => setTransactionsDrilldown(null)}
+              onCategorizationChange={handleCategorizationChange}
             />
           )}
 
           {mode === "categorize" && (
-            <CategorizeTab key={`cat-${selectedId}-${refreshKey}`} businessId={selectedId} />
+            <CategorizeTab
+              key={`cat-${selectedId}-${refreshKey}`}
+              businessId={selectedId}
+              onCategorizationChange={handleCategorizationChange}
+            />
           )}
 
           {mode === "ledger" && (
