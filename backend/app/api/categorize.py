@@ -90,7 +90,6 @@ class BrainVendorSetIn(BaseModel):
     merchant_key: str
     category_id: str
     canonical_name: Optional[str] = None
-    confidence: Optional[float] = None
 
 
 class BrainVendorForgetIn(BaseModel):
@@ -260,7 +259,7 @@ def set_brain_vendor(business_id: str, req: BrainVendorSetIn, db: Session = Depe
         raise HTTPException(400, "category must map to a valid system_key")
 
     canonical = canonical_merchant_name(req.canonical_name or alias_key or "Unknown")
-    confidence = float(req.confidence or 0.92)
+    confidence = 0.92
 
     label = brain.apply_label(
         business_id=business_id,
@@ -290,16 +289,15 @@ def forget_brain_vendor(business_id: str, req: BrainVendorForgetIn, db: Session 
     if not merchant_id:
         return {"status": "ok", "deleted": False}
 
-    per = brain.labels.get(business_id, {})
-    if merchant_id not in per:
+    per = brain.labels.get(business_id)
+    if not per:
         return {"status": "ok", "deleted": False}
 
-    del per[merchant_id]
-    if not per:
-        brain.labels.pop(business_id, None)
-    brain.save()
+    deleted = per.pop(merchant_id, None) is not None
+    if deleted:
+        brain.save()
 
-    return {"status": "ok", "deleted": True}
+    return {"status": "ok", "deleted": deleted}
 
 
 @router.get("/business/{business_id}/txns", response_model=List[NormalizedTxnOut])
