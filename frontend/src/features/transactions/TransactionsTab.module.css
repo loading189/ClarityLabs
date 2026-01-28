@@ -54,7 +54,13 @@
   padding: 0;
 }
 
-.secondaryButton {
+.linkButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus);
+  border-radius: var(--radius-sm);
+}
+
+.buttonBase {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 6px 12px;
@@ -62,17 +68,22 @@
   cursor: pointer;
   font-size: 12px;
   font-weight: 600;
+  color: var(--text);
   transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 
-.secondaryButton:hover {
+.buttonBase:hover {
   border-color: var(--border-strong);
   box-shadow: var(--shadow-sm);
 }
 
-.secondaryButton:focus-visible {
+.buttonBase:focus-visible {
   outline: none;
   box-shadow: 0 0 0 4px var(--focus);
+}
+
+.secondaryButton {
+  composes: buttonBase;
 }
 
 .filterBar {
@@ -102,7 +113,7 @@
   background: var(--card-bg);
 }
 
-.searchInput:focus {
+.searchInput:focus-visible {
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 4px var(--focus);
@@ -115,7 +126,7 @@
   background: var(--card-bg);
 }
 
-.select:focus {
+.select:focus-visible {
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 4px var(--focus);
@@ -127,12 +138,9 @@
 }
 
 .datePresetButton {
-  border: 1px solid var(--border);
+  composes: buttonBase;
   border-radius: 999px;
   padding: 6px 10px;
-  background: var(--card-bg);
-  cursor: pointer;
-  font-size: 12px;
   color: var(--text-muted);
 }
 
@@ -144,12 +152,8 @@
 }
 
 .clearButton {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  composes: buttonBase;
   padding: 8px 12px;
-  background: var(--card-bg);
-  cursor: pointer;
-  font-size: 12px;
 }
 
 .clearButton:disabled {
@@ -177,7 +181,8 @@
 .tableWrap {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   background: var(--card-bg);
   box-shadow: var(--shadow-sm);
 }
@@ -185,6 +190,7 @@
 .table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 
 .table thead tr {
@@ -196,6 +202,7 @@
 .table td {
   padding: 10px 12px;
   font-size: 13px;
+  word-break: break-word;
 }
 
 .table tbody tr {
@@ -300,6 +307,11 @@
 .closeButton:hover {
   border-color: var(--border-strong);
   color: var(--text);
+}
+
+.closeButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus);
 }
 
 .drawerAmount {
@@ -476,7 +488,7 @@
   background: var(--card-bg);
 }
 
-.textInput:focus {
+.textInput:focus-visible {
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 4px var(--focus);
@@ -503,6 +515,11 @@
   transform: translateY(-1px);
 }
 
+.primaryButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px var(--focus);
+}
+
 .primaryButton:disabled {
   opacity: 0.6;
   cursor: default;
@@ -514,7 +531,7 @@
   background: var(--danger-bg);
   border: 1px solid var(--danger-border);
   color: var(--danger);
-  padding: 8px 10px;
+  padding: 10px 12px;
   border-radius: var(--radius-sm);
   font-size: 12px;
 }
@@ -523,7 +540,7 @@
   background: var(--primary-soft);
   border: 1px solid rgba(37, 99, 235, 0.25);
   color: var(--primary-strong);
-  padding: 8px 10px;
+  padding: 10px 12px;
   border-radius: var(--radius-sm);
   font-size: 12px;
 }

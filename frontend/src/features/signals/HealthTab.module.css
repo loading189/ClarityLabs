@@ -115,6 +115,12 @@
   text-decoration: underline;
 }
 
+.tileAction:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus);
+  border-radius: var(--radius-sm);
+}
+
 .signalDashboardLayout {
   display: grid;
   grid-template-columns: 1fr;
@@ -238,6 +244,12 @@
   transform: translateY(-1px);
   box-shadow: var(--shadow-sm);
   border-color: var(--border-strong);
+}
+
+.signalLight:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px var(--focus);
+  border-color: var(--primary);
 }
 
 .signalLightActive {
@@ -417,7 +429,7 @@
   transform: translateY(-1px);
 }
 
-.actionButton:focus {
+.actionButton:focus-visible {
   outline: none;
   box-shadow: 0 0 0 4px var(--focus);
 }
