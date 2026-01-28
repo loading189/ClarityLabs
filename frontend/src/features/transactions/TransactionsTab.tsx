@@ -57,27 +57,28 @@ const DATE_PRESET_DAYS: Record<DatePreset, number> = {
   "90d": 90,
 };
 
-function toMerchantKey(description: string) {
-  const stopwords = new Set([
-    "pos",
-    "ach",
-    "debit",
-    "credit",
-    "card",
-    "purchase",
-    "payment",
-    "pmt",
-    "online",
-    "web",
-    "www",
-    "inc",
-    "llc",
-    "co",
-    "company",
-    "corp",
-    "corporation",
-    "the",
-  ]);
+const MERCHANT_STOPWORDS = new Set([
+  "pos",
+  "ach",
+  "debit",
+  "credit",
+  "card",
+  "purchase",
+  "payment",
+  "pmt",
+  "online",
+  "web",
+  "www",
+  "inc",
+  "llc",
+  "co",
+  "company",
+  "corp",
+  "corporation",
+  "the",
+]);
+
+function toMerchantKey(description?: string | null) {
   const normalized = (description || "")
     .toLowerCase()
     .trim()
@@ -88,7 +89,7 @@ function toMerchantKey(description: string) {
     .trim();
   const tokens = normalized
     .split(" ")
-    .filter((token) => token && !stopwords.has(token))
+    .filter((token) => token && !MERCHANT_STOPWORDS.has(token))
     .slice(0, 6);
   return tokens.join(" ");
 }
@@ -147,6 +148,9 @@ export function TransactionsTab({
   }, [drilldownKey, drilldown]);
 
   const txns = data?.transactions ?? [];
+  const getTxnKey = useCallback((txn: NormalizedTxn) => {
+    return txn.source_event_id || txn.id;
+  }, []);
 
   const isUncategorized = useCallback((value?: string | null) => {
     return (value ?? "").trim().toLowerCase() === "uncategorized";
@@ -187,6 +191,24 @@ export function TransactionsTab({
     [categories, isCategoryUncategorized]
   );
 
+  const merchantKeyByTxn = useMemo(() => {
+    const map = new Map<string, string>();
+    txns.forEach((txn) => {
+      map.set(getTxnKey(txn), toMerchantKey(txn.description));
+    });
+    return map;
+  }, [getTxnKey, txns]);
+
+  const categoryOptions = useMemo(() => {
+    const set = new Set<string>();
+    txns.forEach((txn) => {
+      if (txn.category) {
+        set.add(txn.category);
+      }
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [txns]);
+
   const filteredTxns = useMemo(() => {
     if (!txns.length) return [];
     const search = filters.search.trim().toLowerCase();
@@ -207,16 +229,16 @@ export function TransactionsTab({
         if (!haystack.includes(search)) return false;
       }
       if (merchantKey) {
-        const candidate = toMerchantKey(t.description ?? "");
+        const candidate = merchantKeyByTxn.get(getTxnKey(t)) ?? "";
         if (!candidate.includes(merchantKey)) return false;
       }
       if (cutoff) {
-        const occurredAt = Date.parse(t.occurred_at);
+        const occurredAt = t.occurred_at ? Date.parse(t.occurred_at) : Number.NaN;
         if (Number.isFinite(occurredAt) && occurredAt < cutoff) return false;
       }
       return true;
     });
-  }, [filters, txns]);
+  }, [filters, getTxnKey, merchantKeyByTxn, txns]);
 
   const loadCategories = useCallback(async () => {
     if (!businessId) return;
@@ -238,11 +260,12 @@ export function TransactionsTab({
 
   useEffect(() => {
     if (!selectedTxn) return;
-    const stillVisible = filteredTxns.some((txn) => txn.id === selectedTxn.id);
+    const selectedKey = getTxnKey(selectedTxn);
+    const stillVisible = filteredTxns.some((txn) => getTxnKey(txn) === selectedKey);
     if (!stillVisible) {
       setSelectedTxn(null);
     }
-  }, [filteredTxns, selectedTxn]);
+  }, [filteredTxns, getTxnKey, selectedTxn]);
 
   const pickDefaultCategoryId = useCallback(
     (txn: NormalizedTxn | null) => {
@@ -302,6 +325,11 @@ export function TransactionsTab({
     }
   }, [categoriesById, pickDefaultCategoryId, selectedCategoryId, selectedTxn]);
 
+  const selectedCategory = selectedCategoryId ? categoriesById.get(selectedCategoryId) ?? null : null;
+  const selectedCategoryValid = Boolean(
+    selectedCategoryId && selectedCategory && !isCategoryUncategorized(selectedCategory)
+  );
+
   useEffect(() => {
     if (!vendorPanelOpen) return;
     if (vendorInfo?.system_key) {
@@ -350,11 +378,6 @@ export function TransactionsTab({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [selectedTxn]);
-
-  const selectedCategory = selectedCategoryId ? categoriesById.get(selectedCategoryId) ?? null : null;
-  const selectedCategoryValid = Boolean(
-    selectedCategoryId && selectedCategory && !isCategoryUncategorized(selectedCategory)
-  );
 
   const suggestionInfo = useMemo(() => {
     if (!selectedTxn) return null;
@@ -423,6 +446,11 @@ export function TransactionsTab({
 
   const handleSave = useCallback(async () => {
     if (!selectedTxn) return;
+    const sourceEventId = getTxnKey(selectedTxn);
+    if (!sourceEventId) {
+      setActionErr("Missing source event id for this transaction.");
+      return;
+    }
     if (!selectedCategoryValid) {
       setActionErr("Select a valid category before saving.");
       return;
@@ -432,7 +460,7 @@ export function TransactionsTab({
     setActionLoading(true);
     try {
       await saveCategorization(businessId, {
-        source_event_id: selectedTxn.source_event_id,
+        source_event_id: sourceEventId,
         category_id: selectedCategoryId,
         source: "manual",
         confidence: 1.0,
@@ -444,7 +472,14 @@ export function TransactionsTab({
     } finally {
       setActionLoading(false);
     }
-  }, [businessId, refresh, selectedCategoryId, selectedCategoryValid, selectedTxn]);
+  }, [
+    businessId,
+    getTxnKey,
+    refresh,
+    selectedCategoryId,
+    selectedCategoryValid,
+    selectedTxn,
+  ]);
 
   const handleBulkApply = useCallback(async () => {
     if (!selectedTxn) return;
@@ -487,7 +522,7 @@ export function TransactionsTab({
     setVendorActionErr(null);
     setVendorActionMsg(null);
     setVendorErr(null);
-    setVendorCanonicalName(selectedTxn.description ?? selectedTxn.merchant_key);
+    setVendorCanonicalName(selectedTxn.description ?? selectedTxn.merchant_key ?? "");
     await loadVendorInfo(selectedTxn.merchant_key);
   }, [loadVendorInfo, selectedTxn, vendorPanelOpen]);
 
@@ -636,13 +671,11 @@ export function TransactionsTab({
             }
           >
             <option value="all">All categories</option>
-            {Array.from(new Set(txns.map((t) => t.category)))
-              .sort((a, b) => a.localeCompare(b))
-              .map((category) => (
-                <option key={category} value={category}>
-                  {category}
-                </option>
-              ))}
+            {categoryOptions.map((category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
+            ))}
           </select>
           <div className={styles.datePresetGroup}>
             {(["7d", "30d", "90d"] as DatePreset[]).map((preset) => (
@@ -696,10 +729,18 @@ export function TransactionsTab({
             </tr>
           </thead>
           <tbody>
-            {filteredTxns.map((t) => (
+            {filteredTxns.map((t) => {
+              const txnKey = getTxnKey(t);
+              const occurredLabel = t.occurred_at
+                ? new Date(t.occurred_at).toLocaleString()
+                : "—";
+              const eventId = txnKey || "—";
+              return (
               <tr
-                key={t.id}
-                className={t.id === selectedTxn?.id ? styles.tableRowSelected : ""}
+                key={txnKey}
+                className={
+                  txnKey === (selectedTxn ? getTxnKey(selectedTxn) : "") ? styles.tableRowSelected : ""
+                }
                 onClick={() => setSelectedTxn(t)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
@@ -708,25 +749,26 @@ export function TransactionsTab({
                 }}
                 role="button"
                 tabIndex={0}
-                aria-label={`Open actions for ${t.description}`}
+                aria-label={`Open actions for ${t.description ?? "transaction"}`}
               >
                 <td className={styles.noWrap}>
-                  {new Date(t.occurred_at).toLocaleString()}
+                  {occurredLabel}
                 </td>
                 <td>
                   <div className={styles.tableTitle}>{t.description}</div>
                   <small className={styles.tableSub}>
-                    event {t.source_event_id.slice(-6)}
+                    event {eventId ? eventId.slice(-6) : "—"}
                     {t.counterparty_hint ? ` · hint: ${t.counterparty_hint}` : ""}
                   </small>
                 </td>
-                <td>{t.account}</td>
-                <td>{t.category}</td>
+                <td>{t.account ?? "—"}</td>
+                <td>{t.category ?? "—"}</td>
                 <td className={styles.alignRight}>
                   {fmtMoney(t.amount, t.direction)}
                 </td>
               </tr>
-            ))}
+              );
+            })}
             {filteredTxns.length === 0 && (
               <tr>
                 <td colSpan={5} className={styles.emptyRow}>
@@ -755,7 +797,9 @@ export function TransactionsTab({
               <div>
                 <div className={styles.drawerTitle}>{selectedTxn.description}</div>
                 <div className={styles.drawerMeta}>
-                  {new Date(selectedTxn.occurred_at).toLocaleString()}
+                  {selectedTxn.occurred_at
+                    ? new Date(selectedTxn.occurred_at).toLocaleString()
+                    : "—"}
                 </div>
               </div>
               <button
