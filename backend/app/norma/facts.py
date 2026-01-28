@@ -200,10 +200,10 @@ def _sum_inflow_outflow(txns: Iterable[NormalizedTransaction]) -> Tuple[float, f
     inflow = 0.0
     outflow = 0.0
     for t in txns:
-        if t.amount >= 0:
+        if t.direction == "inflow":
             inflow += t.amount
         else:
-            outflow += abs(t.amount)
+            outflow += t.amount
     return inflow, outflow
 
 
@@ -215,10 +215,10 @@ def compute_monthly_cashflow(txns: Iterable[NormalizedTransaction]) -> List[Mont
         if k not in monthly:
             monthly[k] = {"inflow": 0.0, "outflow": 0.0}
 
-        if t.amount >= 0:
+        if t.direction == "inflow":
             monthly[k]["inflow"] += t.amount
         else:
-            monthly[k]["outflow"] += abs(t.amount)
+            monthly[k]["outflow"] += t.amount
 
     rows: List[MonthlyCashflow] = []
     for k in sorted(monthly.keys()):
@@ -235,7 +235,8 @@ def compute_category_totals(txns: Iterable[NormalizedTransaction]) -> List[Categ
     for t in txns:
         # Always ensure a category exists (defensive)
         cat = t.category or "uncategorized"
-        cat_totals[cat] = cat_totals.get(cat, 0.0) + t.amount
+        signed = t.amount if t.direction == "inflow" else -t.amount
+        cat_totals[cat] = cat_totals.get(cat, 0.0) + signed
 
     # Sort by absolute impact (largest magnitude first)
     rows = [

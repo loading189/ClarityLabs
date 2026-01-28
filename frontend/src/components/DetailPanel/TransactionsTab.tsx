@@ -1,11 +1,16 @@
 // src/components/detail/TransactionsTab.tsx
 import { useTransactions } from "../../hooks/useTransactions";
 
-function fmtMoney(n: number) {
-  const sign = n < 0 ? "-" : "";
-  const abs = Math.abs(n);
-  return `${sign}$${abs.toFixed(2)}`;
+function fmtMoney(amount: number, direction?: string) {
+  const signed =
+    direction === "outflow" ? -Math.abs(amount)
+    : direction === "inflow" ? Math.abs(amount)
+    : amount; // fallback if direction missing
+
+  const sign = signed < 0 ? "-" : "";
+  return `${sign}$${Math.abs(signed).toFixed(2)}`;
 }
+
 
 export function TransactionsTab({ businessId }: { businessId: string }) {
   const { data, loading, err, refresh } = useTransactions(businessId, 50);
@@ -59,7 +64,7 @@ export function TransactionsTab({ businessId }: { businessId: string }) {
                 <td style={{ padding: "10px 12px" }}>{t.account}</td>
                 <td style={{ padding: "10px 12px" }}>{t.category}</td>
                 <td style={{ padding: "10px 12px", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                  {fmtMoney(t.amount)}
+                  {fmtMoney(t.amount, t.direction)}
                 </td>
               </tr>
             ))}

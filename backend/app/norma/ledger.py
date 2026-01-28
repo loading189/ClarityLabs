@@ -24,7 +24,7 @@ class LedgerRow:
     A single line in a running cash ledger.
 
     Invariants:
-    - balance is the running total after applying this row's amount
+    - balance is the running total after applying this row's signed amount
     - rows are ordered deterministically
     """
     occurred_at: datetime
@@ -48,6 +48,11 @@ def _sort_key(t: NormalizedTransaction) -> tuple:
     )
 
 
+def _signed_amount(t: NormalizedTransaction) -> float:
+    amt = float(t.amount or 0.0)
+    return amt if t.direction == "inflow" else -amt
+
+
 def build_cash_ledger(
     txns: Iterable[NormalizedTransaction],
     opening_balance: float = 0.0,
@@ -58,7 +63,7 @@ def build_cash_ledger(
     ledger: List[LedgerRow] = []
 
     for t in txns_sorted:
-        amt = float(t.amount or 0.0)
+        amt = _signed_amount(t)
         balance += amt
         ledger.append(
             LedgerRow(

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import List, Optional, Literal, Dict
+import logging
+from typing import List, Optional, Literal, Dict, Iterable
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -15,6 +16,8 @@ from backend.app.norma.from_events import raw_event_to_txn
 router = APIRouter(prefix="/ledger", tags=["ledger"])
 
 Direction = Literal["inflow", "outflow"]
+
+logger = logging.getLogger(__name__)
 
 
 def _require_business(db: Session, business_id: str) -> Business:
@@ -95,6 +98,29 @@ def _date_range_filter(occurred_at: datetime, start: Optional[date], end: Option
     return True
 
 
+def is_inflow(direction: str) -> bool:
+    return direction == "inflow"
+
+
+def signed_amount(amount: float, direction: str) -> float:
+    amt = float(amount or 0.0)
+    if amt < 0:
+        logger.warning("Invariant guard: normalized transaction amount is negative: %s", amt)
+    return amt if is_inflow(direction) else -amt
+
+
+def _build_cash_series(
+    txns: Iterable,
+    starting_cash: float,
+) -> List[CashPointOut]:
+    bal = float(starting_cash or 0.0)
+    out: List[CashPointOut] = []
+    for txn in txns:
+        bal += signed_amount(txn.amount or 0.0, txn.direction)
+        out.append(CashPointOut(occurred_at=txn.occurred_at, balance=round(bal, 2)))
+    return out
+
+
 # -------------------------
 # Endpoints
 # -------------------------
@@ -135,8 +161,7 @@ def ledger_lines(
 
         txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
 
-        signed = float(txn.amount or 0.0)
-        direction: Direction = "inflow" if signed >= 0 else "outflow"
+        direction: Direction = txn.direction
 
         out.append(
             LedgerLineOut(
@@ -144,8 +169,8 @@ def ledger_lines(
                 source_event_id=ev.source_event_id,
                 description=txn.description,
                 direction=direction,
-                signed_amount=signed,
-                display_amount=abs(signed),
+                signed_amount=signed_amount(txn.amount or 0.0, direction),
+                display_amount=float(txn.amount or 0.0),
                 category_id=cat.id,
                 category_name=cat.name,
                 account_id=acct.id,
@@ -198,7 +223,7 @@ def income_statement(
             continue
 
         txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
-        amt = float(txn.amount or 0.0)
+        amt = signed_amount(txn.amount or 0.0, txn.direction)
         t = (acct.type or "").strip().lower()
         st = (acct.subtype or "").strip().lower()
 
@@ -207,8 +232,8 @@ def income_statement(
             rev_total += amt
             rev_by_name[cat.name] = rev_by_name.get(cat.name, 0.0) + amt
         elif t == "expense" or st == "cogs":
-            # expenses we report as positive numbers
-            exp = abs(amt)
+            # expenses we report as positive numbers; rebates reduce expense
+            exp = -amt
             exp_total += exp
             exp_by_name[cat.name] = exp_by_name.get(cat.name, 0.0) + exp
 
@@ -241,8 +266,8 @@ def cash_flow(
 ):
     """
     Direct-method cashflow MVP:
-    cash_in = sum of positive signed_amount across posted lines in range
-    cash_out = sum of abs(negative signed_amount) across posted lines in range
+    cash_in = sum of inflow amounts across posted lines in range
+    cash_out = sum of outflow amounts across posted lines in range
     """
     _require_business(db, business_id)
 
@@ -265,11 +290,11 @@ def cash_flow(
         if not _date_range_filter(ev.occurred_at, start_date, end_date):
             continue
         txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
-        amt = float(txn.amount or 0.0)
-        if amt >= 0:
-            cash_in += amt
+        signed = signed_amount(txn.amount or 0.0, txn.direction)
+        if is_inflow(txn.direction):
+            cash_in += abs(signed)
         else:
-            cash_out += abs(amt)
+            cash_out += abs(signed)
 
     return CashFlowOut(
         start_date=start_date,
@@ -307,17 +332,14 @@ def cash_series(
     )
     rows = db.execute(stmt).all()
 
-    bal = float(starting_cash or 0.0)
-    out: List[CashPointOut] = []
+    txns = []
 
     for _, ev in rows:
         if not _date_range_filter(ev.occurred_at, start_date, end_date):
             continue
-        txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
-        bal += float(txn.amount or 0.0)
-        out.append(CashPointOut(occurred_at=ev.occurred_at, balance=round(bal, 2)))
+        txns.append(raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id))
 
-    return out
+    return _build_cash_series(txns, starting_cash)
 
 
 @router.get("/business/{business_id}/balance_sheet_v1", response_model=BalanceSheetV1Out)
@@ -351,7 +373,7 @@ def balance_sheet_v1(
     for _, ev in rows:
         if ev.occurred_at.date() <= as_of:
             txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
-            bal += float(txn.amount or 0.0)
+            bal += signed_amount(txn.amount or 0.0, txn.direction)
 
     assets = bal
     liabilities = 0.0

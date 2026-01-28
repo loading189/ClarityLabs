@@ -29,6 +29,28 @@ export type CategoryOut = {
   account_name: string;
 };
 
+export type CategorizeMetricsOut = {
+  total_events: number;
+  posted: number;
+  uncategorized: number;
+  suggestion_coverage: number;
+  brain_coverage: number;
+};
+
+export type BulkApplyByMerchantKeyIn = {
+  merchant_key: string;
+  category_id: string;
+  source?: string;
+  confidence?: number;
+  note?: string | null;
+};
+
+export type BulkApplyByMerchantKeyOut = {
+  status: string;
+  matched_events: number;
+  created: number;
+  updated: number;
+};
 
 export function labelVendor(
   businessId: string,
@@ -46,6 +68,14 @@ export function getCategories(businessId: string) {
   return apiGet<CategoryOut[]>(`/categorize/business/${businessId}/categories`);
 }
 
+export function getCategorizeMetrics(businessId: string) {
+  return apiGet<CategorizeMetricsOut>(`/categorize/business/${businessId}/categorize/metrics`);
+}
+
+export function bulkApplyByMerchantKey(businessId: string, payload: BulkApplyByMerchantKeyIn) {
+  return apiPost<BulkApplyByMerchantKeyOut>(`/categorize/business/${businessId}/categorize/bulk_apply`, payload);
+}
+
 export function saveCategorization(
   businessId: string,
   payload: {
@@ -61,4 +91,3 @@ export function saveCategorization(
     payload
   );
 }
-

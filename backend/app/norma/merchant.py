@@ -17,3 +17,10 @@ def merchant_key(description: str) -> str:
     # keep first N tokens to avoid overfitting to long tails
     tokens = tokens[:6]
     return " ".join(tokens)
+
+
+def canonical_merchant_name(description: str) -> str:
+    key = merchant_key(description)
+    if not key:
+        return (description or "").strip() or "Unknown"
+    return " ".join(word.capitalize() for word in key.split(" "))
