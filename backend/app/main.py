@@ -1,17 +1,17 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.app.api.core import router as core_router
-from backend.app.api.demo import router as demo_router
-from backend.app.api.sim import router as sim_router
-from backend.app.api.onboarding import router as onboarding_router
-from backend.app.api.integrations import router as integrations_router
-from backend.app.api.categorize import router as categorize_router
-from backend.app.api.coa import router as coa_router
+from backend.app.api.routes.core import router as core_router
+from backend.app.api.routes.demo import router as demo_router
+from backend.app.api.routes.sim import router as sim_router
+from backend.app.api.routes.onboarding import router as onboarding_router
+from backend.app.api.routes.integrations import router as integrations_router
+from backend.app.api.routes.categorize import router as categorize_router
+from backend.app.api.routes.coa import router as coa_router
 from backend.app.seed.run import seed_system_categories
-from backend.app.api.admin import router as admin_router
-from backend.app.api.ledger import router as ledger_router
-from backend.app.api.brief import router as brief_router
+from backend.app.api.routes.admin import router as admin_router
+from backend.app.api.routes.ledger import router as ledger_router
+from backend.app.api.routes.brief import router as brief_router
 
 
 

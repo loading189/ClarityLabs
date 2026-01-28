@@ -1,0 +1,186 @@
+from __future__ import annotations
+
+from datetime import datetime
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, Query
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
+
+from backend.app.db import get_db
+from backend.app.services import categorize_service
+
+router = APIRouter(prefix="/categorize", tags=["categorize"])
+
+
+class NormalizedTxnOut(BaseModel):
+    source_event_id: str
+    occurred_at: datetime
+    description: str
+    amount: float
+    direction: str
+    account: str
+    category_hint: str
+
+    suggested_system_key: Optional[str] = None
+    suggestion_source: Optional[str] = None
+    confidence: Optional[float] = None
+    reason: Optional[str] = None
+
+    suggested_category_id: Optional[str] = None
+    suggested_category_name: Optional[str] = None
+
+    merchant_key: Optional[str] = None
+
+
+class LabelVendorIn(BaseModel):
+    source_event_id: str
+    system_key: str
+    canonical_name: Optional[str] = None
+    confidence: float = 0.92
+
+
+class BrainVendorOut(BaseModel):
+    merchant_id: str
+    canonical_name: str
+    system_key: str
+    confidence: float
+    evidence_count: int
+    updated_at: str
+    alias_keys: Optional[List[str]] = None
+    merchant_key: Optional[str] = None
+
+
+class BrainVendorSetIn(BaseModel):
+    merchant_key: str
+    category_id: str
+    canonical_name: Optional[str] = None
+
+
+class BrainVendorForgetIn(BaseModel):
+    merchant_key: str
+
+
+class CategoryOut(BaseModel):
+    id: str
+    name: str
+    system_key: Optional[str] = None
+    account_id: str
+    account_code: Optional[str] = None
+    account_name: str
+
+
+class CategorizationUpsertIn(BaseModel):
+    source_event_id: str
+    category_id: str
+    source: str = "manual"
+    confidence: float = 1.0
+    note: Optional[str] = None
+
+
+class BulkCategorizationIn(BaseModel):
+    merchant_key: str
+    category_id: str
+    source: str = "bulk"
+    confidence: float = 1.0
+    note: Optional[str] = None
+
+
+class CategorizationMetricsOut(BaseModel):
+    total_events: int
+    posted: int
+    uncategorized: int
+    suggestion_coverage: int
+    brain_coverage: int
+
+
+class CategoryRuleIn(BaseModel):
+    contains_text: str = Field(min_length=1, max_length=120)
+    category_id: str
+    priority: Optional[int] = 100
+    direction: Optional[str] = None
+    account: Optional[str] = None
+    active: Optional[bool] = True
+
+
+class CategoryRuleOut(BaseModel):
+    id: str
+    business_id: str
+    category_id: str
+    contains_text: str
+    direction: Optional[str] = None
+    account: Optional[str] = None
+    priority: int
+    active: bool
+    created_at: datetime
+
+
+@router.post("/business/{business_id}/label_vendor")
+def label_vendor(business_id: str, req: LabelVendorIn, db: Session = Depends(get_db)):
+    return categorize_service.label_vendor(db, business_id, req)
+
+
+@router.get("/business/{business_id}/brain/vendors", response_model=List[BrainVendorOut])
+def list_brain_vendors(business_id: str, db: Session = Depends(get_db)):
+    return [BrainVendorOut(**item) for item in categorize_service.list_brain_vendors(db, business_id)]
+
+
+@router.get("/business/{business_id}/brain/vendor", response_model=BrainVendorOut)
+def get_brain_vendor(
+    business_id: str,
+    merchant_key_value: str = Query(..., alias="merchant_key"),
+    db: Session = Depends(get_db),
+):
+    return BrainVendorOut(**categorize_service.get_brain_vendor(db, business_id, merchant_key_value))
+
+
+@router.post("/business/{business_id}/brain/vendor/set", response_model=BrainVendorOut)
+def set_brain_vendor(business_id: str, req: BrainVendorSetIn, db: Session = Depends(get_db)):
+    return BrainVendorOut(**categorize_service.set_brain_vendor(db, business_id, req))
+
+
+@router.post("/business/{business_id}/brain/vendor/forget")
+def forget_brain_vendor(business_id: str, req: BrainVendorForgetIn, db: Session = Depends(get_db)):
+    return categorize_service.forget_brain_vendor(db, business_id, req)
+
+
+@router.get("/business/{business_id}/txns", response_model=List[NormalizedTxnOut])
+def list_txns_to_categorize(
+    business_id: str,
+    limit: int = Query(50, ge=1, le=200),
+    only_uncategorized: bool = True,
+    db: Session = Depends(get_db),
+):
+    return [
+        NormalizedTxnOut(**item)
+        for item in categorize_service.list_txns_to_categorize(db, business_id, limit, only_uncategorized)
+    ]
+
+
+@router.get("/business/{business_id}/categories", response_model=List[CategoryOut])
+def list_categories(business_id: str, db: Session = Depends(get_db)):
+    return [CategoryOut(**item) for item in categorize_service.list_categories(db, business_id)]
+
+
+@router.post("/business/{business_id}/rules", response_model=CategoryRuleOut)
+def create_category_rule(business_id: str, req: CategoryRuleIn, db: Session = Depends(get_db)):
+    return CategoryRuleOut(**categorize_service.create_category_rule(db, business_id, req))
+
+
+@router.post("/business/{business_id}/categorize")
+def upsert_categorization(business_id: str, req: CategorizationUpsertIn, db: Session = Depends(get_db)):
+    return categorize_service.upsert_categorization(db, business_id, req)
+
+
+@router.post("/business/{business_id}/categorize/bulk_apply")
+def bulk_apply_categorization(
+    business_id: str,
+    req: BulkCategorizationIn,
+    db: Session = Depends(get_db),
+):
+    return categorize_service.bulk_apply_categorization(db, business_id, req)
+
+
+@router.get("/business/{business_id}/categorize/metrics", response_model=CategorizationMetricsOut)
+def categorization_metrics(business_id: str, db: Session = Depends(get_db)):
+    return CategorizationMetricsOut(**categorize_service.categorization_metrics(db, business_id))
