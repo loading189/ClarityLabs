@@ -59,12 +59,14 @@
 }
 
 .txnItem {
+  appearance: none;
   text-align: left;
   opacity: 0.75;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   padding: 10px;
   background: #fff;
+  cursor: pointer;
 }
 
 .txnItemActive {
@@ -149,6 +151,34 @@
   gap: 8px;
   margin-top: 10px;
   flex-wrap: wrap;
+}
+
+.buttonBase {
+  appearance: none;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  padding: 8px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  background: #fff;
+}
+
+.buttonBase:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.buttonPrimary {
+  composes: buttonBase;
+  background: #4f46e5;
+  border-color: #4338ca;
+  color: #fff;
+}
+
+.buttonSecondary {
+  composes: buttonBase;
+  border-color: #e5e7eb;
+  color: #111827;
 }
 
 .formRow {
