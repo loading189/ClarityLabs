@@ -4,7 +4,7 @@ import type { BusinessDetail, HealthSignal } from "../../types";
 import SignalGrid from "../../components/DetailPanel/SignalGrid";
 import SignalDetail from "../../components/DetailPanel/SignalDetail";
 import styles from "./HealthTab.module.css";
-import type { TransactionsDrilldown } from "../transactions";
+import { logRefresh } from "../../utils/refreshLog";
 
 function sevRank(sev?: string) {
   if (sev === "red") return 3;
@@ -25,10 +25,12 @@ type HealthNavigateTarget = "transactions" | "trends" | "categorize" | "ledger";
 
 export default function SignalsTab({
   detail,
+  refreshToken,
   onNavigate,
 }: {
   detail: BusinessDetail;
-  onNavigate?: (target: HealthNavigateTarget, drilldown?: TransactionsDrilldown | null) => void;
+  refreshToken?: number;
+  onNavigate?: (target: HealthNavigateTarget, drilldown?: Record<string, any> | null) => void;
 }) {
   const signals = (detail.health_signals ?? []) as HealthSignal[];
 
@@ -71,6 +73,7 @@ export default function SignalsTab({
       setMetricsLoading(true);
       setMetricsErr(null);
       try {
+        logRefresh("health", "categorize-metrics");
         const data = await getCategorizeMetrics(detail.business_id);
         if (!active) return;
         setMetrics(data);
@@ -89,7 +92,7 @@ export default function SignalsTab({
     return () => {
       active = false;
     };
-  }, [detail.business_id]);
+  }, [detail.business_id, refreshToken]);
 
   const redSignals = useMemo(
     () => sorted.filter((s) => s.severity === "red").length,

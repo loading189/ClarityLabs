@@ -167,6 +167,17 @@ export function TransactionsTab({
     });
   }, [drilldownKey, drilldown]);
 
+  const drilldownSummary = useMemo(() => {
+    if (!drilldown) return "";
+    const parts = [];
+    if (drilldown.direction) parts.push(`Direction: ${drilldown.direction}`);
+    if (drilldown.category_id) parts.push(`Category: ${drilldown.category_id}`);
+    if (drilldown.merchant_key) parts.push(`Merchant: ${drilldown.merchant_key}`);
+    if (drilldown.search) parts.push(`Search: "${drilldown.search}"`);
+    if (drilldown.date_preset) parts.push(`Range: ${drilldown.date_preset}`);
+    return parts.join(" · ");
+  }, [drilldown]);
+
   const txns = data?.transactions ?? [];
   const getTxnKey = useCallback((txn: NormalizedTxn) => {
     return txn.source_event_id || txn.id;
@@ -686,6 +697,7 @@ export function TransactionsTab({
       });
       setRuleActionMsg("Rule created. Refreshing transactions…");
       await refresh();
+      onCategorizationChange?.();
     } catch (e: any) {
       setRuleActionErr(e?.message ?? "Failed to create rule");
     } finally {
@@ -695,6 +707,7 @@ export function TransactionsTab({
     businessId,
     categoriesById,
     isCategoryUncategorized,
+    onCategorizationChange,
     refresh,
     ruleAccount,
     ruleCategoryId,
@@ -714,6 +727,11 @@ export function TransactionsTab({
       filters.merchantKey.trim()
   );
 
+  const clearFilters = useCallback(() => {
+    setFilters(DEFAULT_FILTERS);
+    onClearDrilldown?.();
+  }, [onClearDrilldown]);
+
   return (
     <div className={styles.container}>
       <div className={styles.headerRow}>
@@ -725,6 +743,18 @@ export function TransactionsTab({
           <button className={styles.secondaryButton} onClick={refresh}>Refresh</button>
         </div>
       </div>
+
+      {drilldown && (
+        <div className={styles.drilldownBanner}>
+          <span className={styles.drilldownLabel}>Active drilldown</span>
+          <span className={styles.drilldownText}>
+            {drilldownSummary || "Filters applied from Health."}
+          </span>
+          <button className={styles.drilldownClear} onClick={clearFilters} type="button">
+            Clear
+          </button>
+        </div>
+      )}
 
       {(err || categoriesErr) && (
         <div className={styles.loadError}>
@@ -813,10 +843,7 @@ export function TransactionsTab({
           </div>
           <button
             className={styles.clearButton}
-            onClick={() => {
-              setFilters(DEFAULT_FILTERS);
-              onClearDrilldown?.();
-            }}
+            onClick={clearFilters}
             disabled={!hasFilters}
           >
             {drilldown ? "Clear drilldown" : "Clear filters"}

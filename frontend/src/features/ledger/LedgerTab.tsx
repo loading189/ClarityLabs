@@ -1,6 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLedger } from "../../hooks/useLedger";
 import styles from "./LedgerTab.module.css";
+
+export type LedgerDrilldown = {
+  direction?: "inflow" | "outflow";
+  date_preset?: "30d" | "90d" | "365d";
+  search?: string;
+};
 
 function fmtMoney(n: number) {
   const sign = n < 0 ? "-" : "";
@@ -32,21 +38,57 @@ function StatCard({
   );
 }
 
-export function LedgerTab({ businessId }: { businessId: string }) {
+export function LedgerTab({
+  businessId,
+  drilldown,
+  refreshToken,
+  onClearDrilldown,
+}: {
+  businessId: string;
+  drilldown?: LedgerDrilldown | null;
+  refreshToken?: number;
+  onClearDrilldown?: () => void;
+}) {
   const [days, setDays] = useState(30);
   const { lines, incomeStatement, cashFlow, balanceSheet, loading, err, refresh, start_date, end_date } =
     useLedger(businessId, { days, limit: 1000 });
 
-  const totals = useMemo(() => {
-    const arr = lines ?? [];
-    let inflow = 0;
-    let outflow = 0;
-    for (const l of arr) {
-      if (l.signed_amount >= 0) inflow += l.signed_amount;
-      else outflow += Math.abs(l.signed_amount);
+  useEffect(() => {
+    if (!drilldown) {
+      setDays(30);
+      return;
     }
-    return { inflow, outflow, net: inflow - outflow, count: arr.length };
-  }, [lines]);
+    if (!drilldown.date_preset) return;
+    const nextDays =
+      drilldown.date_preset === "365d" ? 365 : drilldown.date_preset === "90d" ? 90 : 30;
+    setDays(nextDays);
+  }, [drilldown]);
+
+  useEffect(() => {
+    if (!refreshToken) return;
+    refresh();
+  }, [refreshToken, refresh]);
+
+  const drilldownSummary = useMemo(() => {
+    if (!drilldown) return "";
+    const parts = [];
+    if (drilldown.direction) parts.push(`Direction: ${drilldown.direction}`);
+    if (drilldown.search) parts.push(`Search: "${drilldown.search}"`);
+    if (drilldown.date_preset) parts.push(`Range: ${drilldown.date_preset}`);
+    return parts.join(" · ");
+  }, [drilldown]);
+
+  const dateFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    []
+  );
 
   if (loading && !lines) return <div className={styles.loadingState}>Loading ledger…</div>;
   if (err)
@@ -59,7 +101,44 @@ export function LedgerTab({ businessId }: { businessId: string }) {
       </div>
     );
 
-  const rows = lines ?? [];
+  const filteredRows = useMemo(() => {
+    const arr = lines ?? [];
+    if (!drilldown) return arr;
+    const search = (drilldown.search ?? "").trim().toLowerCase();
+    return arr.filter((row) => {
+      if (drilldown.direction && row.direction !== drilldown.direction) return false;
+      if (search) {
+        const haystack = `${row.description ?? ""} ${row.category_name ?? ""}`.toLowerCase();
+        if (!haystack.includes(search)) return false;
+      }
+      return true;
+    });
+  }, [drilldown, lines]);
+
+  const totals = useMemo(() => {
+    let inflow = 0;
+    let outflow = 0;
+    for (const l of filteredRows) {
+      if (l.signed_amount >= 0) inflow += l.signed_amount;
+      else outflow += Math.abs(l.signed_amount);
+    }
+    return { inflow, outflow, net: inflow - outflow, count: filteredRows.length };
+  }, [filteredRows]);
+
+  const runningBalanceById = useMemo(() => {
+    const map = new Map<string, number>();
+    const sorted = [...filteredRows].sort((a, b) => {
+      const dateDiff = new Date(a.occurred_at).getTime() - new Date(b.occurred_at).getTime();
+      if (dateDiff !== 0) return dateDiff;
+      return a.source_event_id.localeCompare(b.source_event_id);
+    });
+    let balance = 0;
+    for (const row of sorted) {
+      balance += row.signed_amount;
+      map.set(row.source_event_id, balance);
+    }
+    return map;
+  }, [filteredRows]);
 
   return (
     <div className={styles.container}>
@@ -88,6 +167,22 @@ export function LedgerTab({ businessId }: { businessId: string }) {
           </button>
         </div>
       </div>
+
+      {drilldown && (
+        <div className={styles.drilldownBanner}>
+          <span className={styles.drilldownLabel}>Active drilldown</span>
+          <span className={styles.drilldownText}>
+            {drilldownSummary || "Filters applied from Health."}
+          </span>
+          <button
+            className={styles.drilldownClear}
+            onClick={() => onClearDrilldown?.()}
+            type="button"
+          >
+            Clear
+          </button>
+        </div>
+      )}
 
       {/* Summary cards */}
       <div className={styles.summaryGrid}>
@@ -181,13 +276,14 @@ export function LedgerTab({ businessId }: { businessId: string }) {
               <th className={styles.tableCell}>Category</th>
               <th className={styles.tableCell}>Type</th>
               <th className={`${styles.tableCell} ${styles.tableCellRight}`}>Amount</th>
+              <th className={`${styles.tableCell} ${styles.tableCellRight}`}>Balance (range)</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((l) => (
+            {filteredRows.map((l) => (
               <tr key={l.source_event_id}>
                 <td className={`${styles.tableCell} ${styles.tableCellNoWrap}`}>
-                  {new Date(l.occurred_at).toLocaleString()}
+                  {dateFormatter.format(new Date(l.occurred_at))}
                 </td>
 
                 <td className={styles.tableCell}>
@@ -210,13 +306,18 @@ export function LedgerTab({ businessId }: { businessId: string }) {
                 <td className={`${styles.tableCell} ${styles.tableCellRight}`}>
                   {fmtMoney(l.signed_amount)}
                 </td>
+                <td className={`${styles.tableCell} ${styles.tableCellRight} ${styles.balanceCell}`}>
+                  {fmtMoney(runningBalanceById.get(l.source_event_id) ?? 0)}
+                </td>
               </tr>
             ))}
 
-            {rows.length === 0 && (
+            {filteredRows.length === 0 && (
               <tr>
-                <td colSpan={6} className={styles.emptyState}>
-                  No posted ledger lines yet. Categorize a few transactions first.
+                <td colSpan={7} className={styles.emptyState}>
+                  {lines && lines.length > 0
+                    ? "No ledger lines match this drilldown."
+                    : "No posted ledger lines yet. Categorize a few transactions first."}
                 </td>
               </tr>
             )}

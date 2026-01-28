@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchMonthlyTrends } from "../api/demo";
+import { logRefresh } from "../utils/refreshLog";
 
 export function useMonthlyTrends(businessId: string | null, lookbackMonths = 12, k = 2.0) {
   const [data, setData] = useState<any>(null);
@@ -11,6 +12,7 @@ export function useMonthlyTrends(businessId: string | null, lookbackMonths = 12,
     setLoading(true);
     setErr(null);
     try {
+      logRefresh("trends", "refresh");
       const json = await fetchMonthlyTrends(businessId, lookbackMonths, k);
       setData(json);
     } catch (e: any) {

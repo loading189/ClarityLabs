@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { logRefresh } from "../utils/refreshLog";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:8000";
 
@@ -95,6 +96,7 @@ export function useLedger(businessId: string, opts?: { days?: number; limit?: nu
     setErr(null);
 
     try {
+      logRefresh("ledger", "refresh");
       const linesUrl =
         `${API_BASE}/ledger/business/${businessId}/lines` +
         qs({ start_date, end_date, limit });
