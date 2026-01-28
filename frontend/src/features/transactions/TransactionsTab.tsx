@@ -4,7 +4,11 @@ import { useTransactions } from "../../hooks/useTransactions";
 import {
   bulkApplyByMerchantKey,
   getCategories,
+  getBrainVendor,
+  setBrainVendor,
+  forgetBrainVendor,
   saveCategorization,
+  type BrainVendor,
   type CategoryOut,
 } from "../../api/categorize";
 import type { NormalizedTxn } from "../../api/transactions";
@@ -109,6 +113,16 @@ export function TransactionsTab({
   const [actionMsg, setActionMsg] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [vendorPanelOpen, setVendorPanelOpen] = useState(false);
+  const [vendorInfo, setVendorInfo] = useState<BrainVendor | null>(null);
+  const [vendorLoading, setVendorLoading] = useState(false);
+  const [vendorErr, setVendorErr] = useState<string | null>(null);
+  const [vendorActionErr, setVendorActionErr] = useState<string | null>(null);
+  const [vendorActionMsg, setVendorActionMsg] = useState<string | null>(null);
+  const [vendorActionLoading, setVendorActionLoading] = useState(false);
+  const [vendorCategoryId, setVendorCategoryId] = useState<string>("");
+  const [vendorCanonicalName, setVendorCanonicalName] = useState<string>("");
+  const [applyToUncategorized, setApplyToUncategorized] = useState(false);
 
   const drilldownKey = useMemo(() => {
     if (!drilldown) return "";
@@ -155,6 +169,16 @@ export function TransactionsTab({
   const categoriesByName = useMemo(() => {
     const map = new Map<string, CategoryOut>();
     categories.forEach((category) => map.set(category.name.toLowerCase(), category));
+    return map;
+  }, [categories]);
+
+  const categoriesBySystemKey = useMemo(() => {
+    const map = new Map<string, CategoryOut>();
+    categories.forEach((category) => {
+      if (category.system_key) {
+        map.set(category.system_key.toLowerCase(), category);
+      }
+    });
     return map;
   }, [categories]);
 
@@ -247,12 +271,63 @@ export function TransactionsTab({
   }, [pickDefaultCategoryId, selectedTxn]);
 
   useEffect(() => {
+    if (!selectedTxn) {
+      setVendorPanelOpen(false);
+      setVendorInfo(null);
+      setVendorErr(null);
+      setVendorActionErr(null);
+      setVendorActionMsg(null);
+      setVendorActionLoading(false);
+      setVendorCategoryId("");
+      setVendorCanonicalName("");
+      setApplyToUncategorized(false);
+      return;
+    }
+    setVendorPanelOpen(false);
+    setVendorInfo(null);
+    setVendorErr(null);
+    setVendorActionErr(null);
+    setVendorActionMsg(null);
+    setVendorActionLoading(false);
+    setVendorCategoryId("");
+    setVendorCanonicalName(selectedTxn.description ?? "");
+    setApplyToUncategorized(false);
+  }, [selectedTxn]);
+
+  useEffect(() => {
     if (!selectedTxn) return;
     if (!selectedCategoryId || !categoriesById.has(selectedCategoryId)) {
       const nextId = pickDefaultCategoryId(selectedTxn);
       if (nextId) setSelectedCategoryId(nextId);
     }
   }, [categoriesById, pickDefaultCategoryId, selectedCategoryId, selectedTxn]);
+
+  useEffect(() => {
+    if (!vendorPanelOpen) return;
+    if (vendorInfo?.system_key) {
+      const mapped = categoriesBySystemKey.get(vendorInfo.system_key.toLowerCase());
+      if (mapped && !isCategoryUncategorized(mapped)) {
+        setVendorCategoryId(mapped.id);
+        return;
+      }
+    }
+    if (!vendorCategoryId) {
+      if (selectedCategoryValid) {
+        setVendorCategoryId(selectedCategoryId);
+      } else {
+        setVendorCategoryId(selectableCategories[0]?.id ?? "");
+      }
+    }
+  }, [
+    categoriesBySystemKey,
+    isCategoryUncategorized,
+    selectedCategoryId,
+    selectedCategoryValid,
+    selectableCategories,
+    vendorCategoryId,
+    vendorInfo,
+    vendorPanelOpen,
+  ]);
 
   useEffect(() => {
     if (!selectedTxn) return;
@@ -298,6 +373,53 @@ export function TransactionsTab({
       reason: selectedTxn.reason ?? "",
     };
   }, [categoriesById, isCategoryUncategorized, isUncategorized, selectedTxn]);
+
+  const provenanceInfo = useMemo(() => {
+    if (!selectedTxn) return null;
+    const source = selectedTxn.suggestion_source ?? "";
+    const confidenceRaw = selectedTxn.confidence;
+    const hasConfidence = typeof confidenceRaw === "number";
+    const confidence = hasConfidence
+      ? Math.max(0, Math.min(100, Math.round(confidenceRaw * 100)))
+      : null;
+    const reason = selectedTxn.reason ?? "";
+    if (!source && confidence === null && !reason) return null;
+    return {
+      source,
+      confidence,
+      reason,
+    };
+  }, [selectedTxn]);
+
+  const vendorMappedCategory = useMemo(() => {
+    if (!vendorInfo?.system_key) return null;
+    return categoriesBySystemKey.get(vendorInfo.system_key.toLowerCase()) ?? null;
+  }, [categoriesBySystemKey, vendorInfo]);
+
+  const vendorCategoryName = vendorMappedCategory?.name ?? vendorInfo?.system_key ?? "—";
+
+  const loadVendorInfo = useCallback(
+    async (merchantKey: string) => {
+      if (!merchantKey) return;
+      setVendorLoading(true);
+      setVendorErr(null);
+      try {
+        const res = await getBrainVendor(businessId, merchantKey);
+        setVendorInfo(res);
+        setVendorCanonicalName(res.canonical_name || merchantKey);
+      } catch (e: any) {
+        const message = e?.message ?? "Failed to load vendor memory";
+        if (message.includes("404")) {
+          setVendorInfo(null);
+        } else {
+          setVendorErr(message);
+        }
+      } finally {
+        setVendorLoading(false);
+      }
+    },
+    [businessId]
+  );
 
   const handleSave = useCallback(async () => {
     if (!selectedTxn) return;
@@ -354,6 +476,84 @@ export function TransactionsTab({
       setBulkLoading(false);
     }
   }, [businessId, refresh, selectedCategoryId, selectedCategoryValid, selectedTxn]);
+
+  const toggleVendorPanel = useCallback(async () => {
+    if (vendorPanelOpen) {
+      setVendorPanelOpen(false);
+      return;
+    }
+    if (!selectedTxn?.merchant_key) return;
+    setVendorPanelOpen(true);
+    setVendorActionErr(null);
+    setVendorActionMsg(null);
+    setVendorErr(null);
+    setVendorCanonicalName(selectedTxn.description ?? selectedTxn.merchant_key);
+    await loadVendorInfo(selectedTxn.merchant_key);
+  }, [loadVendorInfo, selectedTxn, vendorPanelOpen]);
+
+  const handleVendorSave = useCallback(async () => {
+    if (!selectedTxn?.merchant_key) return;
+    if (!vendorCategoryId) {
+      setVendorActionErr("Select a valid category for this vendor.");
+      return;
+    }
+    setVendorActionErr(null);
+    setVendorActionMsg(null);
+    setVendorActionLoading(true);
+    try {
+      const res = await setBrainVendor(businessId, {
+        merchant_key: selectedTxn.merchant_key,
+        category_id: vendorCategoryId,
+        canonical_name: vendorCanonicalName.trim() || undefined,
+      });
+      setVendorInfo(res);
+      let message = "Vendor memory updated.";
+      if (applyToUncategorized) {
+        const bulk = await bulkApplyByMerchantKey(businessId, {
+          merchant_key: selectedTxn.merchant_key,
+          category_id: vendorCategoryId,
+          source: "bulk",
+          confidence: 1.0,
+        });
+        message = `Vendor memory updated. Applied to ${bulk.matched_events} events.`;
+      }
+      setVendorActionMsg(message);
+      await refresh();
+    } catch (e: any) {
+      setVendorActionErr(e?.message ?? "Failed to update vendor memory");
+    } finally {
+      setVendorActionLoading(false);
+    }
+  }, [
+    applyToUncategorized,
+    businessId,
+    refresh,
+    selectedTxn,
+    vendorCategoryId,
+    vendorCanonicalName,
+  ]);
+
+  const handleVendorForget = useCallback(async () => {
+    if (!selectedTxn?.merchant_key) return;
+    setVendorActionErr(null);
+    setVendorActionMsg(null);
+    setVendorActionLoading(true);
+    try {
+      const res = await forgetBrainVendor(businessId, {
+        merchant_key: selectedTxn.merchant_key,
+      });
+      if (res.deleted) {
+        setVendorInfo(null);
+        setVendorActionMsg("Vendor memory cleared.");
+      } else {
+        setVendorActionMsg("No vendor memory found to remove.");
+      }
+    } catch (e: any) {
+      setVendorActionErr(e?.message ?? "Failed to forget vendor memory");
+    } finally {
+      setVendorActionLoading(false);
+    }
+  }, [businessId, selectedTxn]);
 
   if (loading && !data) return <div style={{ padding: 12 }}>Loading transactions…</div>;
 
@@ -579,6 +779,31 @@ export function TransactionsTab({
               </div>
             </div>
 
+            {provenanceInfo && (
+              <div className={styles.drawerSection}>
+                <div className={styles.drawerSectionLabel}>Categorization source</div>
+                <div className={styles.provenanceCard}>
+                  {provenanceInfo.source && (
+                    <div className={styles.provenanceRow}>
+                      <span>Source</span>
+                      <span className={styles.provenanceValue}>{provenanceInfo.source}</span>
+                    </div>
+                  )}
+                  {provenanceInfo.confidence !== null && (
+                    <div className={styles.provenanceRow}>
+                      <span>Confidence</span>
+                      <span className={styles.provenanceValue}>
+                        {provenanceInfo.confidence}%
+                      </span>
+                    </div>
+                  )}
+                  {provenanceInfo.reason && (
+                    <div className={styles.provenanceReason}>{provenanceInfo.reason}</div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {suggestionInfo && (
               <div className={styles.drawerSection}>
                 <div className={styles.drawerSectionLabel}>Suggestion</div>
@@ -595,6 +820,149 @@ export function TransactionsTab({
                   {suggestionInfo.reason && (
                     <div className={styles.suggestionReason}>{suggestionInfo.reason}</div>
                   )}
+                </div>
+              </div>
+            )}
+
+            {selectedTxn.merchant_key && (
+              <div className={styles.drawerSection}>
+                <div className={styles.drawerSectionLabel}>Vendor</div>
+                <div className={styles.vendorRow}>
+                  <span className={styles.vendorKey}>{selectedTxn.merchant_key}</span>
+                  <button
+                    className={styles.linkButton}
+                    onClick={toggleVendorPanel}
+                    type="button"
+                  >
+                    {vendorPanelOpen ? "Hide vendor" : "Manage vendor"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {vendorPanelOpen && selectedTxn.merchant_key && (
+              <div className={styles.vendorPanel}>
+                <div className={styles.vendorPanelHeader}>
+                  <div>
+                    <div className={styles.vendorPanelTitle}>Vendor memory</div>
+                    <div className={styles.vendorPanelSub}>
+                      Applies automatically only to uncategorized transactions.
+                    </div>
+                  </div>
+                  <button
+                    className={styles.linkButton}
+                    onClick={() => setVendorPanelOpen(false)}
+                    type="button"
+                  >
+                    Close
+                  </button>
+                </div>
+
+                {vendorLoading && (
+                  <div className={styles.drawerHelp}>Loading vendor memory…</div>
+                )}
+                {vendorErr && <div className={styles.actionError}>{vendorErr}</div>}
+
+                {!vendorLoading && !vendorInfo && (
+                  <div className={styles.vendorEmpty}>
+                    No vendor memory found yet for this merchant key.
+                  </div>
+                )}
+
+                <div className={styles.vendorGrid}>
+                  <div>
+                    <div className={styles.vendorLabel}>Merchant key</div>
+                    <div className={styles.vendorValue}>{selectedTxn.merchant_key}</div>
+                  </div>
+                  <label className={styles.vendorLabel} htmlFor="vendor-canonical">
+                    Canonical name
+                  </label>
+                  <input
+                    id="vendor-canonical"
+                    className={styles.textInput}
+                    value={vendorCanonicalName}
+                    onChange={(event) => setVendorCanonicalName(event.target.value)}
+                    placeholder="e.g., Acme Co"
+                  />
+                  <div>
+                    <div className={styles.vendorLabel}>Current category</div>
+                    <div className={styles.vendorValue}>{vendorCategoryName}</div>
+                  </div>
+                </div>
+
+                {vendorInfo && (
+                  <div className={styles.vendorMeta}>
+                    <span>Confidence: {Math.round(vendorInfo.confidence * 100)}%</span>
+                    <span>Evidence: {vendorInfo.evidence_count}</span>
+                    {vendorInfo.updated_at && (
+                      <span>Updated: {new Date(vendorInfo.updated_at).toLocaleString()}</span>
+                    )}
+                  </div>
+                )}
+
+                {vendorInfo?.alias_keys?.length ? (
+                  <div className={styles.vendorAliases}>
+                    <div className={styles.vendorLabel}>Aliases</div>
+                    <div className={styles.vendorAliasList}>
+                      {vendorInfo.alias_keys.map((alias) => (
+                        <span key={alias} className={styles.vendorAlias}>
+                          {alias}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className={styles.vendorControls}>
+                  <label className={styles.vendorLabel} htmlFor="vendor-category">
+                    Change vendor category
+                  </label>
+                  <select
+                    id="vendor-category"
+                    className={styles.select}
+                    value={vendorCategoryId}
+                    onChange={(event) => setVendorCategoryId(event.target.value)}
+                    disabled={selectableCategories.length === 0}
+                  >
+                    {selectableCategories.length === 0 && (
+                      <option value="">No categories available</option>
+                    )}
+                    {selectableCategories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                  <label className={styles.checkboxRow}>
+                    <input
+                      type="checkbox"
+                      checked={applyToUncategorized}
+                      onChange={(event) => setApplyToUncategorized(event.target.checked)}
+                    />
+                    Apply to existing uncategorized
+                  </label>
+                </div>
+
+                {vendorActionErr && <div className={styles.actionError}>{vendorActionErr}</div>}
+                {vendorActionMsg && <div className={styles.actionMessage}>{vendorActionMsg}</div>}
+
+                <div className={styles.vendorActions}>
+                  <button
+                    className={styles.primaryButton}
+                    onClick={handleVendorSave}
+                    disabled={!vendorCategoryId || vendorActionLoading}
+                    type="button"
+                  >
+                    {vendorActionLoading ? "Saving…" : "Save vendor"}
+                  </button>
+                  <button
+                    className={styles.secondaryButton}
+                    onClick={handleVendorForget}
+                    disabled={vendorActionLoading}
+                    type="button"
+                  >
+                    Forget vendor
+                  </button>
                 </div>
               </div>
             )}

@@ -75,6 +75,28 @@ class LabelVendorIn(BaseModel):
     confidence: float = 0.92
 
 
+class BrainVendorOut(BaseModel):
+    merchant_id: str
+    canonical_name: str
+    system_key: str
+    confidence: float
+    evidence_count: int
+    updated_at: str
+    alias_keys: Optional[List[str]] = None
+    merchant_key: Optional[str] = None
+
+
+class BrainVendorSetIn(BaseModel):
+    merchant_key: str
+    category_id: str
+    canonical_name: Optional[str] = None
+    confidence: Optional[float] = None
+
+
+class BrainVendorForgetIn(BaseModel):
+    merchant_key: str
+
+
 class CategoryOut(BaseModel):
     id: str
     name: str
@@ -151,6 +173,133 @@ def label_vendor(business_id: str, req: LabelVendorIn, db: Session = Depends(get
         "resolved": bool(resolved),
         **(resolved or {}),
     }
+
+
+def _brain_alias_keys_for_merchant(merchant_id: str) -> List[str]:
+    return sorted(
+        [alias.alias_key for alias in brain.aliases.values() if alias.merchant_id == merchant_id]
+    )
+
+
+def _brain_vendor_out(
+    *,
+    merchant_id: str,
+    label,
+    merchant_key_value: Optional[str] = None,
+) -> BrainVendorOut:
+    merchant = brain.get_merchant(merchant_id)
+    canonical = merchant.canonical_name if merchant else "Unknown"
+    return BrainVendorOut(
+        merchant_id=merchant_id,
+        canonical_name=canonical,
+        system_key=label.system_key,
+        confidence=label.confidence,
+        evidence_count=label.evidence_count,
+        updated_at=label.updated_at,
+        alias_keys=_brain_alias_keys_for_merchant(merchant_id),
+        merchant_key=merchant_key_value,
+    )
+
+
+@router.get("/business/{business_id}/brain/vendors", response_model=List[BrainVendorOut])
+def list_brain_vendors(business_id: str, db: Session = Depends(get_db)):
+    _require_business(db, business_id)
+
+    labels = brain.labels.get(business_id, {})
+    vendors: List[BrainVendorOut] = []
+    for merchant_id, label in labels.items():
+        system_key = (label.system_key or "").strip().lower()
+        if not system_key or system_key == "uncategorized":
+            continue
+        vendors.append(_brain_vendor_out(merchant_id=merchant_id, label=label))
+
+    vendors.sort(key=lambda v: (v.canonical_name or "").lower())
+    return vendors
+
+
+@router.get("/business/{business_id}/brain/vendor", response_model=BrainVendorOut)
+def get_brain_vendor(
+    business_id: str,
+    merchant_key_value: str = Query(..., alias="merchant_key"),
+    db: Session = Depends(get_db),
+):
+    _require_business(db, business_id)
+
+    alias_key = merchant_key_value.strip() if merchant_key_value else ""
+    alias_key = merchant_key(alias_key) if alias_key else ""
+    if not alias_key:
+        raise HTTPException(400, "merchant_key required")
+
+    merchant_id = brain.resolve_merchant_id(alias_key)
+    if not merchant_id:
+        raise HTTPException(404, "vendor not found")
+
+    label = brain.labels.get(business_id, {}).get(merchant_id)
+    if not label or (label.system_key or "").strip().lower() == "uncategorized":
+        raise HTTPException(404, "vendor not found")
+
+    return _brain_vendor_out(
+        merchant_id=merchant_id,
+        label=label,
+        merchant_key_value=alias_key,
+    )
+
+
+@router.post("/business/{business_id}/brain/vendor/set", response_model=BrainVendorOut)
+def set_brain_vendor(business_id: str, req: BrainVendorSetIn, db: Session = Depends(get_db)):
+    _require_business(db, business_id)
+    seed_coa_and_categories_and_mappings(db, business_id)
+    _require_category(db, business_id, req.category_id)
+
+    alias_key = merchant_key(req.merchant_key or "")
+    if not alias_key:
+        raise HTTPException(400, "merchant_key required")
+
+    system_key = _system_key_for_category(db, business_id, req.category_id)
+    if not system_key or system_key == "uncategorized":
+        raise HTTPException(400, "category must map to a valid system_key")
+
+    canonical = canonical_merchant_name(req.canonical_name or alias_key or "Unknown")
+    confidence = float(req.confidence or 0.92)
+
+    label = brain.apply_label(
+        business_id=business_id,
+        alias_key=alias_key,
+        canonical_name=canonical,
+        system_key=system_key,
+        confidence=confidence,
+    )
+    brain.save()
+
+    return _brain_vendor_out(
+        merchant_id=label.merchant_id,
+        label=label,
+        merchant_key_value=alias_key,
+    )
+
+
+@router.post("/business/{business_id}/brain/vendor/forget")
+def forget_brain_vendor(business_id: str, req: BrainVendorForgetIn, db: Session = Depends(get_db)):
+    _require_business(db, business_id)
+
+    alias_key = merchant_key(req.merchant_key or "")
+    if not alias_key:
+        raise HTTPException(400, "merchant_key required")
+
+    merchant_id = brain.resolve_merchant_id(alias_key)
+    if not merchant_id:
+        return {"status": "ok", "deleted": False}
+
+    per = brain.labels.get(business_id, {})
+    if merchant_id not in per:
+        return {"status": "ok", "deleted": False}
+
+    del per[merchant_id]
+    if not per:
+        brain.labels.pop(business_id, None)
+    brain.save()
+
+    return {"status": "ok", "deleted": True}
 
 
 @router.get("/business/{business_id}/txns", response_model=List[NormalizedTxnOut])

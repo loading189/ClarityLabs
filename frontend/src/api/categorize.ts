@@ -18,7 +18,16 @@ export type NormalizedTxn = {
   merchant_key?: string | null;
 };
 
-
+export type BrainVendor = {
+  merchant_id: string;
+  canonical_name: string;
+  system_key: string;
+  confidence: number;
+  evidence_count: number;
+  updated_at: string;
+  alias_keys?: string[] | null;
+  merchant_key?: string | null;
+};
 
 export type CategoryOut = {
   id: string;
@@ -59,6 +68,28 @@ export function labelVendor(
   return apiPost<any>(`/categorize/business/${businessId}/label_vendor`, payload);
 }
 
+export function getBrainVendors(businessId: string) {
+  return apiGet<BrainVendor[]>(`/categorize/business/${businessId}/brain/vendors`);
+}
+
+export function getBrainVendor(businessId: string, merchantKey: string) {
+  const params = new URLSearchParams({ merchant_key: merchantKey });
+  return apiGet<BrainVendor>(`/categorize/business/${businessId}/brain/vendor?${params.toString()}`);
+}
+
+export function setBrainVendor(
+  businessId: string,
+  payload: { merchant_key: string; category_id: string; canonical_name?: string; confidence?: number }
+) {
+  return apiPost<BrainVendor>(`/categorize/business/${businessId}/brain/vendor/set`, payload);
+}
+
+export function forgetBrainVendor(businessId: string, payload: { merchant_key: string }) {
+  return apiPost<{ status: string; deleted: boolean }>(
+    `/categorize/business/${businessId}/brain/vendor/forget`,
+    payload
+  );
+}
 
 export function getTxnsToCategorize(businessId: string, limit = 50) {
   return apiGet<NormalizedTxn[]>(`/categorize/business/${businessId}/txns?limit=${limit}&only_uncategorized=true`);
