@@ -1,18 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  bulkApplyByMerchantKey,
   getCategories,
+  getCategorizeMetrics,
   getTxnsToCategorize,
   saveCategorization,
-  labelVendor,
   type CategoryOut,
+  type CategorizeMetricsOut,
   type NormalizedTxn,
 } from "../../api/categorize";
+import styles from "./CategorizeTab.module.css";
 
 export default function CategorizeTab({ businessId }: { businessId: string }) {
   const [txns, setTxns] = useState<NormalizedTxn[]>([]);
   const [cats, setCats] = useState<CategoryOut[]>([]);
+  const [metrics, setMetrics] = useState<CategorizeMetricsOut | null>(null);
   const [selectedTxn, setSelectedTxn] = useState<NormalizedTxn | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
+  const selectedTxnRef = useRef<NormalizedTxn | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -26,6 +31,25 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
     for (const c of cats) m.set(c.id, c);
     return m;
   }, [cats]);
+
+  const currencyFormatter = useMemo(
+    () => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }),
+    []
+  );
+
+  const formatAmount = useCallback(
+    (txn: NormalizedTxn): string => {
+      const direction = (txn.direction || "").toLowerCase();
+      const sign = direction === "inflow" ? "+" : "-";
+      const amount = Number.isFinite(txn.amount) ? Math.abs(txn.amount) : 0;
+      return `${sign}${currencyFormatter.format(amount)}`;
+    },
+    [currencyFormatter]
+  );
+
+  const isUncategorized = useCallback((value?: string | null) => {
+    return (value ?? "").trim().toLowerCase() === "uncategorized";
+  }, []);
 
   const pickBestCategoryId = useCallback(
     (txn: NormalizedTxn | null, categories: CategoryOut[]): string => {
@@ -43,13 +67,15 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
     [selectedTxn]
   );
 
+  const suggestedCategory = useMemo(() => {
+    if (!suggestedCategoryId || isUncategorized(selectedTxn?.suggested_system_key)) return null;
+    return catsById.get(suggestedCategoryId) ?? null;
+  }, [catsById, isUncategorized, selectedTxn, suggestedCategoryId]);
+
   const suggestedName = useMemo(() => {
-    return (
-      selectedTxn?.suggested_category_name ??
-      selectedTxn?.suggested_system_key ??
-      "uncategorized"
-    );
-  }, [selectedTxn]);
+    if (!suggestedCategory) return "No suggestion";
+    return suggestedCategory.name;
+  }, [suggestedCategory]);
 
   const suggestedPct = useMemo(() => {
     const c = Number(selectedTxn?.confidence ?? 0);
@@ -57,8 +83,15 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
   }, [selectedTxn]);
 
   const suggestedIdIsValid = useMemo(() => {
-    return !!suggestedCategoryId && catsById.has(suggestedCategoryId);
-  }, [suggestedCategoryId, catsById]);
+    return !!suggestedCategory;
+  }, [suggestedCategory]);
+
+  const metricsSuggestionPercent = useMemo(() => {
+    if (!metrics) return 0;
+    const denom = metrics.uncategorized || metrics.total_events || 0;
+    if (!denom) return 0;
+    return Math.round((metrics.suggestion_coverage / denom) * 100);
+  }, [metrics]);
 
   const load = useCallback(async () => {
     if (!businessId) return;
@@ -70,9 +103,10 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
     setMsg(null);
 
     try {
-      const [t, c] = await Promise.all([
+      const [t, c, m] = await Promise.all([
         getTxnsToCategorize(businessId, 50),
         getCategories(businessId),
+        getCategorizeMetrics(businessId),
       ]);
 
       // If a newer load started, ignore this result
@@ -80,10 +114,14 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
 
       setTxns(t);
       setCats(c);
+      setMetrics(m);
 
-      const firstTxn = t[0] ?? null;
-      setSelectedTxn(firstTxn);
-      setSelectedCategoryId(pickBestCategoryId(firstTxn, c));
+      const existingTxn = selectedTxnRef.current
+        ? t.find((txn) => txn.source_event_id === selectedTxnRef.current?.source_event_id) ?? null
+        : null;
+      const nextTxn = existingTxn ?? t[0] ?? null;
+      setSelectedTxn(nextTxn);
+      setSelectedCategoryId(pickBestCategoryId(nextTxn, c));
     } catch (e: any) {
       if (seq !== loadSeq.current) return;
       setErr(e?.message ?? "Failed to load categorization");
@@ -131,35 +169,36 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
     [businessId, selectedTxn, load]
   );
 
-  const doAlwaysVendor = useCallback(
-  async (systemKey?: string | null) => {
-    if (!selectedTxn) return;
+  const doBulkApply = useCallback(
+    async (categoryId: string) => {
+      if (!selectedTxn) return;
 
-    const sk = (systemKey ?? "").trim().toLowerCase();
-    if (!sk || sk === "uncategorized") {
-      setErr("No usable system category to learn for this vendor.");
-      return;
-    }
+      if (!selectedTxn.merchant_key) {
+        setErr("No merchant key available for this vendor.");
+        return;
+      }
 
-    setErr(null);
-    setMsg(null);
+      setErr(null);
+      setMsg(null);
 
-    try {
-      await labelVendor(businessId, {
-        source_event_id: selectedTxn.source_event_id,
-        system_key: sk,
-        canonical_name: selectedTxn.description,
-        confidence: Number(selectedTxn.confidence ?? 0.92),
-      });
+      try {
+        const res = await bulkApplyByMerchantKey(businessId, {
+          merchant_key: selectedTxn.merchant_key,
+          category_id: categoryId,
+          source: "bulk",
+          confidence: Number(selectedTxn.confidence ?? 1.0),
+        });
 
-      setMsg(`Learned vendor → ${sk}. Reloading suggestions…`);
-      await load();
-    } catch (e: any) {
-      setErr(e?.message ?? "Failed to label vendor");
-    }
-  },
-  [businessId, selectedTxn, load]
-);
+        setMsg(
+          `Applied to ${res.matched_events} events (${res.created} new, ${res.updated} updated). Reloading…`
+        );
+        await load();
+      } catch (e: any) {
+        setErr(e?.message ?? "Failed to apply vendor categorization");
+      }
+    },
+    [businessId, load, selectedTxn]
+  );
 
 
   // When categories arrive/refresh, ensure selection is valid.
@@ -174,55 +213,86 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
     }
   }, [cats, catsById, pickBestCategoryId, selectedCategoryId, selectedTxn]);
 
+  useEffect(() => {
+    selectedTxnRef.current = selectedTxn;
+  }, [selectedTxn]);
+
   // On business change, reload
   useEffect(() => {
     load();
   }, [load]);
 
-  if (loading) return <div style={{ paddingTop: 8 }}>Loading…</div>;
-  if (err) return <div style={{ paddingTop: 8, color: "#b91c1c" }}>Error: {err}</div>;
+  if (loading) return <div className={styles.loading}>Loading…</div>;
+  if (err) return <div className={styles.error}>Error: {err}</div>;
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: 12 }}>
+    <div className={styles.container}>
       {/* LEFT: txns */}
-      <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 12 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-          <h3 style={{ margin: 0 }}>To categorize</h3>
+      <div className={styles.panel}>
+        <div className={styles.headerRow}>
+          <h3 className={styles.title}>To categorize</h3>
           <button className="closeBtn" onClick={load}>
             Reload
           </button>
         </div>
 
+        {metrics && (
+          <div className={styles.metricsPanel}>
+            <div className={styles.metricsGrid}>
+              <div className={styles.metricItem}>
+                <span className={styles.metricLabel}>Total events</span>
+                <span className={styles.metricValue}>{metrics.total_events}</span>
+              </div>
+              <div className={styles.metricItem}>
+                <span className={styles.metricLabel}>Posted</span>
+                <span className={styles.metricValue}>{metrics.posted}</span>
+              </div>
+              <div className={styles.metricItem}>
+                <span className={styles.metricLabel}>Remaining</span>
+                <span className={styles.metricValue}>{metrics.uncategorized}</span>
+              </div>
+              <div className={styles.metricItem}>
+                <span className={styles.metricLabel}>Suggestion coverage</span>
+                <span className={styles.metricValue}>
+                  {metrics.suggestion_coverage} ({metricsSuggestionPercent}%)
+                </span>
+              </div>
+              <div className={styles.metricItem}>
+                <span className={styles.metricLabel}>Brain coverage</span>
+                <span className={styles.metricValue}>{metrics.brain_coverage}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {txns.length === 0 ? (
-          <div style={{ marginTop: 10, opacity: 0.7 }}>No uncategorized transactions.</div>
+          <div className={styles.emptyState}>No uncategorized transactions.</div>
         ) : (
-          <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
+          <div className={styles.txnList}>
             {txns.map((t) => (
               <button
                 key={t.source_event_id}
-                className="closeBtn"
                 onClick={() => pickTxn(t)}
-                style={{
-                  textAlign: "left",
-                  opacity: selectedTxn?.source_event_id === t.source_event_id ? 1 : 0.75,
-                  border: "1px solid #e5e7eb",
-                  borderRadius: 12,
-                  padding: 10,
-                }}
+                aria-pressed={selectedTxn?.source_event_id === t.source_event_id}
+                aria-label={`Select transaction ${t.description}`}
+                className={`${styles.txnItem} ${
+                  selectedTxn?.source_event_id === t.source_event_id ? styles.txnItemActive : ""
+                } closeBtn`}
               >
-                <div style={{ fontSize: 13 }}>{t.description}</div>
-                <div style={{ fontSize: 12, opacity: 0.7 }}>
+                <div className={styles.txnTitle}>{t.description}</div>
+                <div className={styles.txnMeta}>
                   {new Date(t.occurred_at).toLocaleString()} • {t.account} • {t.direction} •{" "}
-                  {t.amount}
+                  {formatAmount(t)}
                 </div>
 
-                {!!t.suggested_system_key && (
-                  <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>
-                    Suggestion:{" "}
-                    <strong>{t.suggested_category_name ?? t.suggested_system_key}</strong> •{" "}
-                    {Math.round(Number(t.confidence ?? 0) * 100)}%
-                  </div>
-                )}
+                {t.suggested_category_id &&
+                  catsById.has(t.suggested_category_id) &&
+                  !isUncategorized(t.suggested_system_key) && (
+                    <div className={styles.suggestionLine}>
+                      Suggestion: <strong>{catsById.get(t.suggested_category_id)?.name}</strong> •{" "}
+                      {Math.round(Number(t.confidence ?? 0) * 100)}%
+                    </div>
+                  )}
               </button>
             ))}
           </div>
@@ -230,44 +300,38 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
       </div>
 
       {/* RIGHT: assign */}
-      <div style={{ border: "1px solid #e5e7eb", borderRadius: 12, padding: 12 }}>
-        <h3 style={{ marginTop: 0 }}>Assign category</h3>
+      <div className={styles.panel}>
+        <h3 className={styles.assignHeader}>Assign category</h3>
 
-        {msg && <div style={{ marginBottom: 10, fontSize: 12, opacity: 0.9 }}>{msg}</div>}
-        {err && <div style={{ marginBottom: 10, color: "#b91c1c" }}>Error: {err}</div>}
+        {msg && <div className={styles.message}>{msg}</div>}
+        {err && <div className={styles.error}>Error: {err}</div>}
 
         {!selectedTxn ? (
-          <div style={{ opacity: 0.7 }}>Select a transaction.</div>
+          <div className={styles.noSelection}>Select a transaction.</div>
         ) : (
           <>
-            <div style={{ fontSize: 13, marginBottom: 6 }}>{selectedTxn.description}</div>
-            <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 12 }}>
-              {selectedTxn.direction} • {selectedTxn.amount} • hint: {selectedTxn.category_hint}
+            <div className={styles.txnTitle}>{selectedTxn.description}</div>
+            <div className={styles.metaLine}>
+              {selectedTxn.direction} • {formatAmount(selectedTxn)} • hint:{" "}
+              {selectedTxn.category_hint}
             </div>
 
             {/* Suggestion box */}
-            <div
-              style={{
-                border: "1px solid #e5e7eb",
-                borderRadius: 12,
-                padding: 10,
-                marginBottom: 12,
-              }}
-            >
-              <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 6 }}>Suggestion</div>
+            <div className={styles.suggestionBox}>
+              <div className={styles.suggestionHeader}>Suggestion</div>
 
-              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                <strong style={{ fontSize: 13 }}>{suggestedName}</strong>
-                <span style={{ fontSize: 12, opacity: 0.7 }}>
-                  {suggestedPct}% • {selectedTxn.suggestion_source ?? "rule"}
-                </span>
+              <div className={styles.suggestionContent}>
+                <strong className={styles.txnTitle}>{suggestedName}</strong>
+                {suggestedIdIsValid && (
+                  <span className={styles.txnMeta}>
+                    {suggestedPct}% • {selectedTxn.suggestion_source ?? "rule"}
+                  </span>
+                )}
               </div>
 
-              <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>
-                {selectedTxn.reason ?? "—"}
-              </div>
+              <div className={styles.suggestionReason}>{selectedTxn.reason ?? "—"}</div>
 
-              <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+              <div className={styles.buttonRow}>
                 <button
                   className="closeBtn"
                   disabled={!suggestedIdIsValid}
@@ -283,10 +347,13 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
                 <button
                   className="closeBtn"
                   disabled={
-                    !selectedTxn.suggested_system_key ||
-                    selectedTxn.suggested_system_key === "uncategorized"
+                    !selectedTxn.merchant_key ||
+                    (!suggestedIdIsValid && !selectedCategoryId) ||
+                    isUncategorized(selectedTxn.suggested_system_key)
                   }
-                  onClick={() => doAlwaysVendor(selectedTxn.suggested_system_key)}
+                  onClick={() =>
+                    doBulkApply(suggestedIdIsValid ? suggestedCategoryId : selectedCategoryId)
+                  }
                 >
                   Always use this for this vendor
                 </button>
@@ -294,15 +361,15 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
             </div>
 
             {/* Manual selection */}
-            <div style={{ display: "grid", gap: 8 }}>
-              <label style={{ display: "grid", gap: 6 }}>
-                <span style={{ fontSize: 12, opacity: 0.8 }}>Category</span>
+            <div className={styles.formRow}>
+              <label className={styles.label}>
+                <span className={styles.suggestionHeader}>Category</span>
 
                 <select
                   value={selectedCategoryId}
                   onChange={(e) => setSelectedCategoryId(e.target.value)}
                   disabled={!cats.length}
-                  style={{ padding: 10, borderRadius: 10, border: "1px solid #e5e7eb" }}
+                  className={styles.select}
                 >
                   {!cats.length ? (
                     <option value="">No categories</option>
@@ -317,7 +384,7 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
                 </select>
               </label>
 
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <div className={styles.buttonRow}>
                 <button
                   className="closeBtn"
                   disabled={!selectedCategoryId}
@@ -330,7 +397,6 @@ export default function CategorizeTab({ businessId }: { businessId: string }) {
                   className="closeBtn"
                   disabled={!suggestedIdIsValid}
                   onClick={() => doSave(suggestedCategoryId, "rule")}
-                  style={{ opacity: suggestedIdIsValid ? 1 : 0.6 }}
                 >
                   Save using suggestion
                 </button>

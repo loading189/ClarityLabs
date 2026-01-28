@@ -1,0 +1,172 @@
+.container {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 12px;
+}
+
+.panel {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+}
+
+.headerRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.title {
+  margin: 0;
+}
+
+.metricsPanel {
+  margin-top: 12px;
+  padding: 10px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  display: grid;
+  gap: 8px;
+}
+
+.metricsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.metricItem {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.metricLabel {
+  opacity: 0.7;
+}
+
+.metricValue {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.txnList {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.txnItem {
+  text-align: left;
+  opacity: 0.75;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 10px;
+  background: #fff;
+}
+
+.txnItemActive {
+  opacity: 1;
+  border-color: #cbd5f5;
+  box-shadow: 0 0 0 1px rgba(129, 140, 248, 0.2);
+}
+
+.txnTitle {
+  font-size: 13px;
+}
+
+.txnMeta {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.suggestionLine {
+  font-size: 12px;
+  opacity: 0.7;
+  margin-top: 6px;
+}
+
+.emptyState {
+  margin-top: 10px;
+  opacity: 0.7;
+}
+
+.assignHeader {
+  margin-top: 0;
+}
+
+.message {
+  margin-bottom: 10px;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.error {
+  margin-bottom: 10px;
+  color: #b91c1c;
+}
+
+.noSelection {
+  opacity: 0.7;
+}
+
+.metaLine {
+  font-size: 12px;
+  opacity: 0.7;
+  margin-bottom: 12px;
+}
+
+.suggestionBox {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 10px;
+  margin-bottom: 12px;
+}
+
+.suggestionHeader {
+  font-size: 12px;
+  opacity: 0.8;
+  margin-bottom: 6px;
+}
+
+.suggestionContent {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.suggestionReason {
+  font-size: 12px;
+  opacity: 0.7;
+  margin-top: 6px;
+}
+
+.buttonRow {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.formRow {
+  display: grid;
+  gap: 8px;
+}
+
+.label {
+  display: grid;
+  gap: 6px;
+}
+
+.select {
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+}
+
+.loading {
+  padding-top: 8px;
+}
