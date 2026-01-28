@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import SimulatorTab from "./simulatorTab";
-import SignalsTab from "./SignalsTab";
-import CategorizeTab from "./CategorizeTab";
-import { TransactionsTab } from "./TransactionsTab";
+import { SignalsTab } from "../../features/signals";
+import { CategorizeTab } from "../../features/categorize";
+import { TransactionsTab } from "../../features/transactions";
 import CoaTab from "./CoaTab";
-import { LedgerTab } from "./LedgerTab";
+import { LedgerTab } from "../../features/ledger";
 import { deleteBusiness } from "../../api/admin"; // ✅ add this (adjust path if needed)
-import TrendsTab from "./TrendsTab";
+import { TrendsTab } from "../../features/trends";
 
 type PanelMode = "simulator" |"coa" | "transactions" | "categorize" | "ledger" | "signals" | "trends";
 

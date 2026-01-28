@@ -112,6 +112,7 @@ def infer_direction(amount: float) -> Direction:
 
 
 def normalize_txn(t: RawTransaction) -> NormalizedTransaction:
+    # MIGRATION NOTE: amount is absolute; direction carries sign.
     return NormalizedTransaction(
         id=getattr(t, "id", None),
         source_event_id=t.source_event_id,
@@ -119,10 +120,9 @@ def normalize_txn(t: RawTransaction) -> NormalizedTransaction:
 
         date=t.date,
         description=t.description,
-        amount=float(t.amount or 0.0),
+        amount=abs(float(t.amount or 0.0)),
         direction=infer_direction(t.amount),
         account=t.source_account,
         category=normalize_category(t.raw_category),
         counterparty_hint=None,
     )
-

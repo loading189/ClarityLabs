@@ -66,18 +66,14 @@ def _extract_amount_generic(payload: Dict[str, Any]) -> Optional[float]:
 
 def _direction_from_amount(amount: float, raw_dir: Optional[str] = None) -> Tuple[float, str]:
     """
-    Normalize sign + direction.
-    Convention in our pipeline:
-      - amount >= 0 => inflow
-      - amount < 0  => outflow
-    If raw_dir is provided, honor it by flipping sign if needed.
+    Normalize direction + absolute amount.
+
+    MIGRATION NOTE: amount is absolute; direction carries sign.
     """
     raw_dir = (raw_dir or "").strip().lower() if isinstance(raw_dir, str) else None
-    if raw_dir == "outflow" and amount > 0:
-        return -abs(amount), "outflow"
-    if raw_dir == "inflow" and amount < 0:
-        return abs(amount), "inflow"
-    return (amount, "inflow" if amount >= 0 else "outflow")
+    if raw_dir in {"inflow", "outflow"}:
+        return abs(amount), raw_dir
+    return (abs(amount), "inflow" if amount >= 0 else "outflow")
 
 
 def _normalize_category(raw: Optional[str], *, direction: Optional[str] = None) -> str:
@@ -194,7 +190,7 @@ def raw_event_to_txn(payload: Any, occurred_at: datetime, source_event_id: str) 
         account = "bank"
 
         amt = float(obj.get("amount", 0.0))
-        amount, direction = _direction_from_amount(amt, raw_dir=None)
+        amount, direction = _direction_from_amount(amt, raw_dir="inflow")
 
         # Stripe payout is real cash inflow, so we can safely mark sales
         category = _normalize_category("sales", direction=direction)
@@ -219,7 +215,6 @@ def raw_event_to_txn(payload: Any, occurred_at: datetime, source_event_id: str) 
         account = "processor"
 
         amt = float(data.get("amount", 0.0))
-        amt = -abs(amt)
         amount, direction = _direction_from_amount(amt, raw_dir="outflow")
 
         # fees: map to software for MVP
@@ -268,7 +263,7 @@ def raw_event_to_txn(payload: Any, occurred_at: datetime, source_event_id: str) 
         description = "Shopify Refund"
         account = "processor"
 
-        amount, direction = _direction_from_amount(-abs(amt), raw_dir="outflow")
+        amount, direction = _direction_from_amount(amt, raw_dir="outflow")
         category = _normalize_category("contra", direction=direction)
 
         return NormalizedTransaction(
@@ -291,7 +286,7 @@ def raw_event_to_txn(payload: Any, occurred_at: datetime, source_event_id: str) 
         description = "Payroll Run"
         account = "bank"
 
-        amount, direction = _direction_from_amount(-abs(net), raw_dir="outflow")
+        amount, direction = _direction_from_amount(net, raw_dir="outflow")
         category = _normalize_category("payroll", direction=direction)
 
         return NormalizedTransaction(
@@ -341,8 +336,8 @@ def raw_event_to_txn(payload: Any, occurred_at: datetime, source_event_id: str) 
         if amt is None:
             raise ValueError("raw_event_to_txn: payroll event missing net_total/gross_total")
 
-        amount = -abs(float(amt))
-        amount, direction = _direction_from_amount(amount)
+        amount = float(amt)
+        amount, direction = _direction_from_amount(amount, raw_dir="outflow")
 
         description = f"Payroll run ({int(payroll.get('employee_count') or 0)} employees)" if payroll else "Payroll run"
         raw_cat = _coerce_str(_get_hint_category(inner), "payroll")
@@ -450,7 +445,7 @@ def raw_event_to_txn(payload: Any, occurred_at: datetime, source_event_id: str) 
                 raise ValueError("raw_event_to_txn: invoice_paid missing invoice.cash_amount/amount")
 
             amount = float(cash_amt)
-            amount, direction = _direction_from_amount(amount)
+            amount, direction = _direction_from_amount(amount, raw_dir="inflow")
 
             invoice_id = _coerce_str(inv.get("invoice_id"), "invoice")
             customer = _coerce_str(inv.get("customer_name"), "customer")
