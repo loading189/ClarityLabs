@@ -10,6 +10,79 @@ export type DashboardCard = {
   highlights: string[];
 };
 
+export type DashboardKpis = {
+  current_cash: number;
+  last_30d_inflow: number;
+  last_30d_outflow: number;
+  last_30d_net: number;
+  prev_30d_inflow: number;
+  prev_30d_outflow: number;
+  prev_30d_net: number;
+};
+
+export type DashboardSignalDrilldown = {
+  kind: "category" | "vendor";
+  value: string;
+  window_days: number;
+  label?: string | null;
+};
+
+export type DashboardSignal = {
+  key: string;
+  title: string;
+  severity: Severity;
+  dimension: Dimension;
+  priority: number;
+  value: any;
+  message: string;
+  drilldown?: DashboardSignalDrilldown | null;
+};
+
+export type DashboardTrends = {
+  experiment: Record<string, any>;
+  metrics: Record<string, any>;
+  cash: Record<string, any>;
+  series: Array<Record<string, any>>;
+  band?: Record<string, any> | null;
+  status: string;
+  current?: Record<string, any> | null;
+};
+
+export type DashboardDetail = {
+  metadata: {
+    business_id: string;
+    name: string;
+    as_of: string;
+    last_event_occurred_at?: string | null;
+  };
+  kpis: DashboardKpis;
+  signals: DashboardSignal[];
+  trends: DashboardTrends;
+};
+
+export type DrilldownRow = {
+  source_event_id: string;
+  occurred_at: string;
+  date: string;
+  description: string;
+  amount: number;
+  direction: string;
+  account: string;
+  category: string;
+  counterparty_hint?: string | null;
+  merchant_key: string;
+};
+
+export type DrilldownResponse = {
+  business_id: string;
+  name: string;
+  window_days: number;
+  limit: number;
+  offset: number;
+  total: number;
+  rows: DrilldownRow[];
+};
+
 export type Signal = {
   key: string;
   title: string;
@@ -114,5 +187,4 @@ export type BrainLabelRequest = {
   category: string;
   confidence?: number;
 };
-
 
