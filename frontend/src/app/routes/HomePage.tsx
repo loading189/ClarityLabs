@@ -6,6 +6,7 @@ import FilterBar from "../../components/common/FilterBar";
 import PageHeader from "../../components/common/PageHeader";
 import { ErrorState, LoadingState } from "../../components/common/DataState";
 import { ledgerPath } from "./routeUtils";
+import { assertBusinessId } from "../../utils/businessId";
 import styles from "./HomePage.module.css";
 
 function formatMoney(value?: number | null) {
@@ -14,7 +15,8 @@ function formatMoney(value?: number | null) {
 }
 
 export default function HomePage() {
-  const { businessId = "" } = useParams();
+  const { businessId: businessIdParam } = useParams();
+  const businessId = assertBusinessId(businessIdParam, "HomePage");
   const [filters, setFilters] = useFilters();
   const { data: dashboard, loading, err } = useDemoDashboard(businessId);
   const { data: detail } = useBusinessDetailData(businessId);

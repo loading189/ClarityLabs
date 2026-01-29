@@ -29,7 +29,6 @@ export type LedgerLinesQuery = {
   start_date: string;
   end_date: string;
   limit?: number;
-  offset?: number;
 };
 
 export function fetchLedgerLines(
@@ -41,7 +40,6 @@ export function fetchLedgerLines(
   params.set("start_date", query.start_date);
   params.set("end_date", query.end_date);
   if (query.limit != null) params.set("limit", String(query.limit));
-  if (query.offset != null) params.set("offset", String(query.offset));
   return apiGet<LedgerLine[]>(
     `/ledger/business/${businessId}/lines?${params.toString()}`,
     { signal }

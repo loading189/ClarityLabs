@@ -9,6 +9,7 @@ import { useFilters } from "../../app/filters/useFilters";
 import { resolveDateRange } from "../../app/filters/filters";
 import { useLedgerLines } from "./useLedgerLines";
 import type { LedgerLine } from "../../api/ledger";
+import { assertBusinessId } from "../../utils/businessId";
 import styles from "./LedgerPage.module.css";
 
 function formatMoney(value: number) {
@@ -34,7 +35,8 @@ function uniqueOptions(values: Array<string | null | undefined>) {
 }
 
 export default function LedgerPage() {
-  const { businessId = "" } = useParams();
+  const { businessId: businessIdParam } = useParams();
+  const businessId = assertBusinessId(businessIdParam, "LedgerPage");
   const [filters, setFilters] = useFilters();
   const range = resolveDateRange(filters);
   const { lines, loading, err } = useLedgerLines(businessId, range.start, range.end);

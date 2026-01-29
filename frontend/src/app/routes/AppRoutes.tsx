@@ -11,7 +11,6 @@ import RulesPage from "./RulesPage";
 import SettingsPage from "./SettingsPage";
 import TrendsPage from "../../features/trends/TrendsPage";
 import VendorsPage from "./VendorsPage";
-import { DEFAULT_BUSINESS_ID } from "./defaults";
 import AppIndexRedirect from "./AppIndexRedirect";
 
 export default function AppRoutes() {
@@ -33,7 +32,7 @@ export default function AppRoutes() {
         <Route path="admin/simulator" element={<AdminSimulatorPage />} />
         <Route path="*" element={<Navigate to="home" replace />} />
       </Route>
-      <Route path="*" element={<Navigate to={`/app/${DEFAULT_BUSINESS_ID}/home`} replace />} />
+      <Route path="*" element={<Navigate to="/app" replace />} />
     </Routes>
   );
 }

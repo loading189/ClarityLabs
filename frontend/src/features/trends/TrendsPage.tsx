@@ -7,6 +7,7 @@ import { useFilters } from "../../app/filters/useFilters";
 import { monthBounds, monthsBetween, resolveDateRange } from "../../app/filters/filters";
 import { ledgerPath } from "../../app/routes/routeUtils";
 import { type MetricSeriesRow, useTrendsData } from "./useTrendsData";
+import { assertBusinessId } from "../../utils/businessId";
 import styles from "./TrendsPage.module.css";
 
 type TrendRow = {
@@ -104,7 +105,8 @@ function BarChart({
 }
 
 export default function TrendsPage() {
-  const { businessId = "" } = useParams();
+  const { businessId: businessIdParam } = useParams();
+  const businessId = assertBusinessId(businessIdParam, "TrendsPage");
   const navigate = useNavigate();
   const [filters, setFilters] = useFilters();
   const range = resolveDateRange(filters);

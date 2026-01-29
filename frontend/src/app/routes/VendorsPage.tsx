@@ -8,6 +8,7 @@ import { useFilters } from "../filters/useFilters";
 import { resolveDateRange } from "../filters/filters";
 import { ledgerPath } from "./routeUtils";
 import { useLedgerLines } from "../../features/ledger/useLedgerLines";
+import { assertBusinessId } from "../../utils/businessId";
 import styles from "./VendorsPage.module.css";
 
 type VendorSummary = {
@@ -22,7 +23,8 @@ function formatMoney(value: number) {
 }
 
 export default function VendorsPage() {
-  const { businessId = "" } = useParams();
+  const { businessId: businessIdParam } = useParams();
+  const businessId = assertBusinessId(businessIdParam, "VendorsPage");
   const navigate = useNavigate();
   const [filters, setFilters] = useFilters();
   const range = resolveDateRange(filters);

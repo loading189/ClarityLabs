@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useParams } from "react-router-dom";
 import styles from "./AppLayout.module.css";
+import { assertBusinessId } from "../../utils/businessId";
 
 type NavItem = {
   label: string;
@@ -22,7 +23,8 @@ const primaryNav: NavItem[] = [
 const adminNav: NavItem[] = [{ label: "Simulator", path: "admin/simulator" }];
 
 function NavSection({ title, items }: { title?: string; items: NavItem[] }) {
-  const { businessId = "" } = useParams();
+  const { businessId: businessIdParam } = useParams();
+  const businessId = assertBusinessId(businessIdParam, "AppLayout.NavSection");
   return (
     <div className={styles.navSection}>
       {title && <div className={styles.navSectionTitle}>{title}</div>}
@@ -44,7 +46,8 @@ function NavSection({ title, items }: { title?: string; items: NavItem[] }) {
 }
 
 export default function AppLayout() {
-  const { businessId = "" } = useParams();
+  const { businessId: businessIdParam } = useParams();
+  const businessId = assertBusinessId(businessIdParam, "AppLayout");
 
   return (
     <div className={styles.shell}>
