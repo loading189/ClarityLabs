@@ -37,6 +37,8 @@ def suggest_from_rules(
 
     If a rule matches, we convert its category_id -> system_key
     using BusinessCategoryMap (because the rest of the pipeline uses system_key).
+
+    Conflict policy: first match wins, ordered by priority (asc), created_at (asc), id (asc).
     """
     desc = _desc(txn)
     if not desc:
@@ -51,7 +53,11 @@ def suggest_from_rules(
                     CategoryRule.active.is_(True),
                 )
             )
-            .order_by(CategoryRule.priority.asc())
+            .order_by(
+                CategoryRule.priority.asc(),
+                CategoryRule.created_at.asc(),
+                CategoryRule.id.asc(),
+            )
         )
         .scalars()
         .all()

@@ -49,6 +49,8 @@ def suggest_from_rules(
     """
     Business-scoped deterministic rules using CategoryRule.
     Returns EnrichedTransaction where `category` == system_key (NOT category name).
+
+    Conflict policy: first match wins, ordered by priority (asc), created_at (asc), id (asc).
     """
     desc = (txn.description or "").strip().lower()
     if not desc:
@@ -66,7 +68,11 @@ def suggest_from_rules(
                 CategoryRule.active.is_(True),
             )
         )
-        .order_by(CategoryRule.priority.asc())
+        .order_by(
+            CategoryRule.priority.asc(),
+            CategoryRule.created_at.asc(),
+            CategoryRule.id.asc(),
+        )
         .limit(5000)
     ).scalars().all()
 

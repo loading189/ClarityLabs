@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  applyCategoryRule,
   bulkApplyByMerchantKey,
   deleteCategoryRule,
   getCategories,
   getCategorizeMetrics,
   getTxnsToCategorize,
   listCategoryRules,
+  previewCategoryRule,
   saveCategorization,
   updateCategoryRule,
   type CategoryRuleOut,
+  type CategoryRulePreviewOut,
   type CategoryOut,
   type CategorizeMetricsOut,
   type NormalizedTxn,
@@ -57,6 +60,11 @@ export default function CategorizeTab({
   const [rulesLoading, setRulesLoading] = useState(false);
   const [rulesErr, setRulesErr] = useState<string | null>(null);
   const [rulesMsg, setRulesMsg] = useState<string | null>(null);
+  const [previewRuleId, setPreviewRuleId] = useState<string | null>(null);
+  const [previewData, setPreviewData] = useState<CategoryRulePreviewOut | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewErr, setPreviewErr] = useState<string | null>(null);
+  const [applyLoadingRuleId, setApplyLoadingRuleId] = useState<string | null>(null);
   const [ruleEdits, setRuleEdits] = useState<
     Record<string, { priority: string; category_id: string }>
   >({});
@@ -96,6 +104,13 @@ export default function CategorizeTab({
     },
     [isUncategorized]
   );
+
+  const formatLastRun = useCallback((rule: CategoryRuleOut): string => {
+    if (!rule.last_run_at) return "Never";
+    const stamp = new Date(rule.last_run_at).toLocaleString();
+    const updated = rule.last_run_updated_count ?? 0;
+    return `${stamp} · ${updated} updated`;
+  }, []);
 
   const pickBestCategoryId = useCallback(
     (txn: NormalizedTxn | null, categories: CategoryOut[]): string => {
@@ -263,9 +278,17 @@ export default function CategorizeTab({
     return [...rules].sort((a, b) => {
       const priorityDiff = a.priority - b.priority;
       if (priorityDiff !== 0) return priorityDiff;
-      return a.contains_text.localeCompare(b.contains_text);
+      const createdDiff =
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      if (createdDiff !== 0) return createdDiff;
+      return a.id.localeCompare(b.id);
     });
   }, [rules]);
+
+  const previewRule = useMemo(() => {
+    if (!previewRuleId) return null;
+    return rules.find((rule) => rule.id === previewRuleId) ?? null;
+  }, [previewRuleId, rules]);
 
   const ruleCategoryOptions = useMemo(
     () => cats.filter((c) => !isCategoryUncategorized(c)),
@@ -430,6 +453,65 @@ export default function CategorizeTab({
       }
     },
     [businessId, loadRules, onCategorizationChange]
+  );
+
+  const clearPreview = useCallback(() => {
+    setPreviewRuleId(null);
+    setPreviewData(null);
+    setPreviewErr(null);
+    setPreviewLoading(false);
+  }, []);
+
+  const runRulePreview = useCallback(
+    async (rule: CategoryRuleOut) => {
+      setPreviewRuleId(rule.id);
+      setPreviewLoading(true);
+      setPreviewErr(null);
+      setPreviewData(null);
+      try {
+        const res = await previewCategoryRule(businessId, rule.id);
+        setPreviewData(res);
+      } catch (e: any) {
+        setPreviewErr(e?.message ?? "Failed to preview rule");
+      } finally {
+        setPreviewLoading(false);
+      }
+    },
+    [businessId]
+  );
+
+  const applyRuleNow = useCallback(
+    async (rule: CategoryRuleOut) => {
+      setApplyLoadingRuleId(rule.id);
+      setRulesErr(null);
+      setRulesMsg(null);
+      try {
+        const res = await applyCategoryRule(businessId, rule.id);
+        setRulesMsg(`Applied rule to ${res.updated} transactions (matched ${res.matched}).`);
+        setRules((prev) =>
+          prev.map((item) =>
+            item.id === rule.id
+              ? {
+                  ...item,
+                  last_run_at: new Date().toISOString(),
+                  last_run_updated_count: res.updated,
+                }
+              : item
+          )
+        );
+        await load();
+        await loadRules();
+        if (previewRuleId === rule.id) {
+          await runRulePreview(rule);
+        }
+        onCategorizationChange?.();
+      } catch (e: any) {
+        setRulesErr(e?.message ?? "Failed to apply rule");
+      } finally {
+        setApplyLoadingRuleId(null);
+      }
+    },
+    [businessId, load, loadRules, onCategorizationChange, previewRuleId, runRulePreview]
   );
 
 
@@ -691,6 +773,66 @@ export default function CategorizeTab({
 
         {rulesMsg && <div className={styles.message}>{rulesMsg}</div>}
         {rulesErr && <div className={styles.error}>Error: {rulesErr}</div>}
+        {previewRuleId && (
+          <div className={styles.previewPanel}>
+            <div className={styles.previewHeader}>
+              <div>
+                <div className={styles.previewTitle}>Rule preview</div>
+                <div className={styles.previewMeta}>
+                  {previewRule
+                    ? `Contains "${previewRule.contains_text}" · Priority ${previewRule.priority}`
+                    : "Loading rule details…"}
+                </div>
+              </div>
+              <button className={styles.buttonSecondary} onClick={clearPreview}>
+                Close
+              </button>
+            </div>
+            {previewLoading ? (
+              <div className={styles.loading}>Loading preview…</div>
+            ) : previewErr ? (
+              <div className={styles.error}>Error: {previewErr}</div>
+            ) : previewData ? (
+              <>
+                <div className={styles.previewSummary}>
+                  <strong>{previewData.matched}</strong> uncategorized transactions match
+                  this rule.
+                  <div className={styles.previewNote}>
+                    Conflicts resolve by priority, then created date, then rule id.
+                  </div>
+                </div>
+                {previewData.samples.length === 0 ? (
+                  <div className={styles.emptyState}>No sample matches.</div>
+                ) : (
+                  <div className={styles.previewTableWrap}>
+                    <table className={styles.previewTable}>
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th>Description</th>
+                          <th>Amount</th>
+                          <th>Direction</th>
+                          <th>Account</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {previewData.samples.map((sample) => (
+                          <tr key={sample.source_event_id}>
+                            <td>{new Date(sample.occurred_at).toLocaleDateString()}</td>
+                            <td>{sample.description}</td>
+                            <td>{currencyFormatter.format(sample.amount)}</td>
+                            <td>{sample.direction}</td>
+                            <td>{sample.account || "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            ) : null}
+          </div>
+        )}
 
         {rulesLoading ? (
           <div className={styles.loading}>Loading rules…</div>
@@ -707,6 +849,7 @@ export default function CategorizeTab({
                   <th>Direction</th>
                   <th>Account</th>
                   <th>Category</th>
+                  <th>Last run</th>
                   <th>Created</th>
                   <th>Actions</th>
                 </tr>
@@ -760,6 +903,7 @@ export default function CategorizeTab({
                           )}
                         </select>
                       </td>
+                      <td>{formatLastRun(rule)}</td>
                       <td>{new Date(rule.created_at).toLocaleDateString()}</td>
                       <td>
                         <div className={styles.buttonRow}>
@@ -775,6 +919,19 @@ export default function CategorizeTab({
                             onClick={() => deleteRule(rule)}
                           >
                             Delete
+                          </button>
+                          <button
+                            className={styles.buttonSecondary}
+                            onClick={() => runRulePreview(rule)}
+                          >
+                            {previewRuleId === rule.id && previewLoading ? "Previewing…" : "Preview"}
+                          </button>
+                          <button
+                            className={styles.buttonPrimary}
+                            disabled={applyLoadingRuleId === rule.id}
+                            onClick={() => applyRuleNow(rule)}
+                          >
+                            {applyLoadingRuleId === rule.id ? "Applying…" : "Apply now"}
                           </button>
                         </div>
                       </td>

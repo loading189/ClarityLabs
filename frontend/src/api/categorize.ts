@@ -71,6 +71,8 @@ export type CategoryRuleOut = {
   priority: number;
   active: boolean;
   created_at: string;
+  last_run_at?: string | null;
+  last_run_updated_count?: number | null;
 };
 
 export type CategoryRulePatch = {
@@ -80,6 +82,27 @@ export type CategoryRulePatch = {
   contains_text?: string;
   direction?: "inflow" | "outflow" | null;
   account?: string | null;
+};
+
+export type CategoryRulePreviewSample = {
+  source_event_id: string;
+  occurred_at: string;
+  description: string;
+  amount: number;
+  direction: string;
+  account: string;
+};
+
+export type CategoryRulePreviewOut = {
+  rule_id: string;
+  matched: number;
+  samples: CategoryRulePreviewSample[];
+};
+
+export type CategoryRuleApplyOut = {
+  rule_id: string;
+  matched: number;
+  updated: number;
 };
 
 export function labelVendor(
@@ -183,4 +206,12 @@ export function updateCategoryRule(businessId: string, ruleId: string, payload: 
 
 export function deleteCategoryRule(businessId: string, ruleId: string) {
   return apiDelete<{ deleted: boolean }>(`/categorize/${businessId}/rules/${ruleId}`);
+}
+
+export function previewCategoryRule(businessId: string, ruleId: string) {
+  return apiGet<CategoryRulePreviewOut>(`/categorize/${businessId}/rules/${ruleId}/preview`);
+}
+
+export function applyCategoryRule(businessId: string, ruleId: string) {
+  return apiPost<CategoryRuleApplyOut>(`/categorize/${businessId}/rules/${ruleId}/apply`, {});
 }
