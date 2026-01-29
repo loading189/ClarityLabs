@@ -1,0 +1,271 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.headerRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title {
+  font-size: 20px;
+  margin: 0 0 4px;
+}
+
+.subtitle {
+  font-size: 13px;
+  color: #6a6a6a;
+}
+
+.refreshButton {
+  border: 1px solid #d1d5db;
+  background: white;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.status {
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.error {
+  font-size: 13px;
+  color: #b91c1c;
+}
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.kpiCard {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: #f8fafc;
+}
+
+.kpiLabel {
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+
+.kpiValue {
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.sectionSub {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.trendsSection {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 14px;
+  background: #fff;
+}
+
+.trendsTable {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.trendsRowHeader,
+.trendsRow {
+  display: grid;
+  grid-template-columns: 1fr repeat(4, minmax(80px, 1fr));
+  gap: 10px;
+  font-size: 12px;
+}
+
+.trendsRowHeader {
+  font-weight: 600;
+  color: #374151;
+}
+
+.trendsRow {
+  padding: 6px 0;
+  border-top: 1px solid #f3f4f6;
+  color: #111827;
+}
+
+.contentGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+  gap: 16px;
+}
+
+.signalsSection {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 14px;
+  background: #fff;
+}
+
+.signalsList {
+  display: grid;
+  gap: 10px;
+}
+
+.signalCard {
+  display: grid;
+  grid-template-columns: 6px 1fr;
+  gap: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: white;
+  text-align: left;
+  cursor: pointer;
+}
+
+.signalCardActive {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 1px #2563eb;
+}
+
+.signalSeverity {
+  width: 6px;
+  border-radius: 6px;
+}
+
+.signalRed {
+  background: #dc2626;
+}
+
+.signalYellow {
+  background: #f59e0b;
+}
+
+.signalGreen {
+  background: #10b981;
+}
+
+.signalTitle {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.signalMessage {
+  font-size: 12px;
+  color: #4b5563;
+}
+
+.drawer {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 14px;
+  background: #f9fafb;
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.drawerMeta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #4b5563;
+}
+
+.ctaButton {
+  align-self: flex-start;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.drawerTable {
+  display: grid;
+  gap: 8px;
+}
+
+.drawerRowHeader,
+.drawerRow {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr) 120px 90px;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.drawerRowHeader {
+  font-weight: 600;
+  color: #374151;
+}
+
+.drawerRow {
+  border-top: 1px solid #e5e7eb;
+  padding: 6px 0;
+  color: #111827;
+}
+
+.drawerDescription {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #4b5563;
+  align-items: center;
+}
+
+.paginationButtons {
+  display: flex;
+  gap: 8px;
+}
+
+.pageButton {
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: white;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.pageButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.empty {
+  font-size: 12px;
+  color: #6b7280;
+  padding: 8px 0;
+}
+
+@media (max-width: 1100px) {
+  .contentGrid {
+    grid-template-columns: 1fr;
+  }
+}

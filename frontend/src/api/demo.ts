@@ -1,5 +1,11 @@
 // src/api/demo.ts
-import type { DashboardCard, BusinessDetail, BrainLabelRequest } from "../types";
+import type {
+  BusinessDetail,
+  BrainLabelRequest,
+  DashboardCard,
+  DashboardDetail,
+  DrilldownResponse,
+} from "../types";
 import { apiGet, apiPost } from "./client";
 
 export function postBrainLabel(payload: BrainLabelRequest) {
@@ -12,6 +18,44 @@ export function fetchDashboard() {
 
 export function fetchBusinessHealth(businessId: string) {
   return apiGet<BusinessDetail>(`/demo/health/${businessId}`);
+}
+
+export function fetchBusinessDashboard(businessId: string) {
+  return apiGet<DashboardDetail>(`/demo/dashboard/${businessId}`);
+}
+
+export function fetchCategoryDrilldown(
+  businessId: string,
+  category: string,
+  windowDays = 30,
+  limit = 50,
+  offset = 0
+) {
+  const params = new URLSearchParams({
+    business_id: businessId,
+    category,
+    window_days: String(windowDays),
+    limit: String(limit),
+    offset: String(offset),
+  });
+  return apiGet<DrilldownResponse>(`/demo/drilldown/category?${params.toString()}`);
+}
+
+export function fetchVendorDrilldown(
+  businessId: string,
+  vendor: string,
+  windowDays = 30,
+  limit = 50,
+  offset = 0
+) {
+  const params = new URLSearchParams({
+    business_id: businessId,
+    vendor,
+    window_days: String(windowDays),
+    limit: String(limit),
+    offset: String(offset),
+  });
+  return apiGet<DrilldownResponse>(`/demo/drilldown/vendor?${params.toString()}`);
 }
 
 export function updateHealthSignalStatus(

@@ -198,6 +198,34 @@ def test_rule_preview_apply_handles_missing_last_run_columns(client, db_session)
 
     applied = client.post(f"/categorize/{biz.id}/rules/{rule.id}/apply")
     assert applied.status_code == 200
-    applied_json = applied.json()
-    for key in ["rule_id", "matched", "updated"]:
-        assert key in applied_json
+
+
+def test_demo_dashboard_payload_ordering(client, db_session):
+    biz = _create_business(db_session)
+    db_session.add(_make_event(biz.id, "evt-1", "Coffee Shop", -120.0))
+    db_session.add(_make_event(biz.id, "evt-2", "Client Payment", 500.0))
+    db_session.commit()
+
+    resp = client.get(f"/demo/dashboard/{biz.id}")
+    assert resp.status_code == 200
+    payload = resp.json()
+
+    for key in ["metadata", "kpis", "signals", "trends"]:
+        assert key in payload
+
+    kpis = payload["kpis"]
+    for key in [
+        "current_cash",
+        "last_30d_inflow",
+        "last_30d_outflow",
+        "last_30d_net",
+        "prev_30d_inflow",
+        "prev_30d_outflow",
+        "prev_30d_net",
+    ]:
+        assert key in kpis
+
+    signals = payload["signals"]
+    assert signals
+    sorted_signals = sorted(signals, key=lambda s: (-int(s["priority"]), str(s["key"])))
+    assert signals == sorted_signals

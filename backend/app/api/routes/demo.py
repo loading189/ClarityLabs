@@ -18,8 +18,8 @@ Design notes
 from __future__ import annotations
 
 from dataclasses import asdict
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Literal, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -46,6 +46,81 @@ router = APIRouter(prefix="/demo", tags=["demo"])
 class HealthSignalStatusIn(BaseModel):
     status: str = Field(..., min_length=2, max_length=32)
     resolution_note: Optional[str] = Field(default=None, max_length=500)
+
+
+class DashboardMetadataOut(BaseModel):
+    business_id: str
+    name: str
+    as_of: str
+    last_event_occurred_at: Optional[str] = None
+
+
+class DashboardKpisOut(BaseModel):
+    current_cash: float
+    last_30d_inflow: float
+    last_30d_outflow: float
+    last_30d_net: float
+    prev_30d_inflow: float
+    prev_30d_outflow: float
+    prev_30d_net: float
+
+
+class DashboardSignalDrilldownOut(BaseModel):
+    kind: Literal["category", "vendor"]
+    value: str
+    window_days: int = Field(default=30, ge=1, le=365)
+    label: Optional[str] = None
+
+
+class DashboardSignalOut(BaseModel):
+    key: str
+    title: str
+    severity: str
+    dimension: str
+    priority: int
+    value: Optional[Any] = None
+    message: str
+    drilldown: Optional[DashboardSignalDrilldownOut] = None
+
+
+class DashboardTrendsOut(BaseModel):
+    experiment: Dict[str, Any]
+    metrics: Dict[str, Any]
+    cash: Dict[str, Any]
+    series: List[Dict[str, Any]]
+    band: Optional[Dict[str, Any]] = None
+    status: str
+    current: Optional[Dict[str, Any]] = None
+
+
+class DashboardPayloadOut(BaseModel):
+    metadata: DashboardMetadataOut
+    kpis: DashboardKpisOut
+    signals: List[DashboardSignalOut]
+    trends: DashboardTrendsOut
+
+
+class DrilldownRowOut(BaseModel):
+    source_event_id: str
+    occurred_at: str
+    date: str
+    description: str
+    amount: float
+    direction: str
+    account: str
+    category: str
+    counterparty_hint: Optional[str] = None
+    merchant_key: str
+
+
+class DrilldownResponseOut(BaseModel):
+    business_id: str
+    name: str
+    window_days: int
+    limit: int
+    offset: int
+    total: int
+    rows: List[DrilldownRowOut]
 
 
 # ----------------------------
@@ -235,6 +310,94 @@ def _build_uncategorized_examples(txns: List[Dict[str, Any]], limit: int = 4) ->
     return examples
 
 
+def _dashboard_kpis(facts_json: Dict[str, Any]) -> DashboardKpisOut:
+    windows = (facts_json.get("windows") or {}).get("windows") or {}
+    window_30 = windows.get("30") or {}
+    return DashboardKpisOut(
+        current_cash=float(facts_json.get("current_cash") or 0.0),
+        last_30d_inflow=float(window_30.get("last_inflow") or 0.0),
+        last_30d_outflow=float(window_30.get("last_outflow") or 0.0),
+        last_30d_net=float(window_30.get("last_net") or 0.0),
+        prev_30d_inflow=float(window_30.get("prev_inflow") or 0.0),
+        prev_30d_outflow=float(window_30.get("prev_outflow") or 0.0),
+        prev_30d_net=float(window_30.get("prev_net") or 0.0),
+    )
+
+
+def _primary_spend_category(facts_json: Dict[str, Any]) -> Optional[str]:
+    totals = facts_json.get("totals_by_category") or []
+    for row in totals:
+        try:
+            total = float(row.get("total") or 0.0)
+        except Exception:
+            continue
+        if total < 0:
+            return str(row.get("category") or "uncategorized")
+    return None
+
+
+def _build_dashboard_signals(signals: List[Any], facts_json: Dict[str, Any]) -> List[DashboardSignalOut]:
+    primary_spend_category = _primary_spend_category(facts_json)
+    out: List[DashboardSignalOut] = []
+    for s in sorted(signals, key=lambda item: (-int(item.priority), str(item.key))):
+        drilldown: Optional[DashboardSignalDrilldownOut] = None
+        if s.key == "top_spend_drivers" and primary_spend_category:
+            drilldown = DashboardSignalDrilldownOut(
+                kind="category",
+                value=primary_spend_category,
+                window_days=30,
+                label=f"Category: {primary_spend_category}",
+            )
+        out.append(
+            DashboardSignalOut(
+                key=s.key,
+                title=s.title,
+                severity=s.severity,
+                dimension=s.dimension,
+                priority=int(s.priority),
+                value=s.value,
+                message=s.message,
+                drilldown=drilldown,
+            )
+        )
+    return out
+
+
+def _filter_pairs_for_window(
+    pairs: List[Tuple[RawEvent, Any]],
+    window_days: int,
+) -> List[Tuple[RawEvent, Any]]:
+    if not pairs:
+        return []
+    anchor = max(e.occurred_at for e, _t in pairs)
+    start = anchor - timedelta(days=window_days - 1)
+    return [(e, t) for e, t in pairs if start <= e.occurred_at <= anchor]
+
+
+def _sort_pairs_deterministic(pairs: List[Tuple[RawEvent, Any]]) -> List[Tuple[RawEvent, Any]]:
+    return sorted(pairs, key=lambda pair: (pair[0].occurred_at, pair[0].source_event_id))
+
+
+def _build_drilldown_rows(pairs: List[Tuple[RawEvent, Any]]) -> List[DrilldownRowOut]:
+    rows: List[DrilldownRowOut] = []
+    for e, t in pairs:
+        rows.append(
+            DrilldownRowOut(
+                source_event_id=e.source_event_id,
+                occurred_at=e.occurred_at.isoformat(),
+                date=t.date.isoformat(),
+                description=t.description,
+                amount=float(t.amount),
+                direction=t.direction,
+                account=t.account,
+                category=t.category,
+                counterparty_hint=t.counterparty_hint,
+                merchant_key=merchant_key(t.description),
+            )
+        )
+    return rows
+
+
 # ----------------------------
 # Endpoints
 # ----------------------------
@@ -321,6 +484,56 @@ def demo_dashboard(db: Session = Depends(get_db)):
     return {"cards": cards}
 
 
+@router.get("/dashboard/{business_id}", response_model=DashboardPayloadOut)
+def demo_dashboard_by_business(
+    business_id: str,
+    lookback_months: int = Query(12, ge=3, le=36),
+    k: float = Query(2.0, ge=0.5, le=5.0),
+    db: Session = Depends(get_db),
+):
+    biz = _require_business(db, business_id)
+    pairs, last_event_occurred_at = _load_event_txn_pairs_from_db(
+        db=db,
+        biz_db_id=biz.id,
+        limit_events=4000,
+        chronological=True,
+    )
+    txns = [t for _e, t in pairs]
+
+    _facts_obj, facts_json, _scoring_input, signals, _signals_dicts, _breakdown, ledger = _compute_health_from_txns(txns)
+    ledger_rows = [
+        {
+            "occurred_at": r.occurred_at.isoformat(),
+            "date": r.date.isoformat(),
+            "amount": float(r.amount),
+            "balance": float(r.balance),
+            "source_event_id": r.source_event_id,
+        }
+        for r in ledger
+    ]
+
+    trends_payload = build_monthly_trends_payload(
+        facts_json=facts_json,
+        lookback_months=lookback_months,
+        k=k,
+        ledger_rows=ledger_rows,
+    )
+
+    return DashboardPayloadOut(
+        metadata=DashboardMetadataOut(
+            business_id=str(biz.id),
+            name=biz.name,
+            as_of=_now_iso(),
+            last_event_occurred_at=None
+            if not last_event_occurred_at
+            else last_event_occurred_at.isoformat(),
+        ),
+        kpis=_dashboard_kpis(facts_json),
+        signals=_build_dashboard_signals(signals, facts_json),
+        trends=DashboardTrendsOut(**trends_payload),
+    )
+
+
 @router.get("/health/{business_id}")
 def demo_health_by_business(business_id: str, db: Session = Depends(get_db)):
     biz = _require_business(db, business_id)
@@ -400,6 +613,73 @@ def demo_health_by_business(business_id: str, db: Session = Depends(get_db)):
         "facts_full": facts_json,  # ✅ fixed
         "ledger_preview": facts_json.get("last_10_ledger_rows", []),
     }
+
+
+@router.get("/drilldown/category", response_model=DrilldownResponseOut)
+def demo_drilldown_category(
+    business_id: str,
+    category: str,
+    window_days: int = Query(30, ge=1, le=365),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
+    biz = _require_business(db, business_id)
+    pairs, _last = _load_event_txn_pairs_from_db(
+        db=db,
+        biz_db_id=biz.id,
+        limit_events=4000,
+        chronological=True,
+    )
+    window_pairs = _filter_pairs_for_window(pairs, window_days)
+    filtered = [(e, t) for e, t in window_pairs if t.category == category]
+    sorted_pairs = _sort_pairs_deterministic(filtered)
+    total = len(sorted_pairs)
+    paged = sorted_pairs[offset : offset + limit]
+    return DrilldownResponseOut(
+        business_id=str(biz.id),
+        name=biz.name,
+        window_days=window_days,
+        limit=limit,
+        offset=offset,
+        total=total,
+        rows=_build_drilldown_rows(paged),
+    )
+
+
+@router.get("/drilldown/vendor", response_model=DrilldownResponseOut)
+def demo_drilldown_vendor(
+    business_id: str,
+    vendor: str,
+    window_days: int = Query(30, ge=1, le=365),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
+    biz = _require_business(db, business_id)
+    vendor_key = merchant_key(vendor)
+    pairs, _last = _load_event_txn_pairs_from_db(
+        db=db,
+        biz_db_id=biz.id,
+        limit_events=4000,
+        chronological=True,
+    )
+    window_pairs = _filter_pairs_for_window(pairs, window_days)
+    filtered = [
+        (e, t) for e, t in window_pairs if merchant_key(t.description) == vendor_key
+    ]
+    sorted_pairs = _sort_pairs_deterministic(filtered)
+    total = len(sorted_pairs)
+    paged = sorted_pairs[offset : offset + limit]
+    return DrilldownResponseOut(
+        business_id=str(biz.id),
+        name=biz.name,
+        window_days=window_days,
+        limit=limit,
+        offset=offset,
+        total=total,
+        rows=_build_drilldown_rows(paged),
+    )
 
 
 @router.post("/health/{business_id}/signals/{signal_id}/status")

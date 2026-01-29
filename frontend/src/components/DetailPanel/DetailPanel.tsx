@@ -7,10 +7,19 @@ import CoaTab from "./CoaTab";
 import { LedgerTab, type LedgerDrilldown } from "../../features/ledger";
 import { deleteBusiness } from "../../api/admin"; // ✅ add this (adjust path if needed)
 import { TrendsTab, type TrendsDrilldown } from "../../features/trends";
+import { DashboardTab } from "../../features/dashboard";
 import styles from "./DetailPanel.module.css";
 import { logRefresh } from "../../utils/refreshLog";
 
-type PanelMode = "simulator" |"coa" | "transactions" | "categorize" | "ledger" | "signals" | "trends";
+type PanelMode =
+  | "dashboard"
+  | "simulator"
+  | "coa"
+  | "transactions"
+  | "categorize"
+  | "ledger"
+  | "signals"
+  | "trends";
 
 export default function DetailPanel({
   state,
@@ -21,7 +30,7 @@ export default function DetailPanel({
 }) {
   const { selectedId, detail, loading, error, close, refreshDetail } = state;
 
-  const [mode, setMode] = useState<PanelMode>("signals");
+  const [mode, setMode] = useState<PanelMode>("dashboard");
   const [refreshKey, setRefreshKey] = useState(0);
   const [transactionsDrilldown, setTransactionsDrilldown] = useState<TransactionsDrilldown | null>(
     null
@@ -42,7 +51,7 @@ export default function DetailPanel({
   // When you open a new business, default back to Health
   useEffect(() => {
     if (selectedId) {
-      setMode("signals");
+      setMode("dashboard");
       setRefreshKey((k) => k + 1); // force tabs to re-load when business changes
       setTransactionsDrilldown(null);
       setCategorizeDrilldown(null);
@@ -121,6 +130,7 @@ export default function DetailPanel({
           </div>
 
           <div className={styles.tabRow}>
+            <TabButton label="Dashboard" value="dashboard" />
             <TabButton label="Simulator" value="simulator" />
             <TabButton label="COA" value="coa" />
             <TabButton label="Transactions" value="transactions" />
@@ -222,6 +232,18 @@ export default function DetailPanel({
           )}  
           {mode === "coa" && <CoaTab key={`coa-${selectedId}-${refreshKey}`} businessId={selectedId} />}
           
+          {mode === "dashboard" && (
+            <DashboardTab
+              key={`dashboard-${selectedId}-${refreshKey}`}
+              businessId={selectedId}
+              onNavigate={(target, drilldown) => {
+                if (target === "categorize") {
+                  setCategorizeDrilldown((drilldown ?? null) as CategorizeDrilldown | null);
+                }
+                setMode(target);
+              }}
+            />
+          )}
 
           {mode === "transactions" && (
             <TransactionsTab
