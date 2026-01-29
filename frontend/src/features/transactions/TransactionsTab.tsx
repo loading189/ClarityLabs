@@ -717,6 +717,12 @@ export function TransactionsTab({
     selectedTxn,
   ]);
 
+  const clearFilters = useCallback(() => {
+    setFilters(DEFAULT_FILTERS);
+    onClearDrilldown?.();
+  }, [onClearDrilldown]);
+
+
   if (loading && !data) return <div className={styles.loading}>Loading transactions…</div>;
 
   const hasFilters = Boolean(
@@ -727,10 +733,6 @@ export function TransactionsTab({
       filters.merchantKey.trim()
   );
 
-  const clearFilters = useCallback(() => {
-    setFilters(DEFAULT_FILTERS);
-    onClearDrilldown?.();
-  }, [onClearDrilldown]);
 
   return (
     <div className={styles.container}>
@@ -872,7 +874,7 @@ export function TransactionsTab({
           </thead>
           <tbody>
             {filteredTxns.map((t) => {
-              const txnKey = getTxnKey(t);
+              const txnKey = getTxnKey(t) ?? `${t.occurred_at ?? "no-date"}-${t.description ?? "no-desc"}-${Math.random()}`;
               const occurredLabel = t.occurred_at
                 ? new Date(t.occurred_at).toLocaleString()
                 : "—";
