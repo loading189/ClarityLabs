@@ -450,6 +450,10 @@ def bulk_apply_categorization(db: Session, business_id: str, req) -> Dict[str, A
     seed_coa_and_categories_and_mappings(db, business_id)
     require_category(db, business_id, req.category_id)
 
+    system_key = system_key_for_category(db, business_id, req.category_id)
+    if not system_key or system_key == "uncategorized":
+        raise HTTPException(400, "category must map to a valid system_key")
+
     target_key = merchant_key(req.merchant_key)
     if not target_key:
         raise HTTPException(400, "merchant_key required")

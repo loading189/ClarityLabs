@@ -10,6 +10,7 @@ from sqlalchemy import (
     ForeignKey,
     JSON,
     String,
+    Text,
     text,
     Integer,
     Float,
@@ -219,6 +220,26 @@ class RawEvent(Base):
 
     processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
+class HealthSignalState(Base):
+    __tablename__ = "health_signal_states"
+
+    business_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    signal_id: Mapped[str] = mapped_column(String(120), primary_key=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="open")
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow)
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    resolution_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow)
+
+    __table_args__ = (
+        Index("ix_health_signal_states_business_id", "business_id"),
+    )
 
 
 # -------------------------

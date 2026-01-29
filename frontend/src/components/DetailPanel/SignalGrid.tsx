@@ -49,7 +49,9 @@ export default function SignalGrid({ signals, selectedKey, onSelect }: Props) {
             >
               <div className={styles.signalInboxBadge}>
                 <div className={styles.signalInboxSeverity}>{String(s.severity).toUpperCase()}</div>
-                <div className={styles.signalInboxStatus}>{s.status}</div>
+                <div className={styles.signalInboxStatus}>
+                  {String(s.status ?? "open").replace(/_/g, " ")}
+                </div>
               </div>
               <div className={styles.signalInboxBody}>
                 <div className={styles.signalInboxTitle}>{s.title}</div>

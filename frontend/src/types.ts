@@ -27,7 +27,7 @@ export type Signal = {
   version?: number;
 };
 
-export type HealthSignalStatus = "open" | "monitoring" | "resolved";
+export type HealthSignalStatus = "open" | "in_progress" | "resolved" | "ignored";
 export type HealthSignalDrilldownTarget = "transactions" | "categorize" | "ledger" | "trends";
 
 export type HealthSignalEvidence = {
@@ -48,10 +48,27 @@ export type HealthSignal = {
   severity: Severity;
   status: HealthSignalStatus;
   updated_at?: string | null;
+  last_seen_at?: string | null;
+  resolved_at?: string | null;
+  resolution_note?: string | null;
   short_summary: string;
   why_it_matters: string;
   evidence: HealthSignalEvidence[];
   drilldowns: HealthSignalDrilldown[];
+  fix_suggestions?: Array<{
+    merchant_key: string;
+    suggested_category_id: string;
+    suggested_category_name: string;
+    contains_text?: string | null;
+    direction?: string | null;
+    account?: string | null;
+    sample_description?: string | null;
+    sample_source_event_id?: string | null;
+    sample_amount?: number | null;
+    sample_occurred_at?: string | null;
+    count?: number | null;
+    total_abs_amount?: number | null;
+  }>;
 };
 
 export type BusinessDetail = {
@@ -97,6 +114,5 @@ export type BrainLabelRequest = {
   category: string;
   confidence?: number;
 };
-
 
 

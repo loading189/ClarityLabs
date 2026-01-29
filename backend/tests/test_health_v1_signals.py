@@ -143,3 +143,28 @@ def test_health_v1_drilldowns_are_valid():
             payload = drilldown.get("payload") or {}
             category_id = payload.get("category_id")
             assert category_id != "uncategorized"
+
+
+def test_health_v1_signal_ordering_unchanged():
+    txns, ledger_rows, facts_json, metrics, is_known_vendor = _build_inputs()
+
+    signals = build_health_v1_signals(
+        facts_json=facts_json,
+        ledger_rows=ledger_rows,
+        txns=txns,
+        updated_at=date(2024, 2, 20).isoformat(),
+        categorization_metrics=metrics,
+        rule_count=1,
+        is_known_vendor=is_known_vendor,
+    )
+
+    assert [signal["id"] for signal in signals] == [
+        "vendor_concentration",
+        "new_unknown_vendors",
+        "expense_spike",
+        "cash_runway_risk",
+        "revenue_drop",
+        "high_uncategorized_rate",
+        "rule_coverage_low",
+        "overdraft_pattern",
+    ]

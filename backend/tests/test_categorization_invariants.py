@@ -4,6 +4,7 @@ from pathlib import Path
 import sys
 
 import pytest
+from fastapi import HTTPException
 
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test_categorization_invariants.db")
@@ -19,7 +20,15 @@ from backend.app.models import (
     RawEvent,
     TxnCategorization,
 )
-from backend.app.api.categorize import list_txns_to_categorize, bulk_apply_categorization, BulkCategorizationIn
+from backend.app.api.categorize import (
+    list_txns_to_categorize,
+    bulk_apply_categorization,
+    create_category_rule,
+    set_brain_vendor,
+    BulkCategorizationIn,
+    CategoryRuleIn,
+    BrainVendorSetIn,
+)
 from backend.app.norma.categorize_brain import brain
 from backend.app.norma.merchant import merchant_key
 
@@ -186,3 +195,31 @@ def test_bulk_apply_skips_already_categorized(db_session, brain_store):
     by_event = {r.source_event_id: r.category_id for r in rows}
     assert by_event["evt_1"] == category_a.id
     assert by_event["evt_2"] == category_b.id
+
+
+def test_fix_actions_reject_uncategorized(db_session, brain_store):
+    biz = _create_business(db_session)
+    uncategorized = _create_category(db_session, biz.id, "Uncategorized", "uncategorized")
+    db_session.add(_make_event(biz.id, "evt_uc", "Mystery Vendor"))
+    db_session.commit()
+
+    with pytest.raises(HTTPException):
+        create_category_rule(
+            biz.id,
+            CategoryRuleIn(contains_text="mystery", category_id=uncategorized.id),
+            db_session,
+        )
+
+    with pytest.raises(HTTPException):
+        set_brain_vendor(
+            biz.id,
+            BrainVendorSetIn(merchant_key="mystery vendor", category_id=uncategorized.id),
+            db_session,
+        )
+
+    with pytest.raises(HTTPException):
+        bulk_apply_categorization(
+            biz.id,
+            BulkCategorizationIn(merchant_key="mystery vendor", category_id=uncategorized.id),
+            db_session,
+        )

@@ -11,7 +11,7 @@ from backend.app.norma.normalize import NormalizedTransaction
 
 
 Severity = Literal["green", "yellow", "red"]
-Status = Literal["open", "monitoring", "resolved"]
+Status = Literal["open", "in_progress", "resolved", "ignored"]
 DrilldownTarget = Literal["transactions", "categorize", "ledger", "trends"]
 
 
@@ -46,7 +46,7 @@ def _status_for(severity: Severity) -> Status:
     if severity == "red":
         return "open"
     if severity == "yellow":
-        return "monitoring"
+        return "in_progress"
     return "resolved"
 
 

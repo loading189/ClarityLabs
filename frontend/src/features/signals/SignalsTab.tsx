@@ -27,10 +27,12 @@ export default function SignalsTab({
   detail,
   refreshToken,
   onNavigate,
+  onAfterAction,
 }: {
   detail: BusinessDetail;
   refreshToken?: number;
   onNavigate?: (target: HealthNavigateTarget, drilldown?: Record<string, any> | null) => void;
+  onAfterAction?: () => void;
 }) {
   const signals = (detail.health_signals ?? []) as HealthSignal[];
 
@@ -307,6 +309,7 @@ export default function SignalsTab({
               businessId={detail.business_id}
               signal={selected}
               onNavigate={(target, drilldown) => onNavigate?.(target, drilldown)}
+              onAfterAction={onAfterAction}
             />
           )}
         </div>
