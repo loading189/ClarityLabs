@@ -311,6 +311,69 @@
   overflow-x: auto;
 }
 
+.previewPanel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  background: var(--card-bg);
+  display: grid;
+  gap: 10px;
+}
+
+.previewHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.previewTitle {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.previewMeta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.previewSummary {
+  font-size: 13px;
+  color: var(--text);
+  display: grid;
+  gap: 4px;
+}
+
+.previewNote {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.previewTableWrap {
+  overflow-x: auto;
+}
+
+.previewTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.previewTable th,
+.previewTable td {
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.previewTable th {
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 10px;
+}
+
 .rulesTable {
   width: 100%;
   border-collapse: collapse;

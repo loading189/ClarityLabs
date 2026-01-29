@@ -14,6 +14,7 @@ from backend.app.models import (
     TxnCategorization,
     BusinessCategoryMap,
     CategoryRule,
+    utcnow,
 )
 from backend.app.norma.from_events import raw_event_to_txn
 from backend.app.norma.category_engine import suggest_category
@@ -342,7 +343,59 @@ def _category_rule_out(rule: CategoryRule) -> Dict[str, Any]:
         "priority": rule.priority,
         "active": rule.active,
         "created_at": rule.created_at,
+        "last_run_at": rule.last_run_at,
+        "last_run_updated_count": rule.last_run_updated_count,
     }
+
+
+def _rule_order_key(rule: CategoryRule) -> tuple:
+    return (rule.priority, rule.created_at, rule.id)
+
+
+def _ordered_active_rules(db: Session, business_id: str) -> List[CategoryRule]:
+    return (
+        db.execute(
+            select(CategoryRule)
+            .where(
+                and_(
+                    CategoryRule.business_id == business_id,
+                    CategoryRule.active.is_(True),
+                )
+            )
+            .order_by(
+                CategoryRule.priority.asc(),
+                CategoryRule.created_at.asc(),
+                CategoryRule.id.asc(),
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+
+def _rule_matches(rule: CategoryRule, txn) -> bool:
+    desc = (txn.description or "").strip().lower()
+    if not desc:
+        return False
+    needle = (rule.contains_text or "").strip().lower()
+    if not needle:
+        return False
+    if needle not in desc:
+        return False
+    direction = (txn.direction or "").strip().lower()
+    account = (txn.account or "").strip().lower()
+    if rule.direction and rule.direction.strip().lower() != direction:
+        return False
+    if rule.account and rule.account.strip().lower() != account:
+        return False
+    return True
+
+
+def _first_matching_rule(rules: List[CategoryRule], txn) -> Optional[CategoryRule]:
+    for rule in rules:
+        if _rule_matches(rule, txn):
+            return rule
+    return None
 
 
 def list_category_rules(
@@ -467,6 +520,142 @@ def delete_category_rule(db: Session, business_id: str, rule_id: str) -> Dict[st
     db.commit()
 
     return {"deleted": True}
+
+
+def preview_category_rule(
+    db: Session,
+    business_id: str,
+    rule_id: str,
+    *,
+    sample_limit: int = 10,
+    max_events: int = 5000,
+) -> Dict[str, Any]:
+    """
+    Preview a single rule using the same conflict policy as the rules engine.
+    Only uncategorized transactions are considered.
+    """
+    require_business(db, business_id)
+
+    rule = db.execute(
+        select(CategoryRule).where(
+            and_(CategoryRule.business_id == business_id, CategoryRule.id == rule_id)
+        )
+    ).scalar_one_or_none()
+    if not rule:
+        raise HTTPException(404, "rule not found")
+
+    rules = _ordered_active_rules(db, business_id)
+    if not any(r.id == rule.id for r in rules):
+        rules.append(rule)
+        rules.sort(key=_rule_order_key)
+
+    existing_ids = set(
+        db.execute(
+            select(TxnCategorization.source_event_id).where(TxnCategorization.business_id == business_id)
+        ).scalars().all()
+    )
+
+    rows = (
+        db.execute(
+            select(RawEvent)
+            .where(RawEvent.business_id == business_id)
+            .order_by(RawEvent.occurred_at.desc(), RawEvent.source_event_id.desc())
+            .limit(max_events)
+        )
+        .scalars()
+        .all()
+    )
+
+    matched = 0
+    samples: List[Dict[str, Any]] = []
+
+    for ev in rows:
+        if ev.source_event_id in existing_ids:
+            continue
+        txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
+        winner = _first_matching_rule(rules, txn)
+        if not winner or winner.id != rule.id:
+            continue
+        matched += 1
+        if len(samples) < sample_limit:
+            samples.append(
+                {
+                    "source_event_id": txn.source_event_id,
+                    "occurred_at": txn.occurred_at,
+                    "description": txn.description,
+                    "amount": txn.amount,
+                    "direction": txn.direction,
+                    "account": txn.account,
+                }
+            )
+
+    return {"rule_id": rule.id, "matched": matched, "samples": samples}
+
+
+def apply_category_rule(db: Session, business_id: str, rule_id: str) -> Dict[str, Any]:
+    """
+    Apply a single rule to uncategorized transactions only.
+    """
+    require_business(db, business_id)
+
+    rule = db.execute(
+        select(CategoryRule).where(
+            and_(CategoryRule.business_id == business_id, CategoryRule.id == rule_id)
+        )
+    ).scalar_one_or_none()
+    if not rule:
+        raise HTTPException(404, "rule not found")
+
+    rules = _ordered_active_rules(db, business_id)
+    if not any(r.id == rule.id for r in rules):
+        rules.append(rule)
+        rules.sort(key=_rule_order_key)
+
+    existing_ids = set(
+        db.execute(
+            select(TxnCategorization.source_event_id).where(TxnCategorization.business_id == business_id)
+        ).scalars().all()
+    )
+
+    rows = (
+        db.execute(
+            select(RawEvent)
+            .where(RawEvent.business_id == business_id)
+            .order_by(RawEvent.occurred_at.desc(), RawEvent.source_event_id.desc())
+            .limit(5000)
+        )
+        .scalars()
+        .all()
+    )
+
+    matched_ids: List[str] = []
+    for ev in rows:
+        if ev.source_event_id in existing_ids:
+            continue
+        txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
+        winner = _first_matching_rule(rules, txn)
+        if winner and winner.id == rule.id:
+            matched_ids.append(ev.source_event_id)
+
+    updated = 0
+    for source_event_id in matched_ids:
+        row = TxnCategorization(
+            business_id=business_id,
+            source_event_id=source_event_id,
+            category_id=rule.category_id,
+            source="rule",
+            confidence=0.92,
+            note=None,
+        )
+        db.add(row)
+        updated += 1
+
+    rule.last_run_at = utcnow()
+    rule.last_run_updated_count = updated
+    db.add(rule)
+    db.commit()
+
+    return {"rule_id": rule.id, "matched": len(matched_ids), "updated": updated}
 
 
 def upsert_categorization(db: Session, business_id: str, req) -> Dict[str, Any]:

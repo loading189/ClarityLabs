@@ -113,6 +113,8 @@ class CategoryRuleOut(BaseModel):
     priority: int
     active: bool
     created_at: datetime
+    last_run_at: Optional[datetime] = None
+    last_run_updated_count: Optional[int] = None
 
 
 class CategoryRulePatch(BaseModel):
@@ -122,6 +124,27 @@ class CategoryRulePatch(BaseModel):
     contains_text: Optional[str] = None
     direction: Optional[str] = None
     account: Optional[str] = None
+
+
+class CategoryRulePreviewSample(BaseModel):
+    source_event_id: str
+    occurred_at: datetime
+    description: str
+    amount: float
+    direction: str
+    account: str
+
+
+class CategoryRulePreviewOut(BaseModel):
+    rule_id: str
+    matched: int
+    samples: List[CategoryRulePreviewSample]
+
+
+class CategoryRuleApplyOut(BaseModel):
+    rule_id: str
+    matched: int
+    updated: int
 
 
 @router.post("/business/{business_id}/label_vendor")
@@ -213,6 +236,26 @@ def delete_category_rule(
     db: Session = Depends(get_db),
 ):
     return categorize_service.delete_category_rule(db, business_id, rule_id)
+
+
+@router.get("/{business_id}/rules/{rule_id}/preview", response_model=CategoryRulePreviewOut)
+def preview_category_rule(
+    business_id: str,
+    rule_id: str,
+    db: Session = Depends(get_db),
+):
+    return CategoryRulePreviewOut(
+        **categorize_service.preview_category_rule(db, business_id, rule_id)
+    )
+
+
+@router.post("/{business_id}/rules/{rule_id}/apply", response_model=CategoryRuleApplyOut)
+def apply_category_rule(
+    business_id: str,
+    rule_id: str,
+    db: Session = Depends(get_db),
+):
+    return CategoryRuleApplyOut(**categorize_service.apply_category_rule(db, business_id, rule_id))
 
 
 @router.post("/business/{business_id}/categorize")

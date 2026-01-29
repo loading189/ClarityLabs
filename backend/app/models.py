@@ -356,6 +356,8 @@ class CategoryRule(Base):
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    last_run_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    last_run_updated_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     category = relationship("Category")
 
