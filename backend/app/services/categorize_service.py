@@ -4,8 +4,8 @@ from datetime import datetime
 from typing import List, Optional, Dict, Any
 
 from fastapi import HTTPException
-from sqlalchemy import select, and_
-from sqlalchemy.orm import Session
+from sqlalchemy import select, and_, inspect
+from sqlalchemy.orm import Session, load_only
 
 from backend.app.models import (
     Business,
@@ -64,6 +64,34 @@ def system_key_for_category(db: Session, business_id: str, category_id: str) -> 
     pick = curated[0] if curated else rows[0]
 
     return (pick or "").strip().lower() or None
+
+
+def _category_rule_column_names(db: Session) -> set[str]:
+    inspector = inspect(db.get_bind())
+    return {col["name"] for col in inspector.get_columns(CategoryRule.__tablename__)}
+
+
+def _category_rule_load_columns(
+    db: Session,
+    *,
+    include_optional: bool = False,
+) -> tuple[list, set[str]]:
+    names = [
+        "id",
+        "business_id",
+        "category_id",
+        "contains_text",
+        "direction",
+        "account",
+        "priority",
+        "active",
+        "created_at",
+    ]
+    if include_optional:
+        names.extend(["last_run_at", "last_run_updated_count"])
+    column_names = _category_rule_column_names(db)
+    attrs = [getattr(CategoryRule, name) for name in names if name in column_names]
+    return attrs, column_names
 
 
 def _brain_alias_keys_for_merchant(merchant_id: str) -> List[str]:
@@ -332,7 +360,7 @@ def list_categories(db: Session, business_id: str) -> List[Dict[str, Any]]:
     ]
 
 
-def _category_rule_out(rule: CategoryRule) -> Dict[str, Any]:
+def _category_rule_out(rule: CategoryRule, column_names: set[str]) -> Dict[str, Any]:
     return {
         "id": rule.id,
         "business_id": rule.business_id,
@@ -343,8 +371,10 @@ def _category_rule_out(rule: CategoryRule) -> Dict[str, Any]:
         "priority": rule.priority,
         "active": rule.active,
         "created_at": rule.created_at,
-        "last_run_at": rule.last_run_at,
-        "last_run_updated_count": rule.last_run_updated_count,
+        "last_run_at": rule.last_run_at if "last_run_at" in column_names else None,
+        "last_run_updated_count": (
+            rule.last_run_updated_count if "last_run_updated_count" in column_names else None
+        ),
     }
 
 
@@ -353,9 +383,11 @@ def _rule_order_key(rule: CategoryRule) -> tuple:
 
 
 def _ordered_active_rules(db: Session, business_id: str) -> List[CategoryRule]:
+    load_columns, _column_names = _category_rule_load_columns(db)
     return (
         db.execute(
             select(CategoryRule)
+            .options(load_only(*load_columns))
             .where(
                 and_(
                     CategoryRule.business_id == business_id,
@@ -408,13 +440,14 @@ def list_category_rules(
 ) -> List[Dict[str, Any]]:
     require_business(db, business_id)
 
+    load_columns, column_names = _category_rule_load_columns(db, include_optional=True)
     query = select(CategoryRule).where(CategoryRule.business_id == business_id)
     if active_only:
         query = query.where(CategoryRule.active.is_(True))
 
     rules = (
         db.execute(
-            query.order_by(
+            query.options(load_only(*load_columns)).order_by(
                 CategoryRule.priority.asc(),
                 CategoryRule.created_at.asc(),
                 CategoryRule.id.asc(),
@@ -426,7 +459,7 @@ def list_category_rules(
         .all()
     )
 
-    return [_category_rule_out(rule) for rule in rules]
+    return [_category_rule_out(rule, column_names) for rule in rules]
 
 
 def create_category_rule(db: Session, business_id: str, req) -> Dict[str, Any]:
@@ -460,16 +493,18 @@ def create_category_rule(db: Session, business_id: str, req) -> Dict[str, Any]:
     db.commit()
     db.refresh(rule)
 
-    return _category_rule_out(rule)
+    column_names = _category_rule_column_names(db)
+    return _category_rule_out(rule, column_names)
 
 
 def update_category_rule(db: Session, business_id: str, rule_id: str, req) -> Dict[str, Any]:
     require_business(db, business_id)
 
+    load_columns, column_names = _category_rule_load_columns(db, include_optional=True)
     rule = db.execute(
-        select(CategoryRule).where(
-            and_(CategoryRule.business_id == business_id, CategoryRule.id == rule_id)
-        )
+        select(CategoryRule)
+        .options(load_only(*load_columns))
+        .where(and_(CategoryRule.business_id == business_id, CategoryRule.id == rule_id))
     ).scalar_one_or_none()
     if not rule:
         raise HTTPException(404, "rule not found")
@@ -503,15 +538,16 @@ def update_category_rule(db: Session, business_id: str, rule_id: str, req) -> Di
     db.commit()
     db.refresh(rule)
 
-    return _category_rule_out(rule)
+    return _category_rule_out(rule, column_names)
 
 
 def delete_category_rule(db: Session, business_id: str, rule_id: str) -> Dict[str, Any]:
     require_business(db, business_id)
+    load_columns, _column_names = _category_rule_load_columns(db)
     rule = db.execute(
-        select(CategoryRule).where(
-            and_(CategoryRule.business_id == business_id, CategoryRule.id == rule_id)
-        )
+        select(CategoryRule)
+        .options(load_only(*load_columns))
+        .where(and_(CategoryRule.business_id == business_id, CategoryRule.id == rule_id))
     ).scalar_one_or_none()
     if not rule:
         raise HTTPException(404, "rule not found")
@@ -536,10 +572,11 @@ def preview_category_rule(
     """
     require_business(db, business_id)
 
+    load_columns, _column_names = _category_rule_load_columns(db)
     rule = db.execute(
-        select(CategoryRule).where(
-            and_(CategoryRule.business_id == business_id, CategoryRule.id == rule_id)
-        )
+        select(CategoryRule)
+        .options(load_only(*load_columns))
+        .where(and_(CategoryRule.business_id == business_id, CategoryRule.id == rule_id))
     ).scalar_one_or_none()
     if not rule:
         raise HTTPException(404, "rule not found")
@@ -598,10 +635,11 @@ def apply_category_rule(db: Session, business_id: str, rule_id: str) -> Dict[str
     """
     require_business(db, business_id)
 
+    load_columns, column_names = _category_rule_load_columns(db, include_optional=True)
     rule = db.execute(
-        select(CategoryRule).where(
-            and_(CategoryRule.business_id == business_id, CategoryRule.id == rule_id)
-        )
+        select(CategoryRule)
+        .options(load_only(*load_columns))
+        .where(and_(CategoryRule.business_id == business_id, CategoryRule.id == rule_id))
     ).scalar_one_or_none()
     if not rule:
         raise HTTPException(404, "rule not found")
@@ -650,8 +688,10 @@ def apply_category_rule(db: Session, business_id: str, rule_id: str) -> Dict[str
         db.add(row)
         updated += 1
 
-    rule.last_run_at = utcnow()
-    rule.last_run_updated_count = updated
+    if "last_run_at" in column_names:
+        rule.last_run_at = utcnow()
+    if "last_run_updated_count" in column_names:
+        rule.last_run_updated_count = updated
     db.add(rule)
     db.commit()
 
