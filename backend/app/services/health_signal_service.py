@@ -5,6 +5,7 @@ from typing import Dict, Iterable, List, Optional
 
 from fastapi import HTTPException
 from sqlalchemy import select
+from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.orm import Session
 
 from backend.app.models import Business, HealthSignalState
@@ -28,6 +29,28 @@ def _status_default(signal_status: Optional[str]) -> str:
         return signal_status
     return "open"
 
+def _is_missing_health_signal_table(exc: Exception) -> bool:
+    orig = getattr(exc, "orig", None)
+    if getattr(orig, "__class__", None) and orig.__class__.__name__ == "UndefinedTable":
+        return True
+    message = str(exc).lower()
+    return (
+        "undefinedtable" in message
+        or "no such table: health_signal_states" in message
+        or "relation \"health_signal_states\" does not exist" in message
+    )
+
+
+def _apply_default_states(signals: List[dict]) -> List[dict]:
+    for signal in signals:
+        signal["status"] = _status_default(signal.get("status"))
+        signal.setdefault("last_seen_at", None)
+        signal.setdefault("resolved_at", None)
+        signal.setdefault("resolution_note", None)
+    return signals
+
+
+
 
 def hydrate_signal_states(
     db: Session,
@@ -40,12 +63,18 @@ def hydrate_signal_states(
     if not signal_ids:
         return signals
 
-    existing = db.execute(
-        select(HealthSignalState).where(
-            HealthSignalState.business_id == business_id,
-            HealthSignalState.signal_id.in_(signal_ids),
-        )
-    ).scalars().all()
+    try:
+        existing = db.execute(
+            select(HealthSignalState).where(
+                HealthSignalState.business_id == business_id,
+                HealthSignalState.signal_id.in_(signal_ids),
+            )
+        ).scalars().all()
+    except (ProgrammingError, OperationalError) as exc:
+        if _is_missing_health_signal_table(exc):
+            db.rollback()
+            return _apply_default_states(signals)
+        raise
 
     existing_map: Dict[str, HealthSignalState] = {row.signal_id: row for row in existing}
 

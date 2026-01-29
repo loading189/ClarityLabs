@@ -44,6 +44,46 @@
       "merchant_id": "c0c60fe8-2509-4962-8e79-f9b7ede1803c",
       "canonical_name": "Clover Deposits",
       "updated_at": "2026-01-28T17:19:29.598699+00:00"
+    },
+    {
+      "merchant_id": "b91ddbcb-da52-4c58-99b8-24f7bd4a4024",
+      "canonical_name": "Toast Payments",
+      "updated_at": "2026-01-28T21:04:23.562674+00:00"
+    },
+    {
+      "merchant_id": "1e5c87da-aee2-4202-98af-dbc6c931bc3d",
+      "canonical_name": "Restaurant Depot",
+      "updated_at": "2026-01-28T23:08:27.948815+00:00"
+    },
+    {
+      "merchant_id": "8239c496-9389-4e32-96fd-05f58109b96b",
+      "canonical_name": "Us Foods",
+      "updated_at": "2026-01-28T22:42:38.118222+00:00"
+    },
+    {
+      "merchant_id": "5eae45bc-f942-4703-8039-a7b22bc418bb",
+      "canonical_name": "Payroll Run",
+      "updated_at": "2026-01-28T22:42:46.433462+00:00"
+    },
+    {
+      "merchant_id": "ad2621fe-2ee4-45b1-b27b-b512ff0803b1",
+      "canonical_name": "Stripe Payouts",
+      "updated_at": "2026-01-29T01:09:34.314554+00:00"
+    },
+    {
+      "merchant_id": "cd8a9ad0-c693-4ea8-b8e3-b97bff570f5f",
+      "canonical_name": "Main Street Properties",
+      "updated_at": "2026-01-29T01:02:53.799205+00:00"
+    },
+    {
+      "merchant_id": "64aa0ef9-5608-4c1a-adac-3f3b8f67bb91",
+      "canonical_name": "City Water Utility",
+      "updated_at": "2026-01-29T01:03:22.462371+00:00"
+    },
+    {
+      "merchant_id": "a98809a3-3997-4ee4-9c45-0f1bc5ba1743",
+      "canonical_name": "Gordon Food Service",
+      "updated_at": "2026-01-29T01:03:28.811635+00:00"
     }
   ],
   "aliases": [
@@ -109,6 +149,62 @@
       "match_type": "exact",
       "evidence_count": 5,
       "updated_at": "2026-01-28T17:19:29.598699+00:00"
+    },
+    {
+      "alias_key": "toast payments",
+      "merchant_id": "b91ddbcb-da52-4c58-99b8-24f7bd4a4024",
+      "match_type": "exact",
+      "evidence_count": 3,
+      "updated_at": "2026-01-28T21:04:23.562674+00:00"
+    },
+    {
+      "alias_key": "restaurant depot",
+      "merchant_id": "1e5c87da-aee2-4202-98af-dbc6c931bc3d",
+      "match_type": "exact",
+      "evidence_count": 2,
+      "updated_at": "2026-01-28T23:08:27.948815+00:00"
+    },
+    {
+      "alias_key": "us foods",
+      "merchant_id": "8239c496-9389-4e32-96fd-05f58109b96b",
+      "match_type": "exact",
+      "evidence_count": 1,
+      "updated_at": "2026-01-28T22:42:38.118222+00:00"
+    },
+    {
+      "alias_key": "payroll run",
+      "merchant_id": "5eae45bc-f942-4703-8039-a7b22bc418bb",
+      "match_type": "exact",
+      "evidence_count": 1,
+      "updated_at": "2026-01-28T22:42:46.433462+00:00"
+    },
+    {
+      "alias_key": "stripe payouts",
+      "merchant_id": "ad2621fe-2ee4-45b1-b27b-b512ff0803b1",
+      "match_type": "exact",
+      "evidence_count": 2,
+      "updated_at": "2026-01-29T01:09:34.314554+00:00"
+    },
+    {
+      "alias_key": "main street properties",
+      "merchant_id": "cd8a9ad0-c693-4ea8-b8e3-b97bff570f5f",
+      "match_type": "exact",
+      "evidence_count": 1,
+      "updated_at": "2026-01-29T01:02:53.799205+00:00"
+    },
+    {
+      "alias_key": "city water utility",
+      "merchant_id": "64aa0ef9-5608-4c1a-adac-3f3b8f67bb91",
+      "match_type": "exact",
+      "evidence_count": 1,
+      "updated_at": "2026-01-29T01:03:22.462371+00:00"
+    },
+    {
+      "alias_key": "gordon food service",
+      "merchant_id": "a98809a3-3997-4ee4-9c45-0f1bc5ba1743",
+      "match_type": "exact",
+      "evidence_count": 1,
+      "updated_at": "2026-01-29T01:03:28.811635+00:00"
     }
   ],
   "labels": {
@@ -224,6 +320,70 @@
         "confidence": 1.0,
         "evidence_count": 5,
         "updated_at": "2026-01-28T17:19:29.598699+00:00"
+      },
+      "b91ddbcb-da52-4c58-99b8-24f7bd4a4024": {
+        "business_id": "be71b5d8-7d3e-42bc-acd0-44b3c55cef85",
+        "merchant_id": "b91ddbcb-da52-4c58-99b8-24f7bd4a4024",
+        "system_key": "sales",
+        "confidence": 1.0,
+        "evidence_count": 3,
+        "updated_at": "2026-01-28T21:04:23.562674+00:00"
+      },
+      "1e5c87da-aee2-4202-98af-dbc6c931bc3d": {
+        "business_id": "be71b5d8-7d3e-42bc-acd0-44b3c55cef85",
+        "merchant_id": "1e5c87da-aee2-4202-98af-dbc6c931bc3d",
+        "system_key": "cogs",
+        "confidence": 1.0,
+        "evidence_count": 2,
+        "updated_at": "2026-01-28T23:08:27.948815+00:00"
+      },
+      "8239c496-9389-4e32-96fd-05f58109b96b": {
+        "business_id": "be71b5d8-7d3e-42bc-acd0-44b3c55cef85",
+        "merchant_id": "8239c496-9389-4e32-96fd-05f58109b96b",
+        "system_key": "cogs",
+        "confidence": 1.0,
+        "evidence_count": 1,
+        "updated_at": "2026-01-28T22:42:38.118222+00:00"
+      },
+      "5eae45bc-f942-4703-8039-a7b22bc418bb": {
+        "business_id": "be71b5d8-7d3e-42bc-acd0-44b3c55cef85",
+        "merchant_id": "5eae45bc-f942-4703-8039-a7b22bc418bb",
+        "system_key": "payroll",
+        "confidence": 1.0,
+        "evidence_count": 1,
+        "updated_at": "2026-01-28T22:42:46.433462+00:00"
+      },
+      "ad2621fe-2ee4-45b1-b27b-b512ff0803b1": {
+        "business_id": "be71b5d8-7d3e-42bc-acd0-44b3c55cef85",
+        "merchant_id": "ad2621fe-2ee4-45b1-b27b-b512ff0803b1",
+        "system_key": "cogs",
+        "confidence": 1.0,
+        "evidence_count": 2,
+        "updated_at": "2026-01-29T01:09:34.314554+00:00"
+      },
+      "cd8a9ad0-c693-4ea8-b8e3-b97bff570f5f": {
+        "business_id": "be71b5d8-7d3e-42bc-acd0-44b3c55cef85",
+        "merchant_id": "cd8a9ad0-c693-4ea8-b8e3-b97bff570f5f",
+        "system_key": "rent",
+        "confidence": 1.0,
+        "evidence_count": 1,
+        "updated_at": "2026-01-29T01:02:53.799205+00:00"
+      },
+      "64aa0ef9-5608-4c1a-adac-3f3b8f67bb91": {
+        "business_id": "be71b5d8-7d3e-42bc-acd0-44b3c55cef85",
+        "merchant_id": "64aa0ef9-5608-4c1a-adac-3f3b8f67bb91",
+        "system_key": "utilities",
+        "confidence": 1.0,
+        "evidence_count": 1,
+        "updated_at": "2026-01-29T01:03:22.462371+00:00"
+      },
+      "a98809a3-3997-4ee4-9c45-0f1bc5ba1743": {
+        "business_id": "be71b5d8-7d3e-42bc-acd0-44b3c55cef85",
+        "merchant_id": "a98809a3-3997-4ee4-9c45-0f1bc5ba1743",
+        "system_key": "cogs",
+        "confidence": 1.0,
+        "evidence_count": 1,
+        "updated_at": "2026-01-29T01:03:28.811635+00:00"
       }
     }
   }

@@ -90,16 +90,7 @@ export function LedgerTab({
     []
   );
 
-  if (loading && !lines) return <div className={styles.loadingState}>Loading ledger…</div>;
-  if (err)
-    return (
-      <div className={styles.errorState}>
-        <div className={styles.errorMessage}>Error: {err}</div>
-        <button onClick={refresh} className={styles.button} type="button">
-          Retry
-        </button>
-      </div>
-    );
+
 
   const filteredRows = useMemo(() => {
     const arr = lines ?? [];
@@ -139,6 +130,17 @@ export function LedgerTab({
     }
     return map;
   }, [filteredRows]);
+
+  if (loading && !lines) return <div className={styles.loadingState}>Loading ledger…</div>;
+  if (err)
+    return (
+      <div className={styles.errorState}>
+        <div className={styles.errorMessage}>Error: {err}</div>
+        <button onClick={refresh} className={styles.button} type="button">
+          Retry
+        </button>
+      </div>
+    );
 
   return (
     <div className={styles.container}>
