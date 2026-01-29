@@ -40,8 +40,12 @@ export function fetchLedgerLines(
   params.set("start_date", query.start_date);
   params.set("end_date", query.end_date);
   if (query.limit != null) params.set("limit", String(query.limit));
-  return apiGet<LedgerLine[]>(
-    `/ledger/business/${businessId}/lines?${params.toString()}`,
-    { signal }
-  );
+  if (!params.get("start_date") || !params.get("end_date")) {
+    throw new Error("Ledger lines request requires start_date and end_date");
+  }
+  const url = `/ledger/business/${businessId}/lines?${params.toString()}`;
+  if (import.meta.env.DEV) {
+    console.info(`[ledger] lines url`, url);
+  }
+  return apiGet<LedgerLine[]>(url, { signal });
 }

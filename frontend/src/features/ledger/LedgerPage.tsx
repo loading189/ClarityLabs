@@ -7,6 +7,8 @@ import Table, { type TableColumn } from "../../components/common/Table";
 import Drawer from "../../components/common/Drawer";
 import { useFilters } from "../../app/filters/useFilters";
 import { resolveDateRange } from "../../app/filters/filters";
+import { useDemoDateRange } from "../../app/filters/useDemoDateRange";
+import { useDemoDashboard } from "../../hooks/useDemoDashboard";
 import { useLedgerLines } from "./useLedgerLines";
 import type { LedgerLine } from "../../api/ledger";
 import { assertBusinessId } from "../../utils/businessId";
@@ -38,6 +40,8 @@ export default function LedgerPage() {
   const { businessId: businessIdParam } = useParams();
   const businessId = assertBusinessId(businessIdParam, "LedgerPage");
   const [filters, setFilters] = useFilters();
+  const { data: dashboard } = useDemoDashboard(businessId);
+  useDemoDateRange(filters, setFilters, dashboard?.metadata);
   const range = resolveDateRange(filters);
   const { lines, loading, err } = useLedgerLines(businessId, range.start, range.end);
   const [selected, setSelected] = useState<LedgerLine | null>(null);
