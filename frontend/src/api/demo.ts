@@ -12,16 +12,16 @@ export function postBrainLabel(payload: BrainLabelRequest) {
   return apiPost<any>("/brain/label", payload);
 }
 
-export function fetchDashboard() {
-  return apiGet<{ cards: DashboardCard[] }>("/demo/dashboard");
+export function fetchDashboard(signal?: AbortSignal) {
+  return apiGet<{ cards: DashboardCard[] }>("/demo/dashboard", { signal });
 }
 
-export function fetchBusinessHealth(businessId: string) {
-  return apiGet<BusinessDetail>(`/demo/health/${businessId}`);
+export function fetchBusinessHealth(businessId: string, signal?: AbortSignal) {
+  return apiGet<BusinessDetail>(`/demo/health/${businessId}`, { signal });
 }
 
-export function fetchBusinessDashboard(businessId: string) {
-  return apiGet<DashboardDetail>(`/demo/dashboard/${businessId}`);
+export function fetchBusinessDashboard(businessId: string, signal?: AbortSignal) {
+  return apiGet<DashboardDetail>(`/demo/dashboard/${businessId}`, { signal });
 }
 
 export function fetchCategoryDrilldown(
@@ -74,10 +74,15 @@ export function fetchReviewQueue(businessId: string, minConf = 0.75) {
 }
 
 // ✅ FIX: use apiGet so API_BASE is respected
-export function fetchMonthlyTrends(businessId: string, lookbackMonths = 12, k = 2.0) {
+export function fetchMonthlyTrends(
+  businessId: string,
+  lookbackMonths = 12,
+  k = 2.0,
+  signal?: AbortSignal
+) {
   const qs = new URLSearchParams({
     lookback_months: String(lookbackMonths),
     k: String(k),
   });
-  return apiGet<any>(`/demo/analytics/monthly-trends/${businessId}?${qs.toString()}`);
+  return apiGet<any>(`/demo/analytics/monthly-trends/${businessId}?${qs.toString()}`, { signal });
 }

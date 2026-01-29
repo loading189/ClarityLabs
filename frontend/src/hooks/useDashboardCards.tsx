@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { fetchDashboard } from "../api/demo";
 import type { DashboardCard } from "../types";
 
-export function useDashboard() {
+export function useDashboardCards() {
   const [cards, setCards] = useState<DashboardCard[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -18,7 +18,7 @@ export function useDashboard() {
           setErr(e.message);
           return;
         }
-        setErr("Failed to load dashboard");
+        setErr("Failed to load dashboard cards");
       })
       .finally(() => setLoading(false));
 

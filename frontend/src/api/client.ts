@@ -20,8 +20,8 @@ async function parseJson<T>(res: Response): Promise<T> {
   }
 }
 
-export async function apiGet<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`);
+export async function apiGet<T>(path: string, options?: { signal?: AbortSignal }): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, { signal: options?.signal });
   if (!res.ok) throw new Error(await parseError(res, `GET ${path} failed (${res.status})`));
   return parseJson<T>(res);
 }
