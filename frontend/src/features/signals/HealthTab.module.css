@@ -531,6 +531,85 @@
   line-height: 1.45;
 }
 
+.signalStatusRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.selectInput {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.textArea {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 12px;
+  resize: vertical;
+}
+
+.signalFixList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.signalFixCard {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card-bg);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.signalFixHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.signalFixTitle {
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.signalFixSub {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.signalFixMeta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.signalFixActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.signalImpactLine {
+  font-size: 12px;
+  color: var(--text);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+}
+
 .signalDetailDetails summary {
   cursor: pointer;
   font-weight: 800;

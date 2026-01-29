@@ -256,6 +256,7 @@ export default function DetailPanel({
             <SignalsTab
               detail={detail}
               refreshToken={signalsRefreshToken}
+              onAfterAction={handleCategorizationChange}
               onNavigate={(target, drilldown) => {
                 if (target === "transactions") {
                   setTransactionsDrilldown((drilldown ?? null) as TransactionsDrilldown | null);

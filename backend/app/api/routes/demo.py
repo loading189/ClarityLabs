@@ -19,9 +19,10 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from datetime import datetime, timezone
-from typing import Any, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -36,10 +37,15 @@ from backend.app.norma.from_events import raw_event_to_txn
 from backend.app.norma.ledger import build_cash_ledger
 from backend.app.norma.merchant import merchant_key
 from backend.app.norma.categorize_brain import brain
-from backend.app.services import categorize_service
+from backend.app.services import categorize_service, health_signal_service
 from backend.app.clarity.health_v1 import build_health_v1_signals
 
 router = APIRouter(prefix="/demo", tags=["demo"])
+
+
+class HealthSignalStatusIn(BaseModel):
+    status: str = Field(..., min_length=2, max_length=32)
+    resolution_note: Optional[str] = Field(default=None, max_length=500)
 
 
 # ----------------------------
@@ -159,6 +165,76 @@ def _attach_signal_refs(signals_dicts: List[dict], pairs: List[Tuple[RawEvent, A
     return out
 
 
+def _build_fix_suggestions(txns: List[Dict[str, Any]], limit: int = 3) -> List[Dict[str, Any]]:
+    grouped: Dict[Tuple[str, str], Dict[str, Any]] = {}
+
+    for txn in txns:
+        merchant_key_value = txn.get("merchant_key")
+        category_id = txn.get("suggested_category_id")
+        category_name = txn.get("suggested_category_name")
+        if not merchant_key_value or not category_id or not category_name:
+            continue
+
+        key = (merchant_key_value, category_id)
+        if key not in grouped:
+            grouped[key] = {
+                "merchant_key": merchant_key_value,
+                "suggested_category_id": category_id,
+                "suggested_category_name": category_name,
+                "contains_text": (txn.get("description") or merchant_key_value).lower(),
+                "direction": txn.get("direction"),
+                "account": txn.get("account"),
+                "sample_description": txn.get("description"),
+                "sample_source_event_id": txn.get("source_event_id"),
+                "sample_amount": float(txn.get("amount")) if txn.get("amount") is not None else None,
+                "sample_occurred_at": txn.get("occurred_at").isoformat()
+                if getattr(txn.get("occurred_at"), "isoformat", None)
+                else txn.get("occurred_at"),
+                "count": 0,
+                "total_abs_amount": 0.0,
+            }
+
+        grouped[key]["count"] += 1
+        amt = txn.get("amount")
+        if amt is not None:
+            grouped[key]["total_abs_amount"] += abs(float(amt))
+
+    suggestions = sorted(
+        grouped.values(),
+        key=lambda item: (item.get("count", 0), item.get("total_abs_amount", 0.0)),
+        reverse=True,
+    )
+    return suggestions[:limit]
+
+
+def _build_uncategorized_examples(txns: List[Dict[str, Any]], limit: int = 4) -> List[Dict[str, Any]]:
+    sorted_txns = sorted(
+        txns,
+        key=lambda item: abs(float(item.get("amount") or 0.0)),
+        reverse=True,
+    )
+    examples: List[Dict[str, Any]] = []
+    for txn in sorted_txns[:limit]:
+        occurred_at = txn.get("occurred_at")
+        examples.append(
+            {
+                "source_event_id": txn.get("source_event_id"),
+                "occurred_at": occurred_at.isoformat() if getattr(occurred_at, "isoformat", None) else occurred_at,
+                "date": occurred_at.date().isoformat()
+                if getattr(occurred_at, "date", None)
+                else None,
+                "description": txn.get("description"),
+                "amount": float(txn.get("amount")) if txn.get("amount") is not None else None,
+                "direction": txn.get("direction"),
+                "account": txn.get("account"),
+                "merchant_key": txn.get("merchant_key"),
+                "suggested_category_id": txn.get("suggested_category_id"),
+                "suggested_category_name": txn.get("suggested_category_name"),
+            }
+        )
+    return examples
+
+
 # ----------------------------
 # Endpoints
 # ----------------------------
@@ -272,6 +348,9 @@ def demo_health_by_business(business_id: str, db: Session = Depends(get_db)):
     ]
 
     categorization_metrics = categorize_service.categorization_metrics(db, biz.id)
+    uncategorized_txns = categorize_service.list_txns_to_categorize(db, biz.id, limit=120, only_uncategorized=True)
+    fix_suggestions = _build_fix_suggestions(uncategorized_txns, limit=4)
+    fix_examples = _build_uncategorized_examples(uncategorized_txns, limit=4)
     rule_count = db.execute(
         select(func.count()).select_from(CategoryRule).where(CategoryRule.business_id == biz.id)
     ).scalar_one()
@@ -288,6 +367,19 @@ def demo_health_by_business(business_id: str, db: Session = Depends(get_db)):
         rule_count=int(rule_count or 0),
         is_known_vendor=_is_known_vendor,
     )
+    for signal in health_signals:
+        if signal.get("id") in {"high_uncategorized_rate", "rule_coverage_low", "new_unknown_vendors"}:
+            signal["fix_suggestions"] = fix_suggestions
+            if fix_examples:
+                signal.setdefault("evidence", []).append(
+                    {
+                        "date_range": {"start": "", "end": "", "label": "Top uncategorized merchants"},
+                        "metrics": {},
+                        "examples": fix_examples,
+                    }
+                )
+
+    health_signals = health_signal_service.hydrate_signal_states(db, biz.id, health_signals)
 
     return {
         "business_id": str(biz.id),
@@ -308,6 +400,22 @@ def demo_health_by_business(business_id: str, db: Session = Depends(get_db)):
         "facts_full": facts_json,  # ✅ fixed
         "ledger_preview": facts_json.get("last_10_ledger_rows", []),
     }
+
+
+@router.post("/health/{business_id}/signals/{signal_id}/status")
+def update_health_signal_status(
+    business_id: str,
+    signal_id: str,
+    req: HealthSignalStatusIn,
+    db: Session = Depends(get_db),
+):
+    return health_signal_service.update_signal_status(
+        db,
+        business_id,
+        signal_id,
+        status=req.status,
+        resolution_note=req.resolution_note,
+    )
 
 @router.get("/transactions/{business_id}")
 def demo_transactions_by_business(
