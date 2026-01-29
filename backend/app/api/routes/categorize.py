@@ -115,6 +115,15 @@ class CategoryRuleOut(BaseModel):
     created_at: datetime
 
 
+class CategoryRulePatch(BaseModel):
+    category_id: Optional[str] = None
+    priority: Optional[int] = None
+    active: Optional[bool] = None
+    contains_text: Optional[str] = None
+    direction: Optional[str] = None
+    account: Optional[str] = None
+
+
 @router.post("/business/{business_id}/label_vendor")
 def label_vendor(business_id: str, req: LabelVendorIn, db: Session = Depends(get_db)):
     return categorize_service.label_vendor(db, business_id, req)
@@ -162,9 +171,48 @@ def list_categories(business_id: str, db: Session = Depends(get_db)):
     return [CategoryOut(**item) for item in categorize_service.list_categories(db, business_id)]
 
 
+@router.get("/{business_id}/rules", response_model=List[CategoryRuleOut])
+def list_category_rules(
+    business_id: str,
+    active_only: bool = False,
+    limit: int = Query(200, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
+    return [
+        CategoryRuleOut(**item)
+        for item in categorize_service.list_category_rules(
+            db,
+            business_id,
+            active_only=active_only,
+            limit=limit,
+            offset=offset,
+        )
+    ]
+
+
 @router.post("/business/{business_id}/rules", response_model=CategoryRuleOut)
 def create_category_rule(business_id: str, req: CategoryRuleIn, db: Session = Depends(get_db)):
     return CategoryRuleOut(**categorize_service.create_category_rule(db, business_id, req))
+
+
+@router.patch("/{business_id}/rules/{rule_id}", response_model=CategoryRuleOut)
+def update_category_rule(
+    business_id: str,
+    rule_id: str,
+    req: CategoryRulePatch,
+    db: Session = Depends(get_db),
+):
+    return CategoryRuleOut(**categorize_service.update_category_rule(db, business_id, rule_id, req))
+
+
+@router.delete("/{business_id}/rules/{rule_id}")
+def delete_category_rule(
+    business_id: str,
+    rule_id: str,
+    db: Session = Depends(get_db),
+):
+    return categorize_service.delete_category_rule(db, business_id, rule_id)
 
 
 @router.post("/business/{business_id}/categorize")

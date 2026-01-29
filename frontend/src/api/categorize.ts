@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from "./client";
+import { apiDelete, apiGet, apiPatch, apiPost } from "./client";
 
 export type NormalizedTxn = {
   source_event_id: string;
@@ -71,6 +71,15 @@ export type CategoryRuleOut = {
   priority: number;
   active: boolean;
   created_at: string;
+};
+
+export type CategoryRulePatch = {
+  category_id?: string;
+  priority?: number;
+  active?: boolean;
+  contains_text?: string;
+  direction?: "inflow" | "outflow" | null;
+  account?: string | null;
 };
 
 export function labelVendor(
@@ -147,4 +156,31 @@ export function createCategoryRule(
   }
 ) {
   return apiPost<CategoryRuleOut>(`/categorize/business/${businessId}/rules`, payload);
+}
+
+export function listCategoryRules(
+  businessId: string,
+  params?: { active_only?: boolean; limit?: number; offset?: number }
+) {
+  const query = new URLSearchParams();
+  if (params?.active_only !== undefined) {
+    query.set("active_only", String(params.active_only));
+  }
+  if (params?.limit !== undefined) {
+    query.set("limit", String(params.limit));
+  }
+  if (params?.offset !== undefined) {
+    query.set("offset", String(params.offset));
+  }
+  const queryString = query.toString();
+  const suffix = queryString ? `?${queryString}` : "";
+  return apiGet<CategoryRuleOut[]>(`/categorize/${businessId}/rules${suffix}`);
+}
+
+export function updateCategoryRule(businessId: string, ruleId: string, payload: CategoryRulePatch) {
+  return apiPatch<CategoryRuleOut>(`/categorize/${businessId}/rules/${ruleId}`, payload);
+}
+
+export function deleteCategoryRule(businessId: string, ruleId: string) {
+  return apiDelete<{ deleted: boolean }>(`/categorize/${businessId}/rules/${ruleId}`);
 }
