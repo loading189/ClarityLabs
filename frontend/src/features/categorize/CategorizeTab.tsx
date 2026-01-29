@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   bulkApplyByMerchantKey,
+  deleteCategoryRule,
   getCategories,
   getCategorizeMetrics,
   getTxnsToCategorize,
+  listCategoryRules,
   saveCategorization,
+  updateCategoryRule,
+  type CategoryRuleOut,
   type CategoryOut,
   type CategorizeMetricsOut,
   type NormalizedTxn,
@@ -41,6 +45,7 @@ export default function CategorizeTab({
   const [txns, setTxns] = useState<NormalizedTxn[]>([]);
   const [cats, setCats] = useState<CategoryOut[]>([]);
   const [metrics, setMetrics] = useState<CategorizeMetricsOut | null>(null);
+  const [rules, setRules] = useState<CategoryRuleOut[]>([]);
   const [selectedTxn, setSelectedTxn] = useState<NormalizedTxn | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
   const selectedTxnRef = useRef<NormalizedTxn | null>(null);
@@ -49,6 +54,12 @@ export default function CategorizeTab({
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [actionErr, setActionErr] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [rulesLoading, setRulesLoading] = useState(false);
+  const [rulesErr, setRulesErr] = useState<string | null>(null);
+  const [rulesMsg, setRulesMsg] = useState<string | null>(null);
+  const [ruleEdits, setRuleEdits] = useState<
+    Record<string, { priority: string; category_id: string }>
+  >({});
 
   // Prevent stale-load races when businessId changes quickly
   const loadSeq = useRef(0);
@@ -174,6 +185,20 @@ export default function CategorizeTab({
     }
   }, [businessId, pickBestCategoryId]);
 
+  const loadRules = useCallback(async () => {
+    if (!businessId) return;
+    setRulesLoading(true);
+    setRulesErr(null);
+    try {
+      const data = await listCategoryRules(businessId);
+      setRules(data);
+    } catch (e: any) {
+      setRulesErr(e?.message ?? "Failed to load rules");
+    } finally {
+      setRulesLoading(false);
+    }
+  }, [businessId]);
+
   const pickTxn = useCallback(
     (t: NormalizedTxn) => {
       setSelectedTxn(t);
@@ -233,6 +258,19 @@ export default function CategorizeTab({
       return true;
     });
   }, [activeDrilldown, txns]);
+
+  const sortedRules = useMemo(() => {
+    return [...rules].sort((a, b) => {
+      const priorityDiff = a.priority - b.priority;
+      if (priorityDiff !== 0) return priorityDiff;
+      return a.contains_text.localeCompare(b.contains_text);
+    });
+  }, [rules]);
+
+  const ruleCategoryOptions = useMemo(
+    () => cats.filter((c) => !isCategoryUncategorized(c)),
+    [cats, isCategoryUncategorized]
+  );
 
   const doSave = useCallback(
     async (categoryId: string, source: "manual" | "rule" | "ml") => {
@@ -296,6 +334,104 @@ export default function CategorizeTab({
     [businessId, load, selectedTxn, onCategorizationChange]
   );
 
+  const updateRuleEdit = useCallback(
+    (rule: CategoryRuleOut, patch: { priority?: string; category_id?: string }) => {
+      setRuleEdits((prev) => {
+        const existing = prev[rule.id] ?? {
+          priority: String(rule.priority),
+          category_id: rule.category_id,
+        };
+        return {
+          ...prev,
+          [rule.id]: {
+            ...existing,
+            ...patch,
+          },
+        };
+      });
+    },
+    []
+  );
+
+  const clearRuleEdit = useCallback((ruleId: string) => {
+    setRuleEdits((prev) => {
+      if (!prev[ruleId]) return prev;
+      const next = { ...prev };
+      delete next[ruleId];
+      return next;
+    });
+  }, []);
+
+  const saveRuleEdit = useCallback(
+    async (rule: CategoryRuleOut) => {
+      const edit = ruleEdits[rule.id];
+      if (!edit) return;
+
+      const priorityValue = edit.priority.trim();
+      const parsedPriority = Number(priorityValue);
+      if (!Number.isFinite(parsedPriority)) {
+        setRulesErr("Priority must be a number.");
+        return;
+      }
+
+      const patch: Record<string, any> = {};
+      if (parsedPriority !== rule.priority) patch.priority = parsedPriority;
+      if (edit.category_id !== rule.category_id) patch.category_id = edit.category_id;
+
+      if (Object.keys(patch).length === 0) {
+        clearRuleEdit(rule.id);
+        return;
+      }
+
+      setRulesErr(null);
+      setRulesMsg(null);
+      try {
+        await updateCategoryRule(businessId, rule.id, patch);
+        setRulesMsg("Rule updated.");
+        clearRuleEdit(rule.id);
+        await loadRules();
+        onCategorizationChange?.();
+      } catch (e: any) {
+        setRulesErr(e?.message ?? "Failed to update rule");
+      }
+    },
+    [businessId, clearRuleEdit, loadRules, onCategorizationChange, ruleEdits]
+  );
+
+  const toggleRuleActive = useCallback(
+    async (rule: CategoryRuleOut) => {
+      setRulesErr(null);
+      setRulesMsg(null);
+      try {
+        await updateCategoryRule(businessId, rule.id, { active: !rule.active });
+        setRulesMsg(rule.active ? "Rule deactivated." : "Rule activated.");
+        await loadRules();
+        onCategorizationChange?.();
+      } catch (e: any) {
+        setRulesErr(e?.message ?? "Failed to update rule");
+      }
+    },
+    [businessId, loadRules, onCategorizationChange]
+  );
+
+  const deleteRule = useCallback(
+    async (rule: CategoryRuleOut) => {
+      const ok = window.confirm(`Delete rule "${rule.contains_text}"?`);
+      if (!ok) return;
+      setRulesErr(null);
+      setRulesMsg(null);
+      try {
+        await deleteCategoryRule(businessId, rule.id);
+        setRulesMsg("Rule deleted.");
+        await loadRules();
+        onCategorizationChange?.();
+      } catch (e: any) {
+        setRulesErr(e?.message ?? "Failed to delete rule");
+      }
+    },
+    [businessId, loadRules, onCategorizationChange]
+  );
+
 
   // When categories arrive/refresh, ensure selection is valid.
   useEffect(() => {
@@ -319,6 +455,10 @@ export default function CategorizeTab({
   }, [load]);
 
   useEffect(() => {
+    loadRules();
+  }, [loadRules]);
+
+  useEffect(() => {
     if (!selectedTxn) return;
     const stillVisible = filteredTxns.some(
       (txn) => txn.source_event_id === selectedTxn.source_event_id
@@ -328,18 +468,24 @@ export default function CategorizeTab({
     }
   }, [filteredTxns, selectedTxn]);
 
+  const reloadAll = useCallback(() => {
+    load();
+    loadRules();
+  }, [load, loadRules]);
+
   if (loading) return <div className={styles.loading}>Loading…</div>;
 
   return (
-    <div className={styles.container}>
-      {/* LEFT: txns */}
-      <div className={styles.panel}>
-        <div className={styles.headerRow}>
-          <h3 className={styles.title}>To categorize</h3>
-          <button className={styles.buttonSecondary} onClick={load}>
-            Reload
-          </button>
-        </div>
+    <div className={styles.page}>
+      <div className={styles.container}>
+        {/* LEFT: txns */}
+        <div className={styles.panel}>
+          <div className={styles.headerRow}>
+            <h3 className={styles.title}>To categorize</h3>
+            <button className={styles.buttonSecondary} onClick={reloadAll}>
+              Reload
+            </button>
+          </div>
 
         {drilldown && (
           <div className={styles.drilldownBanner}>
@@ -422,9 +568,9 @@ export default function CategorizeTab({
         )}
       </div>
 
-      {/* RIGHT: assign */}
-      <div className={styles.panel}>
-        <h3 className={styles.assignHeader}>Assign category</h3>
+        {/* RIGHT: assign */}
+        <div className={styles.panel}>
+          <h3 className={styles.assignHeader}>Assign category</h3>
 
         {msg && <div className={styles.message}>{msg}</div>}
         {actionErr && <div className={styles.error}>Error: {actionErr}</div>}
@@ -529,6 +675,115 @@ export default function CategorizeTab({
               </div>
             </div>
           </>
+        )}
+        </div>
+      </div>
+      <div className={`${styles.panel} ${styles.rulesPanel}`}>
+        <div className={styles.headerRow}>
+          <div>
+            <h3 className={styles.title}>Rule management</h3>
+            <div className={styles.rulesSubtitle}>Manage saved categorization rules.</div>
+          </div>
+          <button className={styles.buttonSecondary} onClick={loadRules}>
+            Refresh rules
+          </button>
+        </div>
+
+        {rulesMsg && <div className={styles.message}>{rulesMsg}</div>}
+        {rulesErr && <div className={styles.error}>Error: {rulesErr}</div>}
+
+        {rulesLoading ? (
+          <div className={styles.loading}>Loading rules…</div>
+        ) : sortedRules.length === 0 ? (
+          <div className={styles.emptyState}>No rules yet.</div>
+        ) : (
+          <div className={styles.rulesTableWrap}>
+            <table className={styles.rulesTable}>
+              <thead>
+                <tr>
+                  <th>Active</th>
+                  <th>Priority</th>
+                  <th>Contains Text</th>
+                  <th>Direction</th>
+                  <th>Account</th>
+                  <th>Category</th>
+                  <th>Created</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedRules.map((rule) => {
+                  const edit = ruleEdits[rule.id];
+                  const priorityValue = edit?.priority ?? String(rule.priority);
+                  const categoryValue = edit?.category_id ?? rule.category_id;
+                  const hasChanges =
+                    Number(priorityValue) !== rule.priority || categoryValue !== rule.category_id;
+                  const category = catsById.get(rule.category_id);
+                  return (
+                    <tr key={rule.id}>
+                      <td>
+                        <label className={styles.toggle}>
+                          <input
+                            type="checkbox"
+                            checked={rule.active}
+                            onChange={() => toggleRuleActive(rule)}
+                          />
+                          <span>{rule.active ? "On" : "Off"}</span>
+                        </label>
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          className={styles.ruleInput}
+                          value={priorityValue}
+                          onChange={(e) => updateRuleEdit(rule, { priority: e.target.value })}
+                        />
+                      </td>
+                      <td className={styles.containsText}>{rule.contains_text}</td>
+                      <td>{rule.direction ?? "—"}</td>
+                      <td>{rule.account ?? "—"}</td>
+                      <td>
+                        <select
+                          className={styles.ruleSelect}
+                          value={categoryValue}
+                          onChange={(e) => updateRuleEdit(rule, { category_id: e.target.value })}
+                        >
+                          {ruleCategoryOptions.map((cat) => (
+                            <option key={cat.id} value={cat.id}>
+                              {cat.name}
+                            </option>
+                          ))}
+                          {!ruleCategoryOptions.find((cat) => cat.id === rule.category_id) && (
+                            <option value={rule.category_id}>
+                              {category?.name ?? "Unknown category"}
+                            </option>
+                          )}
+                        </select>
+                      </td>
+                      <td>{new Date(rule.created_at).toLocaleDateString()}</td>
+                      <td>
+                        <div className={styles.buttonRow}>
+                          <button
+                            className={styles.buttonSecondary}
+                            disabled={!hasChanges}
+                            onClick={() => saveRuleEdit(rule)}
+                          >
+                            Save
+                          </button>
+                          <button
+                            className={styles.buttonSecondary}
+                            onClick={() => deleteRule(rule)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>

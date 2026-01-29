@@ -331,6 +331,51 @@ def list_categories(db: Session, business_id: str) -> List[Dict[str, Any]]:
     ]
 
 
+def _category_rule_out(rule: CategoryRule) -> Dict[str, Any]:
+    return {
+        "id": rule.id,
+        "business_id": rule.business_id,
+        "category_id": rule.category_id,
+        "contains_text": rule.contains_text,
+        "direction": rule.direction,
+        "account": rule.account,
+        "priority": rule.priority,
+        "active": rule.active,
+        "created_at": rule.created_at,
+    }
+
+
+def list_category_rules(
+    db: Session,
+    business_id: str,
+    *,
+    active_only: bool = False,
+    limit: int = 200,
+    offset: int = 0,
+) -> List[Dict[str, Any]]:
+    require_business(db, business_id)
+
+    query = select(CategoryRule).where(CategoryRule.business_id == business_id)
+    if active_only:
+        query = query.where(CategoryRule.active.is_(True))
+
+    rules = (
+        db.execute(
+            query.order_by(
+                CategoryRule.priority.asc(),
+                CategoryRule.created_at.asc(),
+                CategoryRule.id.asc(),
+            )
+            .limit(limit)
+            .offset(offset)
+        )
+        .scalars()
+        .all()
+    )
+
+    return [_category_rule_out(rule) for rule in rules]
+
+
 def create_category_rule(db: Session, business_id: str, req) -> Dict[str, Any]:
     require_business(db, business_id)
     seed_coa_and_categories_and_mappings(db, business_id)
@@ -362,17 +407,66 @@ def create_category_rule(db: Session, business_id: str, req) -> Dict[str, Any]:
     db.commit()
     db.refresh(rule)
 
-    return {
-        "id": rule.id,
-        "business_id": rule.business_id,
-        "category_id": rule.category_id,
-        "contains_text": rule.contains_text,
-        "direction": rule.direction,
-        "account": rule.account,
-        "priority": rule.priority,
-        "active": rule.active,
-        "created_at": rule.created_at,
-    }
+    return _category_rule_out(rule)
+
+
+def update_category_rule(db: Session, business_id: str, rule_id: str, req) -> Dict[str, Any]:
+    require_business(db, business_id)
+
+    rule = db.execute(
+        select(CategoryRule).where(
+            and_(CategoryRule.business_id == business_id, CategoryRule.id == rule_id)
+        )
+    ).scalar_one_or_none()
+    if not rule:
+        raise HTTPException(404, "rule not found")
+
+    if req.category_id is not None:
+        require_category(db, business_id, req.category_id)
+        system_key = system_key_for_category(db, business_id, req.category_id)
+        if not system_key or system_key == "uncategorized":
+            raise HTTPException(400, "category must map to a valid system_key")
+        rule.category_id = req.category_id
+
+    if req.contains_text is not None:
+        contains_text = (req.contains_text or "").strip().lower()
+        if not contains_text:
+            raise HTTPException(400, "contains_text required")
+        rule.contains_text = contains_text
+
+    if req.direction is not None:
+        rule.direction = (req.direction or "").strip().lower() or None
+
+    if req.account is not None:
+        rule.account = (req.account or "").strip().lower() or None
+
+    if req.priority is not None:
+        rule.priority = int(req.priority)
+
+    if req.active is not None:
+        rule.active = bool(req.active)
+
+    db.add(rule)
+    db.commit()
+    db.refresh(rule)
+
+    return _category_rule_out(rule)
+
+
+def delete_category_rule(db: Session, business_id: str, rule_id: str) -> Dict[str, Any]:
+    require_business(db, business_id)
+    rule = db.execute(
+        select(CategoryRule).where(
+            and_(CategoryRule.business_id == business_id, CategoryRule.id == rule_id)
+        )
+    ).scalar_one_or_none()
+    if not rule:
+        raise HTTPException(404, "rule not found")
+
+    db.delete(rule)
+    db.commit()
+
+    return {"deleted": True}
 
 
 def upsert_categorization(db: Session, business_id: str, req) -> Dict[str, Any]:
