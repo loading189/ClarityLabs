@@ -12,6 +12,12 @@ export function postBrainLabel(payload: BrainLabelRequest) {
   return apiPost<any>("/brain/label", payload);
 }
 
+export function fetchDemoHealth(signal?: AbortSignal) {
+  // returns the same shape you showed earlier: { metadata: { business_id, ... }, stages: ... }
+  return apiGet<any>("/demo/health", { signal });
+}
+
+
 export function fetchDashboard(signal?: AbortSignal) {
   return apiGet<{ cards: DashboardCard[] }>("/demo/dashboard", { signal });
 }

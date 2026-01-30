@@ -39,6 +39,19 @@ function uniqueOptions(values: Array<string | null | undefined>) {
 export default function LedgerPage() {
   const { businessId: businessIdParam } = useParams();
   const businessId = assertBusinessId(businessIdParam, "LedgerPage");
+
+  if (!businessId) {
+    return (
+      <div className={styles.page}>
+        <PageHeader
+          title="Ledger"
+          subtitle="Source-of-truth timeline with filters, search, and transaction drilldowns."
+        />
+        <ErrorState label="Invalid business id in URL. Go back to /app to re-select a business." />
+      </div>
+    );
+  }
+
   const [filters, setFilters] = useFilters();
   const { data: dashboard } = useDemoDashboard(businessId);
   useDemoDateRange(filters, setFilters, dashboard?.metadata);
