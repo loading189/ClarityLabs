@@ -1,0 +1,100 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.primaryButton {
+  text-decoration: none;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: #5d76ff;
+  color: #fff;
+  font-size: 0.85rem;
+}
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.kpiCard {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 14px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.kpiLabel {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.75rem;
+}
+
+.kpiValue {
+  font-size: 1.2rem;
+  margin-top: 6px;
+  font-weight: 600;
+}
+
+.kpiMeta {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 6px;
+}
+
+.tableCard {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 16px;
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.tableHeader h2 {
+  margin: 0;
+}
+
+.tableHeader p {
+  margin-top: 6px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.85rem;
+}
+
+.tableGrid {
+  margin-top: 16px;
+  display: grid;
+  gap: 8px;
+}
+
+.tableRowHeader,
+.tableRow {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+}
+
+.tableRowHeader {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.tableRow {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tableRow:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.empty {
+  padding: 16px;
+  color: rgba(255, 255, 255, 0.5);
+}

@@ -8,10 +8,21 @@ export function useDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchDashboard()
+    const controller = new AbortController();
+
+    fetchDashboard(controller.signal)
       .then((data) => setCards(data.cards))
-      .catch((e) => setErr(e.message))
+      .catch((e: unknown) => {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        if (e instanceof Error) {
+          setErr(e.message);
+          return;
+        }
+        setErr("Failed to load dashboard");
+      })
       .finally(() => setLoading(false));
+
+    return () => controller.abort();
   }, []);
 
   return { cards, err, loading };

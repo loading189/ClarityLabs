@@ -1,0 +1,127 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.summary {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+  gap: 4px;
+}
+
+.descriptionCell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.descriptionTitle {
+  font-weight: 600;
+}
+
+.descriptionMeta {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.inflow {
+  color: #7ddf8d;
+  font-weight: 600;
+}
+
+.outflow {
+  color: #ff9b85;
+  font-weight: 600;
+}
+
+.rowAction {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: inherit;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+}
+
+.pagination {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.pageButton {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: inherit;
+  padding: 6px 12px;
+  border-radius: 8px;
+}
+
+.drawerBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.drawerLabel {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.drawerMeta {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.drawerGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.payload {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.drawerActions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.primaryButton,
+.secondaryButton,
+.ghostButton {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.primaryButton {
+  background: #5d76ff;
+  color: #fff;
+}
+
+.secondaryButton {
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+}
+
+.ghostButton {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.2);
+  color: inherit;
+}

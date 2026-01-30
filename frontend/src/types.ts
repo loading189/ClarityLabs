@@ -54,6 +54,8 @@ export type DashboardDetail = {
     name: string;
     as_of: string;
     last_event_occurred_at?: string | null;
+    start_at?: string | null;
+    end_at?: string | null;
   };
   kpis: DashboardKpis;
   signals: DashboardSignal[];
@@ -148,6 +150,8 @@ export type BusinessDetail = {
   business_id: string;
   name: string;
   as_of: string;
+  start_at?: string | null;
+  end_at?: string | null;
   risk: Risk;
   health_score: number;
   highlights: string[];
@@ -187,4 +191,3 @@ export type BrainLabelRequest = {
   category: string;
   confidence?: number;
 };
-
