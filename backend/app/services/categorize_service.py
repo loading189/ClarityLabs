@@ -20,7 +20,10 @@ from backend.app.norma.from_events import raw_event_to_txn
 from backend.app.norma.category_engine import suggest_category
 from backend.app.norma.merchant import merchant_key, canonical_merchant_name
 from backend.app.norma.categorize_brain import brain
-from backend.app.services.category_seed import seed_coa_and_categories_and_mappings
+from backend.app.services.category_seed import (
+    seed_coa_and_categories_and_mappings,
+    ensure_category_mapping_for_category,
+)
 from backend.app.services.category_resolver import resolve_system_key
 
 
@@ -42,6 +45,10 @@ def require_category(db: Session, business_id: str, category_id: str) -> Categor
     ).scalar_one_or_none()
     if not cat or not cat.account_id:
         raise HTTPException(404, "category not found for business")
+    if not system_key_for_category(db, business_id, category_id):
+        repaired = ensure_category_mapping_for_category(db, business_id, category_id)
+        if not repaired:
+            raise HTTPException(400, "category missing account mapping")
     return cat
 
 
@@ -140,6 +147,9 @@ def label_vendor(db: Session, business_id: str, req) -> Dict[str, Any]:
     if not system_key:
         raise HTTPException(400, "system_key required")
 
+    if not resolve_system_key(db, business_id, system_key):
+        raise HTTPException(400, "system_key must map to a valid category")
+
     canon = canonical_merchant_name(req.canonical_name or txn.description or "Unknown")
 
     lbl = brain.apply_label(
@@ -206,12 +216,18 @@ def set_brain_vendor(db: Session, business_id: str, req) -> Dict[str, Any]:
     require_business(db, business_id)
     seed_coa_and_categories_and_mappings(db, business_id)
     require_category(db, business_id, req.category_id)
+    if not system_key_for_category(db, business_id, req.category_id):
+        repaired = ensure_category_mapping_for_category(db, business_id, req.category_id)
+        if not repaired:
+            raise HTTPException(400, "category missing account mapping")
 
     alias_key = merchant_key(req.merchant_key or "")
     if not alias_key:
         raise HTTPException(400, "merchant_key required")
 
     system_key = system_key_for_category(db, business_id, req.category_id)
+    if not system_key:
+        system_key = ensure_category_mapping_for_category(db, business_id, req.category_id)
     if not system_key or system_key == "uncategorized":
         raise HTTPException(400, "category must map to a valid system_key")
 
@@ -468,6 +484,8 @@ def create_category_rule(db: Session, business_id: str, req) -> Dict[str, Any]:
     require_category(db, business_id, req.category_id)
 
     system_key = system_key_for_category(db, business_id, req.category_id)
+    if not system_key:
+        system_key = ensure_category_mapping_for_category(db, business_id, req.category_id)
     if not system_key or system_key == "uncategorized":
         raise HTTPException(400, "category must map to a valid system_key")
 
@@ -512,6 +530,8 @@ def update_category_rule(db: Session, business_id: str, rule_id: str, req) -> Di
     if req.category_id is not None:
         require_category(db, business_id, req.category_id)
         system_key = system_key_for_category(db, business_id, req.category_id)
+        if not system_key:
+            system_key = ensure_category_mapping_for_category(db, business_id, req.category_id)
         if not system_key or system_key == "uncategorized":
             raise HTTPException(400, "category must map to a valid system_key")
         rule.category_id = req.category_id
@@ -644,6 +664,11 @@ def apply_category_rule(db: Session, business_id: str, rule_id: str) -> Dict[str
     if not rule:
         raise HTTPException(404, "rule not found")
 
+    if not system_key_for_category(db, business_id, rule.category_id):
+        repaired = ensure_category_mapping_for_category(db, business_id, rule.category_id)
+        if not repaired:
+            raise HTTPException(400, "rule category missing account mapping")
+
     rules = _ordered_active_rules(db, business_id)
     if not any(r.id == rule.id for r in rules):
         rules.append(rule)
@@ -746,6 +771,8 @@ def upsert_categorization(db: Session, business_id: str, req) -> Dict[str, Any]:
         txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
         mk = merchant_key(txn.description)
         system_key = system_key_for_category(db, business_id, req.category_id)
+        if not system_key:
+            system_key = ensure_category_mapping_for_category(db, business_id, req.category_id)
 
         if system_key and system_key != "uncategorized":
             canon = canonical_merchant_name(txn.description or "Unknown")
@@ -774,6 +801,8 @@ def bulk_apply_categorization(db: Session, business_id: str, req) -> Dict[str, A
     require_category(db, business_id, req.category_id)
 
     system_key = system_key_for_category(db, business_id, req.category_id)
+    if not system_key:
+        system_key = ensure_category_mapping_for_category(db, business_id, req.category_id)
     if not system_key or system_key == "uncategorized":
         raise HTTPException(400, "category must map to a valid system_key")
 

@@ -8,16 +8,24 @@ import {
   getTxnsToCategorize,
   listCategoryRules,
   previewCategoryRule,
+  getBrainVendors,
+  createCategoryRule,
   saveCategorization,
   updateCategoryRule,
   type CategoryRuleOut,
   type CategoryRulePreviewOut,
   type CategoryOut,
+  type BrainVendor,
   type CategorizeMetricsOut,
   type NormalizedTxn,
 } from "../../api/categorize";
 import styles from "./CategorizeTab.module.css";
 import { logRefresh } from "../../utils/refreshLog";
+import { useAppState } from "../../app/state/appState";
+import { isBusinessIdValid } from "../../utils/businessId";
+import { isValidIsoDate } from "../../app/filters/filters";
+import { normalizeVendorDisplay } from "../../utils/vendors";
+import { hasValidCategoryMapping } from "../../utils/categories";
 
 export type CategorizeDrilldown = {
   merchant_key?: string;
@@ -49,9 +57,11 @@ export default function CategorizeTab({
   const [cats, setCats] = useState<CategoryOut[]>([]);
   const [metrics, setMetrics] = useState<CategorizeMetricsOut | null>(null);
   const [rules, setRules] = useState<CategoryRuleOut[]>([]);
+  const [brainVendors, setBrainVendors] = useState<BrainVendor[]>([]);
   const [selectedTxn, setSelectedTxn] = useState<NormalizedTxn | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
   const selectedTxnRef = useRef<NormalizedTxn | null>(null);
+  const { dateRange, dataVersion, bumpDataVersion } = useAppState();
 
   const [loading, setLoading] = useState(false);
   const [loadErr, setLoadErr] = useState<string | null>(null);
@@ -65,6 +75,8 @@ export default function CategorizeTab({
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewErr, setPreviewErr] = useState<string | null>(null);
   const [applyLoadingRuleId, setApplyLoadingRuleId] = useState<string | null>(null);
+  const [createRuleLoading, setCreateRuleLoading] = useState(false);
+  const [createRuleErr, setCreateRuleErr] = useState<string | null>(null);
   const [ruleEdits, setRuleEdits] = useState<
     Record<string, { priority: string; category_id: string }>
   >({});
@@ -77,6 +89,16 @@ export default function CategorizeTab({
     for (const c of cats) m.set(c.id, c);
     return m;
   }, [cats]);
+
+  const vendorNameByKey = useMemo(() => {
+    const map = new Map<string, BrainVendor>();
+    brainVendors.forEach((vendor) => {
+      vendor.alias_keys?.forEach((alias) => {
+        map.set(alias, vendor);
+      });
+    });
+    return map;
+  }, [brainVendors]);
 
   const currencyFormatter = useMemo(
     () => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }),
@@ -105,6 +127,18 @@ export default function CategorizeTab({
     [isUncategorized]
   );
 
+  const invalidBusinessId = useMemo(() => {
+    return !isBusinessIdValid(businessId);
+  }, [businessId]);
+
+  const invalidDateRange = useMemo(() => {
+    return (
+      !isValidIsoDate(dateRange.start) ||
+      !isValidIsoDate(dateRange.end) ||
+      dateRange.start > dateRange.end
+    );
+  }, [dateRange.end, dateRange.start]);
+
   const formatLastRun = useCallback((rule: CategoryRuleOut): string => {
     if (!rule.last_run_at) return "Never";
     const stamp = new Date(rule.last_run_at).toLocaleString();
@@ -117,7 +151,8 @@ export default function CategorizeTab({
       if (!categories.length) return "";
       const suggested = (txn?.suggested_category_id ?? "") as string;
       if (suggested && categories.some((c) => c.id === suggested)) return suggested;
-      return categories[0].id;
+      const fallback = categories.find((category) => hasValidCategoryMapping(category));
+      return fallback?.id ?? categories[0].id;
     },
     []
   );
@@ -162,8 +197,12 @@ export default function CategorizeTab({
     return Math.round((metrics.suggestion_coverage / denom) * 100);
   }, [metrics]);
 
+  const missingCoaMappings = useMemo(() => {
+    return cats.filter((cat) => !cat.account_id);
+  }, [cats]);
+
   const load = useCallback(async () => {
-    if (!businessId) return;
+    if (!businessId || invalidBusinessId || invalidDateRange) return;
 
     const seq = ++loadSeq.current;
 
@@ -173,10 +212,11 @@ export default function CategorizeTab({
 
     try {
       logRefresh("categorize", "reload");
-      const [t, c, m] = await Promise.all([
+      const [t, c, m, vendors] = await Promise.all([
         getTxnsToCategorize(businessId, 50),
         getCategories(businessId),
         getCategorizeMetrics(businessId),
+        getBrainVendors(businessId),
       ]);
 
       // If a newer load started, ignore this result
@@ -185,6 +225,7 @@ export default function CategorizeTab({
       setTxns(t);
       setCats(c);
       setMetrics(m);
+      setBrainVendors(vendors);
 
       const existingTxn = selectedTxnRef.current
         ? t.find((txn) => txn.source_event_id === selectedTxnRef.current?.source_event_id) ?? null
@@ -194,25 +235,37 @@ export default function CategorizeTab({
       setSelectedCategoryId(pickBestCategoryId(nextTxn, c));
     } catch (e: any) {
       if (seq !== loadSeq.current) return;
+      console.error("[categorize] load failed", {
+        businessId,
+        dateRange,
+        url: `/categorize/business/${businessId}/txns?limit=50&only_uncategorized=true`,
+        error: e?.message ?? e,
+      });
       setLoadErr(e?.message ?? "Failed to load categorization");
     } finally {
       if (seq === loadSeq.current) setLoading(false);
     }
-  }, [businessId, pickBestCategoryId]);
+  }, [businessId, dateRange, invalidBusinessId, invalidDateRange, pickBestCategoryId]);
 
   const loadRules = useCallback(async () => {
-    if (!businessId) return;
+    if (!businessId || invalidBusinessId) return;
     setRulesLoading(true);
     setRulesErr(null);
     try {
       const data = await listCategoryRules(businessId);
       setRules(data);
     } catch (e: any) {
+      console.error("[categorize] rules fetch failed", {
+        businessId,
+        dateRange,
+        url: `/categorize/${businessId}/rules`,
+        error: e?.message ?? e,
+      });
       setRulesErr(e?.message ?? "Failed to load rules");
     } finally {
       setRulesLoading(false);
     }
-  }, [businessId]);
+  }, [businessId, dateRange, invalidBusinessId]);
 
   const pickTxn = useCallback(
     (t: NormalizedTxn) => {
@@ -245,7 +298,17 @@ export default function CategorizeTab({
   }, [drilldown]);
 
   const filteredTxns = useMemo(() => {
-    if (!activeDrilldown) return txns;
+    const start = Date.parse(dateRange.start);
+    const end = Date.parse(dateRange.end);
+    let filtered = txns.filter((t) => {
+      if (!Number.isFinite(start) || !Number.isFinite(end)) return true;
+      const occurredAt = t.occurred_at ? Date.parse(t.occurred_at) : Number.NaN;
+      if (!Number.isFinite(occurredAt)) return true;
+      return occurredAt >= start && occurredAt <= end;
+    });
+
+    if (!activeDrilldown) return filtered;
+
     const search = activeDrilldown.search.trim().toLowerCase();
     const merchantKey = activeDrilldown.merchantKey.trim().toLowerCase();
     const now = Date.now();
@@ -254,7 +317,7 @@ export default function CategorizeTab({
       : null;
     const cutoff = days ? now - days * 24 * 60 * 60 * 1000 : null;
 
-    return txns.filter((t) => {
+    return filtered.filter((t) => {
       if (activeDrilldown.direction && t.direction !== activeDrilldown.direction) {
         return false;
       }
@@ -272,7 +335,7 @@ export default function CategorizeTab({
       }
       return true;
     });
-  }, [activeDrilldown, txns]);
+  }, [activeDrilldown, dateRange.end, dateRange.start, txns]);
 
   const sortedRules = useMemo(() => {
     return [...rules].sort((a, b) => {
@@ -298,6 +361,11 @@ export default function CategorizeTab({
   const doSave = useCallback(
     async (categoryId: string, source: "manual" | "rule" | "ml") => {
       if (!selectedTxn) return;
+      const category = catsById.get(categoryId);
+      if (!hasValidCategoryMapping(category)) {
+        setActionErr("Selected category is missing a valid COA mapping.");
+        return;
+      }
 
       setActionErr(null);
       setMsg(null);
@@ -318,16 +386,23 @@ export default function CategorizeTab({
 
         await load(); // ✅ ensures next txn shows updated suggestions
         onCategorizationChange?.();
+        bumpDataVersion();
       } catch (e: any) {
         setActionErr(e?.message ?? "Save failed");
       }
     },
-    [businessId, selectedTxn, load, onCategorizationChange]
+    [bumpDataVersion, businessId, catsById, load, onCategorizationChange, selectedTxn]
   );
 
   const doBulkApply = useCallback(
     async (categoryId: string) => {
       if (!selectedTxn) return;
+
+      const category = catsById.get(categoryId);
+      if (!hasValidCategoryMapping(category)) {
+        setActionErr("Selected category is missing a valid COA mapping.");
+        return;
+      }
 
       if (!selectedTxn.merchant_key) {
         setActionErr("No merchant key available for this vendor.");
@@ -350,11 +425,12 @@ export default function CategorizeTab({
         );
         await load();
         onCategorizationChange?.();
+        bumpDataVersion();
       } catch (e: any) {
         setActionErr(e?.message ?? "Failed to apply vendor categorization");
       }
     },
-    [businessId, load, selectedTxn, onCategorizationChange]
+    [bumpDataVersion, businessId, catsById, load, onCategorizationChange, selectedTxn]
   );
 
   const updateRuleEdit = useCallback(
@@ -399,7 +475,14 @@ export default function CategorizeTab({
 
       const patch: Record<string, any> = {};
       if (parsedPriority !== rule.priority) patch.priority = parsedPriority;
-      if (edit.category_id !== rule.category_id) patch.category_id = edit.category_id;
+      if (edit.category_id !== rule.category_id) {
+        const category = catsById.get(edit.category_id);
+        if (!hasValidCategoryMapping(category)) {
+          setRulesErr("Rule category is missing a valid COA mapping.");
+          return;
+        }
+        patch.category_id = edit.category_id;
+      }
 
       if (Object.keys(patch).length === 0) {
         clearRuleEdit(rule.id);
@@ -414,11 +497,12 @@ export default function CategorizeTab({
         clearRuleEdit(rule.id);
         await loadRules();
         onCategorizationChange?.();
+        bumpDataVersion();
       } catch (e: any) {
         setRulesErr(e?.message ?? "Failed to update rule");
       }
     },
-    [businessId, clearRuleEdit, loadRules, onCategorizationChange, ruleEdits]
+    [bumpDataVersion, businessId, catsById, clearRuleEdit, loadRules, onCategorizationChange, ruleEdits]
   );
 
   const toggleRuleActive = useCallback(
@@ -430,11 +514,12 @@ export default function CategorizeTab({
         setRulesMsg(rule.active ? "Rule deactivated." : "Rule activated.");
         await loadRules();
         onCategorizationChange?.();
+        bumpDataVersion();
       } catch (e: any) {
         setRulesErr(e?.message ?? "Failed to update rule");
       }
     },
-    [businessId, loadRules, onCategorizationChange]
+    [bumpDataVersion, businessId, loadRules, onCategorizationChange]
   );
 
   const deleteRule = useCallback(
@@ -448,11 +533,12 @@ export default function CategorizeTab({
         setRulesMsg("Rule deleted.");
         await loadRules();
         onCategorizationChange?.();
+        bumpDataVersion();
       } catch (e: any) {
         setRulesErr(e?.message ?? "Failed to delete rule");
       }
     },
-    [businessId, loadRules, onCategorizationChange]
+    [bumpDataVersion, businessId, loadRules, onCategorizationChange]
   );
 
   const clearPreview = useCallback(() => {
@@ -482,6 +568,11 @@ export default function CategorizeTab({
 
   const applyRuleNow = useCallback(
     async (rule: CategoryRuleOut) => {
+      const category = catsById.get(rule.category_id);
+      if (!hasValidCategoryMapping(category)) {
+        setRulesErr("Rule category is missing a valid COA mapping.");
+        return;
+      }
       setApplyLoadingRuleId(rule.id);
       setRulesErr(null);
       setRulesMsg(null);
@@ -505,14 +596,65 @@ export default function CategorizeTab({
           await runRulePreview(rule);
         }
         onCategorizationChange?.();
+        bumpDataVersion();
       } catch (e: any) {
         setRulesErr(e?.message ?? "Failed to apply rule");
       } finally {
         setApplyLoadingRuleId(null);
       }
     },
-    [businessId, load, loadRules, onCategorizationChange, previewRuleId, runRulePreview]
+    [
+      bumpDataVersion,
+      businessId,
+      catsById,
+      load,
+      loadRules,
+      onCategorizationChange,
+      previewRuleId,
+      runRulePreview,
+    ]
   );
+
+  const createRuleFromTxn = useCallback(async () => {
+    if (!selectedTxn) return;
+    const category = catsById.get(selectedCategoryId);
+    if (!hasValidCategoryMapping(category)) {
+      setCreateRuleErr("Select a category with a valid COA mapping first.");
+      return;
+    }
+    const contains = (selectedTxn.description || "").trim();
+    if (!contains) {
+      setCreateRuleErr("No description available to build a rule.");
+      return;
+    }
+    setCreateRuleLoading(true);
+    setCreateRuleErr(null);
+    setRulesMsg(null);
+    try {
+      await createCategoryRule(businessId, {
+        contains_text: contains,
+        category_id: selectedCategoryId,
+        priority: 100,
+        direction: selectedTxn.direction || null,
+        account: selectedTxn.account || null,
+        active: true,
+      });
+      setRulesMsg("Rule created from this transaction.");
+      await loadRules();
+      bumpDataVersion();
+    } catch (e: any) {
+      setCreateRuleErr(e?.message ?? "Failed to create rule");
+    } finally {
+      setCreateRuleLoading(false);
+    }
+  }, [
+    bumpDataVersion,
+    businessId,
+    catsById,
+    loadRules,
+    selectedCategoryId,
+    selectedTxn,
+  ]);
 
 
   // When categories arrive/refresh, ensure selection is valid.
@@ -534,11 +676,11 @@ export default function CategorizeTab({
   // On business change, reload
   useEffect(() => {
     load();
-  }, [load]);
+  }, [dataVersion, load]);
 
   useEffect(() => {
     loadRules();
-  }, [loadRules]);
+  }, [dataVersion, loadRules]);
 
   useEffect(() => {
     if (!selectedTxn) return;
@@ -554,6 +696,18 @@ export default function CategorizeTab({
     load();
     loadRules();
   }, [load, loadRules]);
+
+  if (invalidBusinessId) {
+    return <div className={styles.error}>Invalid business id.</div>;
+  }
+
+  if (invalidDateRange) {
+    return (
+      <div className={styles.error}>
+        Invalid date range: {dateRange.start} → {dateRange.end}
+      </div>
+    );
+  }
 
   if (loading) return <div className={styles.loading}>Loading…</div>;
 
@@ -586,6 +740,12 @@ export default function CategorizeTab({
         )}
 
         {loadErr && <div className={styles.error}>Load error: {loadErr}</div>}
+        {missingCoaMappings.length > 0 && (
+          <div className={styles.error}>
+            Missing COA mapping for {missingCoaMappings.length} categories. Fix Chart of
+            Accounts before categorizing.
+          </div>
+        )}
 
         {metrics && (
           <div className={styles.metricsPanel}>
@@ -616,7 +776,9 @@ export default function CategorizeTab({
           </div>
         )}
 
-        {filteredTxns.length === 0 ? (
+        {cats.length === 0 ? (
+          <div className={styles.emptyState}>No categories found. Fix your COA mapping first.</div>
+        ) : filteredTxns.length === 0 ? (
           <div className={styles.emptyState}>No uncategorized transactions.</div>
         ) : (
           <div className={styles.txnList}>
@@ -630,7 +792,12 @@ export default function CategorizeTab({
                   selectedTxn?.source_event_id === t.source_event_id ? styles.txnItemActive : ""
                 }`}
               >
-                <div className={styles.txnTitle}>{t.description}</div>
+                <div className={styles.txnTitle}>
+                  {normalizeVendorDisplay(
+                    t.description,
+                    vendorNameByKey.get(t.merchant_key ?? "")?.canonical_name
+                  )}
+                </div>
                 <div className={styles.txnMeta}>
                   {new Date(t.occurred_at).toLocaleString()} • {t.account} • {t.direction} •{" "}
                   {formatAmount(t)}
@@ -661,7 +828,12 @@ export default function CategorizeTab({
           <div className={styles.noSelection}>Select a transaction.</div>
         ) : (
           <>
-            <div className={styles.txnTitle}>{selectedTxn.description}</div>
+            <div className={styles.txnTitle}>
+              {normalizeVendorDisplay(
+                selectedTxn.description,
+                vendorNameByKey.get(selectedTxn.merchant_key ?? "")?.canonical_name
+              )}
+            </div>
             <div className={styles.metaLine}>
               {selectedTxn.direction} • {formatAmount(selectedTxn)} • hint:{" "}
               {selectedTxn.category_hint}
@@ -754,6 +926,14 @@ export default function CategorizeTab({
                 >
                   Save using suggestion
                 </button>
+
+                <button
+                  className={styles.buttonSecondary}
+                  disabled={createRuleLoading || !selectedCategoryId}
+                  onClick={createRuleFromTxn}
+                >
+                  {createRuleLoading ? "Creating rule…" : "Create rule from this"}
+                </button>
               </div>
             </div>
           </>
@@ -773,6 +953,7 @@ export default function CategorizeTab({
 
         {rulesMsg && <div className={styles.message}>{rulesMsg}</div>}
         {rulesErr && <div className={styles.error}>Error: {rulesErr}</div>}
+        {createRuleErr && <div className={styles.error}>Error: {createRuleErr}</div>}
         {previewRuleId && (
           <div className={styles.previewPanel}>
             <div className={styles.previewHeader}>

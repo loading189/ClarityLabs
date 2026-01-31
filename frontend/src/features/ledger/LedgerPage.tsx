@@ -14,6 +14,8 @@ import type { LedgerLine } from "../../api/ledger";
 import { assertBusinessId } from "../../utils/businessId";
 import { useAppState } from "../../app/state/appState";
 import styles from "./LedgerPage.module.css";
+import { getBrainVendors, type BrainVendor } from "../../api/categorize";
+import { normalizeVendorDisplay, normalizeVendorKey } from "../../utils/vendors";
 
 function formatMoney(value: number) {
   const sign = value < 0 ? "-" : "";
@@ -55,13 +57,15 @@ export default function LedgerPage() {
 
   const [filters, setFilters] = useFilters();
   const { data: dashboard } = useDemoDashboard();
-  const { dateRange, setDateRange } = useAppState();
+  const { dateRange, setDateRange, dataVersion } = useAppState();
   useDemoDateRange(filters, setFilters, dashboard?.metadata);
   const range = resolveDateRange(filters);
   useEffect(() => {
     setDateRange(range);
   }, [range.end, range.start, setDateRange]);
   const { lines, loading, err } = useLedgerLines();
+  const [brainVendors, setBrainVendors] = useState<BrainVendor[]>([]);
+  const [vendorErr, setVendorErr] = useState<string | null>(null);
   const [selected, setSelected] = useState<LedgerLine | null>(null);
   const [page, setPage] = useState(1);
 
@@ -90,6 +94,32 @@ export default function LedgerPage() {
       .sort((a, b) => new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime());
   }, [filters.account, filters.category, filters.direction, filters.q, lines]);
 
+  const vendorsByAlias = useMemo(() => {
+    const map = new Map<string, BrainVendor>();
+    brainVendors.forEach((vendor) => {
+      vendor.alias_keys?.forEach((alias) => {
+        map.set(alias, vendor);
+      });
+    });
+    return map;
+  }, [brainVendors]);
+
+  useEffect(() => {
+    if (!businessId) return;
+    setVendorErr(null);
+    getBrainVendors(businessId)
+      .then((vendors) => setBrainVendors(vendors))
+      .catch((e: any) => {
+        console.error("[ledger] vendor fetch failed", {
+          businessId,
+          dateRange,
+          url: `/categorize/business/${businessId}/brain/vendors`,
+          error: e?.message ?? e,
+        });
+        setVendorErr(e?.message ?? "Failed to load vendor mappings");
+      });
+  }, [businessId, dateRange, dataVersion]);
+
   const pageSize = 50;
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, totalPages);
@@ -108,7 +138,11 @@ export default function LedgerPage() {
         <div className={styles.descriptionCell}>
           <div className={styles.descriptionTitle}>{row.description}</div>
           <div className={styles.descriptionMeta}>
-            {row.counterparty_hint ?? "Counterparty unknown"}
+            {normalizeVendorDisplay(
+              row.counterparty_hint ?? row.description,
+              vendorsByAlias.get(normalizeVendorKey(row.counterparty_hint ?? row.description))
+                ?.canonical_name
+            )}
           </div>
         </div>
       ),
@@ -176,6 +210,7 @@ export default function LedgerPage() {
 
       {loading && <LoadingState label="Loading ledger lines…" />}
       {err && <ErrorState label={`Failed to load ledger: ${err}`} />}
+      {vendorErr && <ErrorState label={`Failed to load vendor mappings: ${vendorErr}`} />}
 
       {!loading && !err && (
         <>
