@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import FilterBar from "../../components/common/FilterBar";
 import PageHeader from "../../components/common/PageHeader";
@@ -12,6 +12,7 @@ import { useDemoDashboard } from "../../hooks/useDemoDashboard";
 import { useLedgerLines } from "./useLedgerLines";
 import type { LedgerLine } from "../../api/ledger";
 import { assertBusinessId } from "../../utils/businessId";
+import { useAppState } from "../../app/state/appState";
 import styles from "./LedgerPage.module.css";
 
 function formatMoney(value: number) {
@@ -53,10 +54,14 @@ export default function LedgerPage() {
   }
 
   const [filters, setFilters] = useFilters();
-  const { data: dashboard } = useDemoDashboard(businessId);
+  const { data: dashboard } = useDemoDashboard();
+  const { dateRange, setDateRange } = useAppState();
   useDemoDateRange(filters, setFilters, dashboard?.metadata);
   const range = resolveDateRange(filters);
-  const { lines, loading, err } = useLedgerLines(businessId, range.start, range.end);
+  useEffect(() => {
+    setDateRange(range);
+  }, [range.end, range.start, setDateRange]);
+  const { lines, loading, err } = useLedgerLines();
   const [selected, setSelected] = useState<LedgerLine | null>(null);
   const [page, setPage] = useState(1);
 
@@ -151,7 +156,7 @@ export default function LedgerPage() {
         actions={
           <div className={styles.summary}>
             <span>
-              {range.start} → {range.end}
+              {dateRange.start} → {dateRange.end}
             </span>
             <span>{filtered.length} results</span>
           </div>

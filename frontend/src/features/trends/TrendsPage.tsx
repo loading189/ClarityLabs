@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import PageHeader from "../../components/common/PageHeader";
 import FilterBar from "../../components/common/FilterBar";
@@ -10,6 +10,7 @@ import { ledgerPath } from "../../app/routes/routeUtils";
 import { type MetricSeriesRow, useTrendsData } from "./useTrendsData";
 import { useDemoDashboard } from "../../hooks/useDemoDashboard";
 import { assertBusinessId } from "../../utils/businessId";
+import { useAppState } from "../../app/state/appState";
 import styles from "./TrendsPage.module.css";
 
 type TrendRow = {
@@ -111,9 +112,13 @@ export default function TrendsPage() {
   const businessId = assertBusinessId(businessIdParam, "TrendsPage");
   const navigate = useNavigate();
   const [filters, setFilters] = useFilters();
-  const { data: dashboard } = useDemoDashboard(businessId);
+  const { data: dashboard } = useDemoDashboard();
+  const { setDateRange } = useAppState();
   useDemoDateRange(filters, setFilters, dashboard?.metadata);
   const range = resolveDateRange(filters);
+  useEffect(() => {
+    setDateRange(range);
+  }, [range.end, range.start, setDateRange]);
   const lookbackMonths = monthsBetween(range.start, range.end);
   const { data, loading, err } = useTrendsData(businessId, lookbackMonths, 2.0);
 

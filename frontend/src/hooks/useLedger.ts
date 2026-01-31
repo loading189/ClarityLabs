@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useAppState } from "../app/state/appState";
 import { logRefresh } from "../utils/refreshLog";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:8000";
@@ -56,25 +57,9 @@ function qs(params: Record<string, string | number | undefined | null>) {
   return s ? `?${s}` : "";
 }
 
-function todayISO() {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
-
-function daysAgoISO(days: number) {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
-
-export function useLedger(businessId: string, opts?: { days?: number; limit?: number }) {
-  const days = opts?.days ?? 30;
+export function useLedger(opts?: { limit?: number }) {
+  const { activeBusinessId, dateRange, dataVersion } = useAppState();
+  const businessId = activeBusinessId ?? "";
   const limit = opts?.limit ?? 500;
 
   const [lines, setLines] = useState<LedgerLine[] | null>(null);
@@ -85,8 +70,8 @@ export function useLedger(businessId: string, opts?: { days?: number; limit?: nu
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const start_date = daysAgoISO(days);
-  const end_date = todayISO();
+  const start_date = dateRange.start;
+  const end_date = dateRange.end;
   const as_of = end_date;
 
   const refresh = useCallback(async () => {
@@ -138,7 +123,7 @@ export function useLedger(businessId: string, opts?: { days?: number; limit?: nu
     } finally {
       setLoading(false);
     }
-  }, [businessId, start_date, end_date, limit, as_of]);
+  }, [businessId, start_date, end_date, limit, as_of, dataVersion]);
 
   useEffect(() => {
     refresh();

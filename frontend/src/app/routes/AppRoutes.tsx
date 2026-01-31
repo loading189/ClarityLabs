@@ -14,6 +14,7 @@ import TrendsPage from "../../features/trends/TrendsPage";
 import VendorsPage from "./VendorsPage";
 import AppIndexRedirect from "./AppIndexRedirect";
 import BusinessSelectPage from "./BusinessSelectPage";
+import OnboardingWizardPage from "./OnboardingWizardPage";
 
 export default function AppRoutes() {
   return (
@@ -23,6 +24,7 @@ export default function AppRoutes() {
       {/* entry */}
       <Route path="/app" element={<AppIndexRedirect />} />
       <Route path="/app/select" element={<BusinessSelectPage />} />
+      <Route path="/onboarding" element={<OnboardingWizardPage />} />
 
       {/* workspace */}
       <Route path="/app/:businessId" element={<AppLayout />}>

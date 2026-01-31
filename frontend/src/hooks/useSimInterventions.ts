@@ -6,8 +6,11 @@ import {
   patchSimIntervention,
 } from "../api/simulator";
 import type { InterventionCreate, InterventionOut, InterventionPatch } from "../api/simulator";
+import { useAppState } from "../app/state/appState";
 
-export function useSimInterventions(businessId: string | null | undefined) {
+export function useSimInterventions() {
+  const { activeBusinessId, dataVersion } = useAppState();
+  const businessId = activeBusinessId ?? null;
   const [data, setData] = useState<InterventionOut[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -29,7 +32,7 @@ export function useSimInterventions(businessId: string | null | undefined) {
         setLoading(false);
       }
     },
-    [businessId]
+    [businessId, dataVersion]
   );
 
   const create = useCallback(

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchDashboard } from "../../api/demo";
 import { assertBusinessId } from "../../utils/businessId";
+import { useAppState } from "../state/appState";
 
 type Card = {
   business_id: string;
@@ -12,6 +13,7 @@ type Card = {
 
 export default function BusinessSelectPage() {
   const navigate = useNavigate();
+  const { setActiveBusinessId } = useAppState();
   const [cards, setCards] = useState<Card[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -38,6 +40,7 @@ export default function BusinessSelectPage() {
   const handleSelect = (rawId: string) => {
     const id = assertBusinessId(rawId, "BusinessSelectPage");
     if (!id) return;
+    setActiveBusinessId(id);
     navigate(`/app/${id}/dashboard`);
   };
 

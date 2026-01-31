@@ -39,7 +39,7 @@ export default function DashboardTab({
   businessId: string;
   onNavigate?: (target: "categorize", drilldown?: CategorizeDrilldown | null) => void;
 }) {
-  const { data, loading, err, refresh } = useDemoDashboard(businessId);
+  const { data, loading, err, refresh } = useDemoDashboard();
   const signals = data?.signals ?? [];
 
   const [selectedKey, setSelectedKey] = useState<string | null>(signals[0]?.key ?? null);
