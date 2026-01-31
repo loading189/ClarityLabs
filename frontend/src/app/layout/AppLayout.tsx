@@ -1,7 +1,9 @@
 // frontend/src/app/layout/AppLayout.tsx
+import { useEffect } from "react";
 import { NavLink, Outlet, useParams } from "react-router-dom";
 import styles from "./AppLayout.module.css";
 import { assertBusinessId } from "../../utils/businessId";
+import { useAppState } from "../state/appState";
 
 type NavItem = { label: string; path: string };
 
@@ -52,6 +54,11 @@ function NavSection({
 export default function AppLayout() {
   const { businessId: businessIdParam } = useParams();
   const businessId = assertBusinessId(businessIdParam, "AppLayout");
+  const { setActiveBusinessId } = useAppState();
+
+  useEffect(() => {
+    setActiveBusinessId(businessId || null);
+  }, [businessId, setActiveBusinessId]);
 
   if (!businessId) {
     return (

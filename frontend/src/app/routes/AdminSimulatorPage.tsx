@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
 import PageHeader from "../../components/common/PageHeader";
 import { ErrorState, LoadingState } from "../../components/common/DataState";
-import { assertBusinessId } from "../../utils/businessId";
 import {
   generateSimHistory,
   getInterventionLibrary,
@@ -15,6 +13,7 @@ import { useBusinessStatus } from "../../hooks/useBusinessStatus";
 import { useSimPlan } from "../../hooks/useSimPlan";
 import { useSimInterventions } from "../../hooks/useSimInterventions";
 import styles from "./AdminSimulatorPage.module.css";
+import { useAppState } from "../state/appState";
 
 function todayISO() {
   const d = new Date();
@@ -77,22 +76,22 @@ function extractPlanDefaults(catalog: ScenarioCatalog | null, scenarioId: string
 }
 
 export default function AdminSimulatorPage() {
-  const { businessId: businessIdParam } = useParams();
-  const businessId = assertBusinessId(businessIdParam, "AdminSimulatorPage");
+  const { activeBusinessId, bumpDataVersion } = useAppState();
+  const businessId = activeBusinessId ?? "";
 
   const {
     data: status,
     loading: statusLoading,
     err: statusErr,
     refresh: refreshStatus,
-  } = useBusinessStatus(businessId);
+  } = useBusinessStatus();
   const {
     data: plan,
     loading: planLoading,
     err: planErr,
     refresh: refreshPlan,
     updatePlan,
-  } = useSimPlan(businessId);
+  } = useSimPlan();
   const {
     data: interventions,
     loading: interventionsLoading,
@@ -100,7 +99,7 @@ export default function AdminSimulatorPage() {
     create: createIntervention,
     update: updateIntervention,
     remove: removeIntervention,
-  } = useSimInterventions(businessId);
+  } = useSimInterventions();
 
   const [catalog, setCatalog] = useState<ScenarioCatalog | null>(null);
   const [catalogLoading, setCatalogLoading] = useState(false);
@@ -367,6 +366,7 @@ export default function AdminSimulatorPage() {
       const result = await generateSimHistory(businessId, payload);
       setGenerateResult(result);
       window.dispatchEvent(new Event("clarity:data-updated"));
+      bumpDataVersion();
       refreshStatus();
     } catch (e: any) {
       setGenerateErr(e?.message ?? "Failed to generate history");

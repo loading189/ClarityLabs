@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { getSimPlan, putSimPlan } from "../api/simulator";
 import type { SimPlanOut, SimPlanUpsert } from "../api/simulator";
+import { useAppState } from "../app/state/appState";
 
-export function useSimPlan(businessId: string | null | undefined) {
+export function useSimPlan() {
+  const { activeBusinessId, dataVersion } = useAppState();
+  const businessId = activeBusinessId ?? null;
   const [data, setData] = useState<SimPlanOut | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -24,7 +27,7 @@ export function useSimPlan(businessId: string | null | undefined) {
         setLoading(false);
       }
     },
-    [businessId]
+    [businessId, dataVersion]
   );
 
   const updatePlan = useCallback(

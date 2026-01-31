@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { getBusinessStatus } from "../api/onboarding";
 import type { BusinessStatusOut } from "../api/onboarding";
+import { useAppState } from "../app/state/appState";
 
-export function useBusinessStatus(businessId: string | null) {
+export function useBusinessStatus() {
+  const { activeBusinessId, dataVersion } = useAppState();
+  const businessId = activeBusinessId ?? null;
   const [data, setData] = useState<BusinessStatusOut | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -23,7 +26,7 @@ export function useBusinessStatus(businessId: string | null) {
         setLoading(false);
       }
     },
-    [businessId]
+    [businessId, dataVersion]
   );
 
   useEffect(() => {

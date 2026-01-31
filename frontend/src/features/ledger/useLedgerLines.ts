@@ -1,13 +1,12 @@
 // frontend/src/features/ledger/useLedgerLines.ts
 import { useEffect, useState } from "react";
 import { fetchLedgerLines, type LedgerLine } from "../../api/ledger";
+import { useAppState } from "../../app/state/appState";
 
-export function useLedgerLines(
-  businessId: string,
-  startDate: string,
-  endDate: string,
-  limit = 2000
-) {
+export function useLedgerLines(limit = 2000) {
+  const { activeBusinessId, dateRange, dataVersion } = useAppState();
+  const businessId = activeBusinessId ?? "";
+  const { start: startDate, end: endDate } = dateRange;
   const [lines, setLines] = useState<LedgerLine[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -45,7 +44,7 @@ export function useLedgerLines(
       alive = false;
       controller.abort();
     };
-  }, [businessId, startDate, endDate, limit]);
+  }, [businessId, startDate, endDate, limit, dataVersion]);
 
   return { lines, loading, err };
 }

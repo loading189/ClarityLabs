@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useDemoDashboard } from "../../hooks/useDemoDashboard";
 import { useBusinessDetailData } from "../../hooks/useBusinessDetailData";
@@ -8,6 +9,7 @@ import PageHeader from "../../components/common/PageHeader";
 import { ErrorState, LoadingState } from "../../components/common/DataState";
 import { ledgerPath } from "./routeUtils";
 import { assertBusinessId } from "../../utils/businessId";
+import { useAppState } from "../state/appState";
 import styles from "./HomePage.module.css";
 
 function formatMoney(value?: number | null) {
@@ -19,9 +21,14 @@ export default function HomePage() {
   const { businessId: businessIdParam } = useParams();
   const businessId = assertBusinessId(businessIdParam, "HomePage");
   const [filters, setFilters] = useFilters();
-  const { data: dashboard, loading, err } = useDemoDashboard(businessId);
+  const { data: dashboard, loading, err } = useDemoDashboard();
   const { data: detail } = useBusinessDetailData(businessId);
+  const { setDateRange } = useAppState();
   useDemoDateRange(filters, setFilters, dashboard?.metadata);
+  useEffect(() => {
+    if (!filters.start || !filters.end) return;
+    setDateRange({ start: filters.start, end: filters.end });
+  }, [filters.end, filters.start, setDateRange]);
 
   const topSignals = (detail?.health_signals ?? []).slice(0, 4);
   const ledgerLink = ledgerPath(businessId, filters);

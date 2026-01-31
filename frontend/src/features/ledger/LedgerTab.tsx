@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLedger } from "../../hooks/useLedger";
+import { useAppState } from "../../app/state/appState";
 import styles from "./LedgerTab.module.css";
 
 export type LedgerDrilldown = {
@@ -16,6 +17,23 @@ function fmtMoney(n: number) {
 
 function Chip({ label }: { label: string }) {
   return <span className={styles.chip}>{label}</span>;
+}
+
+function todayISO() {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function daysAgoISO(days: number) {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 function StatCard({
@@ -39,19 +57,27 @@ function StatCard({
 }
 
 export function LedgerTab({
-  businessId,
   drilldown,
   refreshToken,
   onClearDrilldown,
 }: {
-  businessId: string;
   drilldown?: LedgerDrilldown | null;
   refreshToken?: number;
   onClearDrilldown?: () => void;
 }) {
   const [days, setDays] = useState(30);
-  const { lines, incomeStatement, cashFlow, balanceSheet, loading, err, refresh, start_date, end_date } =
-    useLedger(businessId, { days, limit: 1000 });
+  const { setDateRange } = useAppState();
+  const {
+    lines,
+    incomeStatement,
+    cashFlow,
+    balanceSheet,
+    loading,
+    err,
+    refresh,
+    start_date,
+    end_date,
+  } = useLedger({ limit: 1000 });
 
   useEffect(() => {
     if (!drilldown) {
@@ -63,6 +89,10 @@ export function LedgerTab({
       drilldown.date_preset === "365d" ? 365 : drilldown.date_preset === "90d" ? 90 : 30;
     setDays(nextDays);
   }, [drilldown]);
+
+  useEffect(() => {
+    setDateRange({ start: daysAgoISO(days), end: todayISO() });
+  }, [days, setDateRange]);
 
   useEffect(() => {
     if (!refreshToken) return;

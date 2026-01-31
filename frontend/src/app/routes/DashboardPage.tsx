@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import PageHeader from "../../components/common/PageHeader";
 import FilterBar from "../../components/common/FilterBar";
@@ -9,6 +10,7 @@ import { monthBounds } from "../filters/filters";
 import { useDemoDateRange } from "../filters/useDemoDateRange";
 import { assertBusinessId } from "../../utils/businessId";
 import styles from "./DashboardPage.module.css";
+import { useAppState } from "../state/appState";
 
 function formatMoney(value?: number | null) {
   if (value == null) return "—";
@@ -20,8 +22,13 @@ export default function DashboardPage() {
   const businessId = assertBusinessId(businessIdParam, "DashboardPage");
   const navigate = useNavigate();
   const [filters, setFilters] = useFilters();
-  const { data, loading, err } = useDemoDashboard(businessId);
+  const { data, loading, err } = useDemoDashboard();
+  const { setDateRange } = useAppState();
   useDemoDateRange(filters, setFilters, data?.metadata);
+  useEffect(() => {
+    if (!filters.start || !filters.end) return;
+    setDateRange({ start: filters.start, end: filters.end });
+  }, [filters.end, filters.start, setDateRange]);
 
   const series =
     (data?.trends?.metrics?.net?.series ??

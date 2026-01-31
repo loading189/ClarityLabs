@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchBusinessDashboard } from "../api/demo";
 import type { DashboardDetail } from "../types";
+import { useAppState } from "../app/state/appState";
 
-export function useDemoDashboard(businessId: string) {
+export function useDemoDashboard() {
+  const { activeBusinessId, dataVersion } = useAppState();
+  const businessId = activeBusinessId ?? "";
   const [data, setData] = useState<DashboardDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -30,7 +33,7 @@ export function useDemoDashboard(businessId: string) {
         setLoading(false);
       }
     }
-  }, [businessId]);
+  }, [businessId, dataVersion]);
 
   useEffect(() => {
     if (!businessId) return;

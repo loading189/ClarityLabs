@@ -268,7 +268,6 @@ export default function DetailPanel({
           {mode === "ledger" && (
             <LedgerTab
               key={`led-${selectedId}-${refreshKey}`}
-              businessId={selectedId}
               drilldown={ledgerDrilldown}
               refreshToken={ledgerRefreshToken}
               onClearDrilldown={() => setLedgerDrilldown(null)}

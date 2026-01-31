@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import PageHeader from "../../components/common/PageHeader";
 import FilterBar from "../../components/common/FilterBar";
@@ -11,6 +11,7 @@ import { ledgerPath } from "./routeUtils";
 import { useLedgerLines } from "../../features/ledger/useLedgerLines";
 import { useDemoDashboard } from "../../hooks/useDemoDashboard";
 import { assertBusinessId } from "../../utils/businessId";
+import { useAppState } from "../state/appState";
 import styles from "./VendorsPage.module.css";
 
 type VendorSummary = {
@@ -29,10 +30,14 @@ export default function VendorsPage() {
   const businessId = assertBusinessId(businessIdParam, "VendorsPage");
   const navigate = useNavigate();
   const [filters, setFilters] = useFilters();
-  const { data: dashboard } = useDemoDashboard(businessId);
+  const { data: dashboard } = useDemoDashboard();
+  const { setDateRange } = useAppState();
   useDemoDateRange(filters, setFilters, dashboard?.metadata);
   const range = resolveDateRange(filters);
-  const { lines, loading, err } = useLedgerLines(businessId, range.start, range.end);
+  useEffect(() => {
+    setDateRange(range);
+  }, [range.end, range.start, setDateRange]);
+  const { lines, loading, err } = useLedgerLines();
 
   const vendorRows = useMemo(() => {
     const map = new Map<string, VendorSummary>();
