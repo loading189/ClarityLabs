@@ -1,6 +1,7 @@
+// frontend/src/app/routes/AppIndexRedirect.tsx
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { fetchBusinessDashboard, fetchDashboard } from "../../api/demo";
+import { fetchDashboard, fetchBusinessDashboard } from "../../api/demo";
 import { assertBusinessId } from "../../utils/businessId";
 
 export default function AppIndexRedirect() {
@@ -9,26 +10,35 @@ export default function AppIndexRedirect() {
   useEffect(() => {
     const controller = new AbortController();
 
-    const redirect = async () => {
+    const run = async () => {
       try {
         const list = await fetchDashboard(controller.signal);
-        const candidateId = assertBusinessId(list.cards[0]?.business_id, "AppIndexRedirect");
-        if (!candidateId) return;
-        const detail = await fetchBusinessDashboard(candidateId, controller.signal);
-        const resolvedId = assertBusinessId(
-          detail.metadata?.business_id,
+        const candidate = assertBusinessId(list?.cards?.[0]?.business_id, "AppIndexRedirect list");
+        if (!candidate) {
+          navigate("/app/select", { replace: true });
+          return;
+        }
+
+        const detail = await fetchBusinessDashboard(candidate, controller.signal);
+        const resolved = assertBusinessId(
+          detail?.metadata?.business_id ?? candidate,
           "AppIndexRedirect dashboard metadata"
         );
-        if (!resolvedId) return;
-        navigate(`/app/${resolvedId}/dashboard`, { replace: true });
-      } catch (e: unknown) {
+
+        if (!resolved) {
+          navigate("/app/select", { replace: true });
+          return;
+        }
+
+        navigate(`/app/${resolved}/dashboard`, { replace: true });
+      } catch (e: any) {
         if (e instanceof DOMException && e.name === "AbortError") return;
-        console.error("[AppIndexRedirect] Failed to resolve business.", e);
+        console.error("[AppIndexRedirect] failed", e);
+        navigate("/app/select", { replace: true });
       }
     };
 
-    redirect();
-
+    run();
     return () => controller.abort();
   }, [navigate]);
 
