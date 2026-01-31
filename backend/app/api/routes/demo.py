@@ -53,6 +53,8 @@ class DashboardMetadataOut(BaseModel):
     name: str
     as_of: str
     last_event_occurred_at: Optional[str] = None
+    start_at: Optional[str] = None
+    end_at: Optional[str] = None
 
 
 class DashboardKpisOut(BaseModel):
@@ -216,6 +218,24 @@ def _compute_health_from_txns(txns: List[Any]):
     breakdown = compute_business_score(scoring_input, signals_dicts)
 
     return facts_obj, facts_json, scoring_input, signals, signals_dicts, breakdown, ledger
+
+
+def _resolve_demo_date_range(txns: List[Any], ledger: List[Any]) -> Tuple[Optional[str], Optional[str]]:
+    dates: List[Any] = []
+    for row in ledger or []:
+        row_date = getattr(row, "date", None)
+        if row_date:
+            dates.append(row_date)
+    if not dates:
+        for txn in txns:
+            txn_date = getattr(txn, "date", None)
+            if txn_date:
+                dates.append(txn_date)
+    if not dates:
+        return None, None
+    start_at = min(dates)
+    end_at = max(dates)
+    return start_at.isoformat(), end_at.isoformat()
 
 
 def _attach_signal_refs(signals_dicts: List[dict], pairs: List[Tuple[RawEvent, Any]]) -> List[dict]:
@@ -501,6 +521,7 @@ def demo_dashboard_by_business(
     txns = [t for _e, t in pairs]
 
     _facts_obj, facts_json, _scoring_input, signals, _signals_dicts, _breakdown, ledger = _compute_health_from_txns(txns)
+    start_at, end_at = _resolve_demo_date_range(txns, ledger)
     ledger_rows = [
         {
             "occurred_at": r.occurred_at.isoformat(),
@@ -527,6 +548,8 @@ def demo_dashboard_by_business(
             last_event_occurred_at=None
             if not last_event_occurred_at
             else last_event_occurred_at.isoformat(),
+            start_at=start_at,
+            end_at=end_at,
         ),
         kpis=_dashboard_kpis(facts_json),
         signals=_build_dashboard_signals(signals, facts_json),
@@ -547,6 +570,7 @@ def demo_health_by_business(business_id: str, db: Session = Depends(get_db)):
     txns = [t for _e, t in pairs]
 
     _facts_obj, facts_json, scoring_input, signals, signals_dicts, breakdown, ledger = _compute_health_from_txns(txns)
+    start_at, end_at = _resolve_demo_date_range(txns, ledger)
     sig_out = _attach_signal_refs(signals_dicts, pairs)
 
     ledger_rows = [
@@ -599,6 +623,8 @@ def demo_health_by_business(business_id: str, db: Session = Depends(get_db)):
         "name": biz.name,
         "as_of": _now_iso(),
         "last_event_occurred_at": None if not last_event_occurred_at else last_event_occurred_at.isoformat(),
+        "start_at": start_at,
+        "end_at": end_at,
         "risk": breakdown.risk,
         "health_score": breakdown.overall,
         "score_breakdown": {
