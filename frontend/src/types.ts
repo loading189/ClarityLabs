@@ -11,13 +11,13 @@ export type DashboardCard = {
 };
 
 export type DashboardKpis = {
-  current_cash: number;
-  last_30d_inflow: number;
-  last_30d_outflow: number;
-  last_30d_net: number;
-  prev_30d_inflow: number;
-  prev_30d_outflow: number;
-  prev_30d_net: number;
+  current_cash: TracedMetric;
+  last_30d_inflow: TracedMetric;
+  last_30d_outflow: TracedMetric;
+  last_30d_net: TracedMetric;
+  prev_30d_inflow: TracedMetric;
+  prev_30d_outflow: TracedMetric;
+  prev_30d_net: TracedMetric;
 };
 
 export type DashboardSignalDrilldown = {
@@ -60,6 +60,37 @@ export type DashboardDetail = {
   kpis: DashboardKpis;
   signals: DashboardSignal[];
   trends: DashboardTrends;
+  analytics: AnalyticsPayload;
+};
+
+export type TraceBundle = {
+  supporting_event_ids: string[];
+  supporting_line_count: number;
+  computation_version: string;
+  features_snapshot: Record<string, any>;
+};
+
+export type TracedMetric = {
+  value: number;
+  trace: TraceBundle;
+};
+
+export type AnalyticsSeriesRow = {
+  month: string;
+  inflow: TracedMetric;
+  outflow: TracedMetric;
+  net: TracedMetric;
+  cash_end: TracedMetric;
+};
+
+export type AnalyticsPayload = {
+  computation_version: string;
+  kpis: DashboardKpis;
+  series: AnalyticsSeriesRow[];
+  category_breakdown: Array<Record<string, any>>;
+  vendor_concentration: Array<Record<string, any>>;
+  anomalies: Array<Record<string, any>>;
+  change_explanations: Record<string, any>;
 };
 
 export type DrilldownRow = {

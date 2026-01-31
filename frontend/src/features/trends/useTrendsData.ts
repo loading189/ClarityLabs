@@ -1,35 +1,16 @@
 import { useEffect, useState } from "react";
 import { fetchMonthlyTrends } from "../../api/demo";
-
-export type TrendRow = {
-  month: string;
-  inflow: number;
-  outflow: number;
-  net: number;
-  cash_end: number;
-};
-
-export type MetricSeriesRow = {
-  month: string;
-  inflow: number;
-  outflow: number;
-  net: number;
-  cash_end: number;
-  value?: number;
-};
-
-export type MetricTrend = {
-  series: MetricSeriesRow[];
-};
+import { useAppState } from "../../app/state/appState";
+import type { AnalyticsPayload } from "../../types";
 
 export type MonthlyTrendsResponse = {
   business_id: string;
   name: string;
-  metrics?: Record<string, MetricTrend>;
-  series?: TrendRow[];
+  analytics?: AnalyticsPayload;
 };
 
 export function useTrendsData(businessId: string, lookbackMonths: number, k = 2.0) {
+  const { dataVersion } = useAppState();
   const [data, setData] = useState<MonthlyTrendsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -52,7 +33,7 @@ export function useTrendsData(businessId: string, lookbackMonths: number, k = 2.
       .finally(() => setLoading(false));
 
     return () => controller.abort();
-  }, [businessId, k, lookbackMonths]);
+  }, [businessId, dataVersion, k, lookbackMonths]);
 
   return { data, loading, err };
 }

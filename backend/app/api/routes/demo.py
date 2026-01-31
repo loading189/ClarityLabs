@@ -34,6 +34,7 @@ from backend.app.models import Business, CategoryRule, RawEvent, TxnCategorizati
 from backend.app.norma.category_engine import suggest_category
 from backend.app.norma.facts import compute_facts, facts_to_dict
 from backend.app.norma.from_events import raw_event_to_txn
+from backend.app.services import analytics_service
 from backend.app.norma.ledger import build_cash_ledger
 from backend.app.norma.merchant import merchant_key
 from backend.app.norma.categorize_brain import brain
@@ -58,13 +59,13 @@ class DashboardMetadataOut(BaseModel):
 
 
 class DashboardKpisOut(BaseModel):
-    current_cash: float
-    last_30d_inflow: float
-    last_30d_outflow: float
-    last_30d_net: float
-    prev_30d_inflow: float
-    prev_30d_outflow: float
-    prev_30d_net: float
+    current_cash: Dict[str, Any]
+    last_30d_inflow: Dict[str, Any]
+    last_30d_outflow: Dict[str, Any]
+    last_30d_net: Dict[str, Any]
+    prev_30d_inflow: Dict[str, Any]
+    prev_30d_outflow: Dict[str, Any]
+    prev_30d_net: Dict[str, Any]
 
 
 class DashboardSignalDrilldownOut(BaseModel):
@@ -95,11 +96,22 @@ class DashboardTrendsOut(BaseModel):
     current: Optional[Dict[str, Any]] = None
 
 
+class AnalyticsPayloadOut(BaseModel):
+    computation_version: str
+    kpis: Dict[str, Any]
+    series: List[Dict[str, Any]]
+    category_breakdown: List[Dict[str, Any]]
+    vendor_concentration: List[Dict[str, Any]]
+    anomalies: List[Dict[str, Any]]
+    change_explanations: Dict[str, Any]
+
+
 class DashboardPayloadOut(BaseModel):
     metadata: DashboardMetadataOut
     kpis: DashboardKpisOut
     signals: List[DashboardSignalOut]
     trends: DashboardTrendsOut
+    analytics: AnalyticsPayloadOut
 
 
 class DrilldownRowOut(BaseModel):
@@ -330,18 +342,9 @@ def _build_uncategorized_examples(txns: List[Dict[str, Any]], limit: int = 4) ->
     return examples
 
 
-def _dashboard_kpis(facts_json: Dict[str, Any]) -> DashboardKpisOut:
-    windows = (facts_json.get("windows") or {}).get("windows") or {}
-    window_30 = windows.get("30") or {}
-    return DashboardKpisOut(
-        current_cash=float(facts_json.get("current_cash") or 0.0),
-        last_30d_inflow=float(window_30.get("last_inflow") or 0.0),
-        last_30d_outflow=float(window_30.get("last_outflow") or 0.0),
-        last_30d_net=float(window_30.get("last_net") or 0.0),
-        prev_30d_inflow=float(window_30.get("prev_inflow") or 0.0),
-        prev_30d_outflow=float(window_30.get("prev_outflow") or 0.0),
-        prev_30d_net=float(window_30.get("prev_net") or 0.0),
-    )
+def _dashboard_kpis(analytics_payload: Dict[str, Any]) -> DashboardKpisOut:
+    kpis = analytics_payload.get("kpis") or {}
+    return DashboardKpisOut(**kpis)
 
 
 def _primary_spend_category(facts_json: Dict[str, Any]) -> Optional[str]:
@@ -443,32 +446,36 @@ def demo_monthly_trends_by_business(
     )
     txns = [t for _e, t in pairs]
 
-    # compute facts_json
     _facts_obj, facts_json, _scoring_input, _signals, _signals_dicts, _breakdown, ledger = _compute_health_from_txns(txns)
-
-    # build full ledger rows for cash_end
-    ledger_rows = [
-        {
-            "occurred_at": r.occurred_at.isoformat(),
-            "date": r.date.isoformat(),
-            "amount": float(r.amount),
-            "balance": float(r.balance),
-            "source_event_id": r.source_event_id,
-        }
-        for r in ledger
-    ]
+    start_at, end_at = _resolve_demo_date_range(txns, ledger)
+    analytics_payload = analytics_service.build_trends_analytics(
+        txns,
+        start_at=start_at,
+        end_at=end_at,
+        lookback_months=lookback_months,
+    )
 
     payload = build_monthly_trends_payload(
         facts_json=facts_json,
         lookback_months=lookback_months,
         k=k,
-        ledger_rows=ledger_rows,
+        ledger_rows=[
+            {
+                "occurred_at": r.occurred_at.isoformat(),
+                "date": r.date.isoformat(),
+                "amount": float(r.amount),
+                "balance": float(r.balance),
+                "source_event_id": r.source_event_id,
+            }
+            for r in ledger
+        ],
     )
 
     return {
         "business_id": str(biz.id),
         "name": biz.name,
         **payload,
+        "analytics": analytics_payload,
     }
 
 
@@ -539,6 +546,12 @@ def demo_dashboard_by_business(
         k=k,
         ledger_rows=ledger_rows,
     )
+    analytics_payload = analytics_service.build_dashboard_analytics(
+        txns,
+        start_at=start_at,
+        end_at=end_at,
+        lookback_months=lookback_months,
+    )
 
     return DashboardPayloadOut(
         metadata=DashboardMetadataOut(
@@ -551,9 +564,10 @@ def demo_dashboard_by_business(
             start_at=start_at,
             end_at=end_at,
         ),
-        kpis=_dashboard_kpis(facts_json),
+        kpis=_dashboard_kpis(analytics_payload),
         signals=_build_dashboard_signals(signals, facts_json),
         trends=DashboardTrendsOut(**trends_payload),
+        analytics=AnalyticsPayloadOut(**analytics_payload),
     )
 
 
