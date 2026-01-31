@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAppState } from "../app/state/appState";
+import { isValidIsoDate } from "../app/filters/filters";
 import { logRefresh } from "../utils/refreshLog";
+import { isBusinessIdValid } from "../utils/businessId";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:8000";
 
@@ -61,6 +63,7 @@ export function useLedger(opts?: { limit?: number }) {
   const { activeBusinessId, dateRange, dataVersion } = useAppState();
   const businessId = activeBusinessId ?? "";
   const limit = opts?.limit ?? 500;
+  const safeLimit = Math.min(Math.max(limit, 1), 2000);
 
   const [lines, setLines] = useState<LedgerLine[] | null>(null);
   const [is, setIS] = useState<IncomeStatement | null>(null);
@@ -76,6 +79,18 @@ export function useLedger(opts?: { limit?: number }) {
 
   const refresh = useCallback(async () => {
     if (!businessId) return;
+    if (!isBusinessIdValid(businessId)) {
+      setErr("Invalid business id. Please re-select a business.");
+      return;
+    }
+    if (!start_date || !end_date || !isValidIsoDate(start_date) || !isValidIsoDate(end_date)) {
+      setErr(`Invalid date range: ${start_date ?? "?"} → ${end_date ?? "?"}`);
+      return;
+    }
+    if (start_date > end_date) {
+      setErr(`Invalid date range: ${start_date} → ${end_date}`);
+      return;
+    }
 
     setLoading(true);
     setErr(null);
@@ -84,7 +99,7 @@ export function useLedger(opts?: { limit?: number }) {
       logRefresh("ledger", "refresh");
       const linesUrl =
         `${API_BASE}/ledger/business/${businessId}/lines` +
-        qs({ start_date, end_date, limit });
+        qs({ start_date, end_date, limit: safeLimit });
 
       const isUrl =
         `${API_BASE}/ledger/business/${businessId}/income_statement` +
@@ -123,7 +138,7 @@ export function useLedger(opts?: { limit?: number }) {
     } finally {
       setLoading(false);
     }
-  }, [businessId, start_date, end_date, limit, as_of, dataVersion]);
+  }, [businessId, start_date, end_date, safeLimit, as_of, dataVersion]);
 
   useEffect(() => {
     refresh();

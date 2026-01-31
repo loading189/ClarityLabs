@@ -2,6 +2,10 @@ import hashlib
 import json
 import random
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
+import sys
+
+sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 from backend.app.analytics.core import (
     compute_cash_summary,
@@ -10,6 +14,7 @@ from backend.app.analytics.core import (
     compute_vendor_concentration,
     line_from_txn,
 )
+from backend.app.services import analytics_service
 from backend.app.norma.categorize import categorize_txn
 from backend.app.norma.from_events import raw_event_to_txn
 from backend.app.sim.engine import build_scenario, generate_raw_events_for_scenario
@@ -68,11 +73,11 @@ def _build_lines(seed: int, days: int):
         for e in raw_events
     ]
     lines = [line_from_txn(txn) for txn in txns]
-    return lines, scenario
+    return lines, scenario, txns
 
 
 def test_analytics_core_invariants_restaurant():
-    lines, scenario = _build_lines(seed=1337, days=90)
+    lines, scenario, _txns = _build_lines(seed=1337, days=90)
     assert lines
 
     start_date = min(line.occurred_at.date() for line in lines)
@@ -120,3 +125,56 @@ def test_analytics_core_invariants_restaurant():
     vendor_totals = compute_vendor_concentration(lines)
     vendor_outflow = sum(row["outflow"]["value"] for row in vendor_totals)
     assert abs(vendor_outflow - summary["outflow"]["value"]) < 0.01
+
+
+def test_analytics_core_contract_guards():
+    lines_a, _scenario, txns = _build_lines(seed=1337, days=90)
+    lines_b, _scenario_b, _txns_b = _build_lines(seed=1337, days=90)
+
+    assert [line.source_event_id for line in lines_a] == [
+        line.source_event_id for line in lines_b
+    ]
+    assert [(line.occurred_at, line.source_event_id) for line in lines_a] == sorted(
+        [(line.occurred_at, line.source_event_id) for line in lines_a]
+    )
+
+    line_by_id = {line.source_event_id: line for line in lines_a}
+    assert line_by_id
+    for txn in txns:
+        line = line_by_id.get(txn.source_event_id)
+        assert line is not None
+        if txn.direction == "inflow":
+            assert line.signed_amount >= 0
+        else:
+            assert line.signed_amount <= 0
+        assert abs(abs(line.signed_amount) - float(txn.amount or 0.0)) < 0.01
+
+    dashboard_payload = analytics_service.build_dashboard_analytics(
+        txns,
+        start_at=min(line.occurred_at.date() for line in lines_a),
+        end_at=max(line.occurred_at.date() for line in lines_a),
+        lookback_months=12,
+    )
+    trends_payload = analytics_service.build_trends_analytics(
+        txns,
+        start_at=min(line.occurred_at.date() for line in lines_a),
+        end_at=max(line.occurred_at.date() for line in lines_a),
+        lookback_months=12,
+    )
+
+    for key in [
+        "computation_version",
+        "kpis",
+        "series",
+        "category_breakdown",
+        "vendor_concentration",
+        "anomalies",
+        "change_explanations",
+    ]:
+        assert key in dashboard_payload
+
+    for key in ["current_cash", "last_30d_inflow", "last_30d_outflow", "last_30d_net"]:
+        assert key in dashboard_payload["kpis"]
+
+    assert "series" in trends_payload
+    assert "computation_version" in trends_payload

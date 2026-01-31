@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { fetchMonthlyTrends } from "../api/demo";
 import { logRefresh } from "../utils/refreshLog";
+import { isBusinessIdValid } from "../utils/businessId";
 
 export function useMonthlyTrends(businessId: string | null, lookbackMonths = 12, k = 2.0) {
   const [data, setData] = useState<any>(null);
@@ -9,6 +10,10 @@ export function useMonthlyTrends(businessId: string | null, lookbackMonths = 12,
 
   async function refresh() {
     if (!businessId) return;
+    if (!isBusinessIdValid(businessId)) {
+      setErr("Invalid business id. Please re-select a business.");
+      return;
+    }
     setLoading(true);
     setErr(null);
     try {

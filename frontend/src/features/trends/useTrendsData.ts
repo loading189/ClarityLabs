@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { fetchMonthlyTrends } from "../../api/demo";
 import { useAppState } from "../../app/state/appState";
 import type { AnalyticsPayload } from "../../types";
+import { isBusinessIdValid } from "../../utils/businessId";
 
 export type MonthlyTrendsResponse = {
   business_id: string;
@@ -17,6 +18,10 @@ export function useTrendsData(businessId: string, lookbackMonths: number, k = 2.
 
   useEffect(() => {
     if (!businessId) return;
+    if (!isBusinessIdValid(businessId)) {
+      setErr("Invalid business id. Please re-select a business.");
+      return;
+    }
     const controller = new AbortController();
     setLoading(true);
     setErr(null);

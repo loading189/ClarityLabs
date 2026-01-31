@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 import { fetchLedgerLines, type LedgerLine } from "../../api/ledger";
 import { useAppState } from "../../app/state/appState";
+import { isValidIsoDate } from "../../app/filters/filters";
+import { isBusinessIdValid } from "../../utils/businessId";
 
 export function useLedgerLines(limit = 2000) {
   const { activeBusinessId, dateRange, dataVersion } = useAppState();
@@ -13,6 +15,16 @@ export function useLedgerLines(limit = 2000) {
 
   useEffect(() => {
     if (!businessId || !startDate || !endDate) return;
+    if (!isBusinessIdValid(businessId)) {
+      setLines([]);
+      setErr("Invalid business id. Please re-select a business.");
+      return;
+    }
+    if (!isValidIsoDate(startDate) || !isValidIsoDate(endDate) || startDate > endDate) {
+      setLines([]);
+      setErr(`Invalid date range: ${startDate} → ${endDate}`);
+      return;
+    }
 
     const controller = new AbortController();
     let alive = true;

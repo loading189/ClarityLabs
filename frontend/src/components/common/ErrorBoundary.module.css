@@ -1,0 +1,33 @@
+.wrapper {
+  margin: 64px auto;
+  max-width: 640px;
+  padding: 24px;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  text-align: center;
+}
+
+.message {
+  margin: 16px 0;
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  color: #475569;
+  text-align: left;
+  white-space: pre-wrap;
+}
+
+.button {
+  border: none;
+  border-radius: 999px;
+  padding: 10px 20px;
+  background: #0f172a;
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button:hover {
+  background: #1e293b;
+}
