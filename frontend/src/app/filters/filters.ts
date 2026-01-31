@@ -10,6 +10,11 @@ export type FilterState = {
   direction?: "inflow" | "outflow";
 };
 
+export type DemoDateRange = {
+  start_at?: string | null;
+  end_at?: string | null;
+};
+
 export const DEFAULT_WINDOW: DateWindow = "30";
 
 export function parseFilters(params: URLSearchParams): FilterState {
@@ -59,6 +64,42 @@ export function getDateRangeForWindow(window: DateWindow) {
   const start = new Date();
   start.setDate(end.getDate() - days);
   return { start: formatDate(start), end: formatDate(end) };
+}
+
+export function normalizeDateInput(value?: string | null) {
+  if (!value) return undefined;
+  return value.split("T")[0];
+}
+
+export function clampFiltersToRange(filters: FilterState, range: DemoDateRange) {
+  const startAt = normalizeDateInput(range.start_at);
+  const endAt = normalizeDateInput(range.end_at);
+  if (!startAt || !endAt) return null;
+
+  const currentStart = filters.start ?? startAt;
+  const currentEnd = filters.end ?? endAt;
+  let nextStart = currentStart < startAt ? startAt : currentStart;
+  let nextEnd = currentEnd > endAt ? endAt : currentEnd;
+
+  if (nextStart > nextEnd) {
+    nextStart = startAt;
+    nextEnd = endAt;
+  }
+
+  if (
+    filters.start === nextStart &&
+    filters.end === nextEnd &&
+    filters.window === undefined
+  ) {
+    return null;
+  }
+
+  return {
+    ...filters,
+    start: nextStart,
+    end: nextEnd,
+    window: undefined,
+  };
 }
 
 export function resolveDateRange(filters: FilterState) {

@@ -1,3 +1,4 @@
+// frontend/src/app/routes/AppRoutes.tsx
 import { Navigate, Route, Routes } from "react-router-dom";
 import AppLayout from "../layout/AppLayout";
 import AdminSimulatorPage from "./AdminSimulatorPage";
@@ -11,14 +12,19 @@ import RulesPage from "./RulesPage";
 import SettingsPage from "./SettingsPage";
 import TrendsPage from "../../features/trends/TrendsPage";
 import VendorsPage from "./VendorsPage";
-import { DEFAULT_BUSINESS_ID } from "./defaults";
 import AppIndexRedirect from "./AppIndexRedirect";
+import BusinessSelectPage from "./BusinessSelectPage";
 
 export default function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/app" replace />} />
+
+      {/* entry */}
       <Route path="/app" element={<AppIndexRedirect />} />
+      <Route path="/app/select" element={<BusinessSelectPage />} />
+
+      {/* workspace */}
       <Route path="/app/:businessId" element={<AppLayout />}>
         <Route path="home" element={<HomePage />} />
         <Route path="health" element={<HealthPage />} />
@@ -31,9 +37,10 @@ export default function AppRoutes() {
         <Route path="integrations" element={<IntegrationsPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="admin/simulator" element={<AdminSimulatorPage />} />
-        <Route path="*" element={<Navigate to="home" replace />} />
+        <Route path="*" element={<Navigate to="dashboard" replace />} />
       </Route>
-      <Route path="*" element={<Navigate to={`/app/${DEFAULT_BUSINESS_ID}/home`} replace />} />
+
+      <Route path="*" element={<Navigate to="/app" replace />} />
     </Routes>
   );
 }

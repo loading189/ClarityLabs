@@ -6,6 +6,8 @@ import { useDemoDashboard } from "../../hooks/useDemoDashboard";
 import { useFilters } from "../filters/useFilters";
 import { ledgerPath } from "./routeUtils";
 import { monthBounds } from "../filters/filters";
+import { useDemoDateRange } from "../filters/useDemoDateRange";
+import { assertBusinessId } from "../../utils/businessId";
 import styles from "./DashboardPage.module.css";
 
 function formatMoney(value?: number | null) {
@@ -14,10 +16,12 @@ function formatMoney(value?: number | null) {
 }
 
 export default function DashboardPage() {
-  const { businessId = "" } = useParams();
+  const { businessId: businessIdParam } = useParams();
+  const businessId = assertBusinessId(businessIdParam, "DashboardPage");
   const navigate = useNavigate();
   const [filters, setFilters] = useFilters();
   const { data, loading, err } = useDemoDashboard(businessId);
+  useDemoDateRange(filters, setFilters, data?.metadata);
 
   const series =
     (data?.trends?.metrics?.net?.series ??

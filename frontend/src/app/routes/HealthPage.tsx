@@ -7,7 +7,9 @@ import { ErrorState, LoadingState } from "../../components/common/DataState";
 import { useBusinessDetailData } from "../../hooks/useBusinessDetailData";
 import { useFilters } from "../filters/useFilters";
 import { getDateRangeForWindow, type FilterState } from "../filters/filters";
+import { useDemoDateRange } from "../filters/useDemoDateRange";
 import { ledgerPath } from "./routeUtils";
+import { assertBusinessId } from "../../utils/businessId";
 
 function getString(payload: Record<string, unknown>, key: string) {
   const value = payload[key];
@@ -44,10 +46,12 @@ function mapDrilldownToFilters(
 }
 
 export default function HealthPage() {
-  const { businessId = "" } = useParams();
+  const { businessId: businessIdParam } = useParams();
+  const businessId = assertBusinessId(businessIdParam, "HealthPage");
   const navigate = useNavigate();
   const [filters, setFilters] = useFilters();
   const { data, loading, err } = useBusinessDetailData(businessId);
+  useDemoDateRange(filters, setFilters, { start_at: data?.start_at, end_at: data?.end_at });
 
   const showContent = useMemo(() => !loading && !err && data, [data, err, loading]);
 

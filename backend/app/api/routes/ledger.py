@@ -1,3 +1,4 @@
+# backend/app/api/ledger.py
 from __future__ import annotations
 
 from datetime import date, datetime
@@ -80,11 +81,12 @@ class CashPointOut(BaseModel):
 @router.get("/business/{business_id}/lines", response_model=List[LedgerLineOut])
 def ledger_lines(
     business_id: str,
-    start_date: Optional[date] = Query(None),
-    end_date: Optional[date] = Query(None),
-    limit: int = Query(200, ge=1, le=2000),
+    start_date: date = Query(..., description="Inclusive start date (YYYY-MM-DD)"),
+    end_date: date = Query(..., description="Inclusive end date (YYYY-MM-DD)"),
+    limit: int = Query(2000, ge=1, le=2000),
     db: Session = Depends(get_db),
 ):
+    # NOTE: limit defaults to 2000 for UI convenience.
     return ledger_service.ledger_lines(db, business_id, start_date, end_date, limit)
 
 

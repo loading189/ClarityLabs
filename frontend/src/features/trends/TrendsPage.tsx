@@ -5,8 +5,11 @@ import FilterBar from "../../components/common/FilterBar";
 import { ErrorState, LoadingState } from "../../components/common/DataState";
 import { useFilters } from "../../app/filters/useFilters";
 import { monthBounds, monthsBetween, resolveDateRange } from "../../app/filters/filters";
+import { useDemoDateRange } from "../../app/filters/useDemoDateRange";
 import { ledgerPath } from "../../app/routes/routeUtils";
 import { type MetricSeriesRow, useTrendsData } from "./useTrendsData";
+import { useDemoDashboard } from "../../hooks/useDemoDashboard";
+import { assertBusinessId } from "../../utils/businessId";
 import styles from "./TrendsPage.module.css";
 
 type TrendRow = {
@@ -104,9 +107,12 @@ function BarChart({
 }
 
 export default function TrendsPage() {
-  const { businessId = "" } = useParams();
+  const { businessId: businessIdParam } = useParams();
+  const businessId = assertBusinessId(businessIdParam, "TrendsPage");
   const navigate = useNavigate();
   const [filters, setFilters] = useFilters();
+  const { data: dashboard } = useDemoDashboard(businessId);
+  useDemoDateRange(filters, setFilters, dashboard?.metadata);
   const range = resolveDateRange(filters);
   const lookbackMonths = monthsBetween(range.start, range.end);
   const { data, loading, err } = useTrendsData(businessId, lookbackMonths, 2.0);
