@@ -30,16 +30,7 @@ export default function DashboardPage() {
     setDateRange({ start: filters.start, end: filters.end });
   }, [filters.end, filters.start, setDateRange]);
 
-  const series =
-    (data?.trends?.metrics?.net?.series ??
-      data?.trends?.series ??
-      []) as Array<{
-      month: string;
-      inflow: number;
-      outflow: number;
-      net: number;
-      cash_end: number;
-    }>;
+  const series = data?.analytics?.series ?? [];
 
   return (
     <div className={styles.page}>
@@ -63,22 +54,30 @@ export default function DashboardPage() {
           <section className={styles.kpiGrid}>
             <div className={styles.kpiCard}>
               <div className={styles.kpiLabel}>Current cash</div>
-              <div className={styles.kpiValue}>{formatMoney(data.kpis.current_cash)}</div>
+              <div className={styles.kpiValue}>
+                {formatMoney(data.kpis.current_cash.value)}
+              </div>
               <div className={styles.kpiMeta}>As of {data.metadata.as_of}</div>
             </div>
             <div className={styles.kpiCard}>
               <div className={styles.kpiLabel}>Inflow (30d)</div>
-              <div className={styles.kpiValue}>{formatMoney(data.kpis.last_30d_inflow)}</div>
+              <div className={styles.kpiValue}>
+                {formatMoney(data.kpis.last_30d_inflow.value)}
+              </div>
               <div className={styles.kpiMeta}>Monitoring only</div>
             </div>
             <div className={styles.kpiCard}>
               <div className={styles.kpiLabel}>Outflow (30d)</div>
-              <div className={styles.kpiValue}>{formatMoney(data.kpis.last_30d_outflow)}</div>
+              <div className={styles.kpiValue}>
+                {formatMoney(data.kpis.last_30d_outflow.value)}
+              </div>
               <div className={styles.kpiMeta}>Monitoring only</div>
             </div>
             <div className={styles.kpiCard}>
               <div className={styles.kpiLabel}>Net (30d)</div>
-              <div className={styles.kpiValue}>{formatMoney(data.kpis.last_30d_net)}</div>
+              <div className={styles.kpiValue}>
+                {formatMoney(data.kpis.last_30d_net.value)}
+              </div>
               <div className={styles.kpiMeta}>Monitoring only</div>
             </div>
           </section>
@@ -117,10 +116,10 @@ export default function DashboardPage() {
                   }}
                 >
                   <span>{row.month}</span>
-                  <span>{formatMoney(row.inflow)}</span>
-                  <span>{formatMoney(row.outflow)}</span>
-                  <span>{formatMoney(row.net)}</span>
-                  <span>{formatMoney(row.cash_end)}</span>
+                  <span>{formatMoney(row.inflow.value)}</span>
+                  <span>{formatMoney(row.outflow.value)}</span>
+                  <span>{formatMoney(row.net.value)}</span>
+                  <span>{formatMoney(row.cash_end.value)}</span>
                 </button>
               ))}
               {series.length === 0 && <div className={styles.empty}>No monthly data yet.</div>}

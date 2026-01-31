@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { computeLedgerSummary, computeRunningBalance } from "../../analytics/core";
 import { useLedger } from "../../hooks/useLedger";
 import { useAppState } from "../../app/state/appState";
 import styles from "./LedgerTab.module.css";
@@ -136,30 +137,11 @@ export function LedgerTab({
     });
   }, [drilldown, lines]);
 
-  const totals = useMemo(() => {
-    let inflow = 0;
-    let outflow = 0;
-    for (const l of filteredRows) {
-      if (l.signed_amount >= 0) inflow += l.signed_amount;
-      else outflow += Math.abs(l.signed_amount);
-    }
-    return { inflow, outflow, net: inflow - outflow, count: filteredRows.length };
-  }, [filteredRows]);
-
-  const runningBalanceById = useMemo(() => {
-    const map = new Map<string, number>();
-    const sorted = [...filteredRows].sort((a, b) => {
-      const dateDiff = new Date(a.occurred_at).getTime() - new Date(b.occurred_at).getTime();
-      if (dateDiff !== 0) return dateDiff;
-      return a.source_event_id.localeCompare(b.source_event_id);
-    });
-    let balance = 0;
-    for (const row of sorted) {
-      balance += row.signed_amount;
-      map.set(row.source_event_id, balance);
-    }
-    return map;
-  }, [filteredRows]);
+  const totals = useMemo(() => computeLedgerSummary(filteredRows), [filteredRows]);
+  const runningBalanceById = useMemo(
+    () => computeRunningBalance(filteredRows),
+    [filteredRows]
+  );
 
   if (loading && !lines) return <div className={styles.loadingState}>Loading ledger…</div>;
   if (err)
@@ -218,9 +200,13 @@ export function LedgerTab({
 
       {/* Summary cards */}
       <div className={styles.summaryGrid}>
-        <StatCard title="Cash In" value={fmtMoney(totals.inflow)} subtitle="Posted lines" />
-        <StatCard title="Cash Out" value={fmtMoney(-totals.outflow)} subtitle="Posted lines" />
-        <StatCard title="Net Cash Flow" value={fmtMoney(totals.net)} subtitle="Posted lines" />
+        <StatCard title="Cash In" value={fmtMoney(totals.inflow.value)} subtitle="Posted lines" />
+        <StatCard
+          title="Cash Out"
+          value={fmtMoney(-totals.outflow.value)}
+          subtitle="Posted lines"
+        />
+        <StatCard title="Net Cash Flow" value={fmtMoney(totals.net.value)} subtitle="Posted lines" />
         <StatCard
           title="Balance Sheet (MVP)"
           value={balanceSheet ? fmtMoney(balanceSheet.cash) : "—"}

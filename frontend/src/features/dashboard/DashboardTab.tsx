@@ -95,9 +95,9 @@ export default function DashboardTab({
   }, [businessId, currentDrilldown, limit, offset, selectedSignal]);
 
   const trendSeries = useMemo(() => {
-    const series = (data?.trends?.metrics?.net?.series ?? data?.trends?.series ?? []) as Array<any>;
+    const series = data?.analytics?.series ?? [];
     return series.slice(-6);
-  }, [data?.trends]);
+  }, [data?.analytics]);
 
   const total = drilldown?.total ?? 0;
   const rowStart = total === 0 ? 0 : offset + 1;
@@ -132,10 +132,10 @@ export default function DashboardTab({
       {!loading && !err && data && (
         <>
           <section className={styles.kpiGrid}>
-            {kpiLabel("Current cash", data.kpis.current_cash)}
-            {kpiLabel("Last 30d inflow", data.kpis.last_30d_inflow)}
-            {kpiLabel("Last 30d outflow", data.kpis.last_30d_outflow)}
-            {kpiLabel("Last 30d net", data.kpis.last_30d_net)}
+            {kpiLabel("Current cash", data.kpis.current_cash.value)}
+            {kpiLabel("Last 30d inflow", data.kpis.last_30d_inflow.value)}
+            {kpiLabel("Last 30d outflow", data.kpis.last_30d_outflow.value)}
+            {kpiLabel("Last 30d net", data.kpis.last_30d_net.value)}
           </section>
 
           <section className={styles.trendsSection}>
@@ -156,10 +156,10 @@ export default function DashboardTab({
               {trendSeries.map((row) => (
                 <div key={row.month} className={styles.trendsRow}>
                   <span>{row.month}</span>
-                  <span>{formatMoney(Number(row.inflow || 0))}</span>
-                  <span>{formatMoney(Number(row.outflow || 0))}</span>
-                  <span>{formatSigned(Number(row.net || 0))}</span>
-                  <span>{formatMoney(Number(row.cash_end || 0))}</span>
+                  <span>{formatMoney(Number(row.inflow?.value || 0))}</span>
+                  <span>{formatMoney(Number(row.outflow?.value || 0))}</span>
+                  <span>{formatSigned(Number(row.net?.value || 0))}</span>
+                  <span>{formatMoney(Number(row.cash_end?.value || 0))}</span>
                 </div>
               ))}
               {!trendSeries.length && <div className={styles.empty}>No trend data.</div>}

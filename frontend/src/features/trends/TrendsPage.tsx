@@ -7,7 +7,7 @@ import { useFilters } from "../../app/filters/useFilters";
 import { monthBounds, monthsBetween, resolveDateRange } from "../../app/filters/filters";
 import { useDemoDateRange } from "../../app/filters/useDemoDateRange";
 import { ledgerPath } from "../../app/routes/routeUtils";
-import { type MetricSeriesRow, useTrendsData } from "./useTrendsData";
+import { useTrendsData } from "./useTrendsData";
 import { useDemoDashboard } from "../../hooks/useDemoDashboard";
 import { assertBusinessId } from "../../utils/businessId";
 import { useAppState } from "../../app/state/appState";
@@ -123,17 +123,15 @@ export default function TrendsPage() {
   const { data, loading, err } = useTrendsData(businessId, lookbackMonths, 2.0);
 
   const rows = useMemo(() => {
-    const series = (data?.metrics?.net?.series ??
-      data?.series ??
-      []) as MetricSeriesRow[];
+    const series = data?.analytics?.series ?? [];
     return series.map((row) => ({
       month: row.month,
-      inflow: row.inflow,
-      outflow: row.outflow,
-      net: row.net,
-      cash_end: row.cash_end,
+      inflow: row.inflow.value,
+      outflow: row.outflow.value,
+      net: row.net.value,
+      cash_end: row.cash_end.value,
     }));
-  }, [data]);
+  }, [data?.analytics?.series]);
 
   const filteredRows = useMemo(() => {
     const start = new Date(range.start);

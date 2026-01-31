@@ -60,22 +60,30 @@ export default function HomePage() {
           <section className={styles.kpiGrid}>
             <div className={styles.kpiCard}>
               <div className={styles.kpiLabel}>Current cash</div>
-              <div className={styles.kpiValue}>{formatMoney(dashboard.kpis.current_cash)}</div>
+              <div className={styles.kpiValue}>
+                {formatMoney(dashboard.kpis.current_cash.value)}
+              </div>
               <div className={styles.kpiMeta}>As of {dashboard.metadata.as_of}</div>
             </div>
             <div className={styles.kpiCard}>
               <div className={styles.kpiLabel}>Last 30d inflow</div>
-              <div className={styles.kpiValue}>{formatMoney(dashboard.kpis.last_30d_inflow)}</div>
+              <div className={styles.kpiValue}>
+                {formatMoney(dashboard.kpis.last_30d_inflow.value)}
+              </div>
               <div className={styles.kpiMeta}>Revenue velocity</div>
             </div>
             <div className={styles.kpiCard}>
               <div className={styles.kpiLabel}>Last 30d outflow</div>
-              <div className={styles.kpiValue}>{formatMoney(dashboard.kpis.last_30d_outflow)}</div>
+              <div className={styles.kpiValue}>
+                {formatMoney(dashboard.kpis.last_30d_outflow.value)}
+              </div>
               <div className={styles.kpiMeta}>Spend velocity</div>
             </div>
             <div className={styles.kpiCard}>
               <div className={styles.kpiLabel}>Net movement</div>
-              <div className={styles.kpiValue}>{formatMoney(dashboard.kpis.last_30d_net)}</div>
+              <div className={styles.kpiValue}>
+                {formatMoney(dashboard.kpis.last_30d_net.value)}
+              </div>
               <div className={styles.kpiMeta}>Monitoring only</div>
             </div>
           </section>
