@@ -71,6 +71,22 @@ export function normalizeDateInput(value?: string | null) {
   return value.split("T")[0];
 }
 
+export function isValidIsoDate(value?: string | null) {
+  if (!value) return false;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (!year || !month || !day) return false;
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
+}
+
 export function clampFiltersToRange(filters: FilterState, range: DemoDateRange) {
   const startAt = normalizeDateInput(range.start_at);
   const endAt = normalizeDateInput(range.end_at);
@@ -103,7 +119,13 @@ export function clampFiltersToRange(filters: FilterState, range: DemoDateRange) 
 }
 
 export function resolveDateRange(filters: FilterState) {
-  if (filters.start && filters.end) {
+  if (
+    filters.start &&
+    filters.end &&
+    isValidIsoDate(filters.start) &&
+    isValidIsoDate(filters.end) &&
+    filters.start <= filters.end
+  ) {
     return { start: filters.start, end: filters.end, window: filters.window };
   }
   const window = filters.window ?? DEFAULT_WINDOW;

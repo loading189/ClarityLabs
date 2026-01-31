@@ -1,5 +1,6 @@
 // frontend/src/api/ledger.ts
-import { apiGet } from "./client";
+import { API_BASE } from "./client";
+import { isValidIsoDate } from "../app/filters/filters";
 
 export type LedgerCategorization = {
   confidence?: number | null;
@@ -86,6 +87,9 @@ export async function fetchLedgerLines(
   if (!start || !end) {
     throw new Error("Ledger lines request requires start_date and end_date");
   }
+  if (!isValidIsoDate(start) || !isValidIsoDate(end) || start > end) {
+    throw new Error(`Ledger lines request has invalid date range: ${start} → ${end}`);
+  }
 
   // ✅ IMPORTANT: backend enforces le=2000
   const limit = Math.min(Math.max(query.limit ?? 2000, 1), 2000);
@@ -96,10 +100,26 @@ export async function fetchLedgerLines(
   params.set("limit", String(limit));
 
   const url = `/ledger/business/${businessId}/lines?${params.toString()}`;
+  const fullUrl = `${API_BASE}${url}`;
 
   if (import.meta.env.DEV) console.info("[ledger] lines url", url);
 
-  const res = await apiGet<any>(url, { signal });
-  const rows: any[] = Array.isArray(res) ? res : Array.isArray(res?.rows) ? res.rows : [];
+  const res = await fetch(fullUrl, { signal });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    if (res.status === 422 || res.status >= 500) {
+      const responseNote = body ? ` Response: ${body}` : "";
+      throw new Error(
+        `Ledger lines request failed (${res.status}). URL: ${fullUrl}. Params: ${params.toString()}.${responseNote}`
+      );
+    }
+    throw new Error(body || `Ledger lines request failed (${res.status})`);
+  }
+  const payload = await res.json();
+  const rows: any[] = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.rows)
+      ? payload.rows
+      : [];
   return rows.map(normalizeLedgerLine);
 }

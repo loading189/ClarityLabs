@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchBusinessDashboard } from "../api/demo";
 import type { DashboardDetail } from "../types";
 import { useAppState } from "../app/state/appState";
+import { isBusinessIdValid } from "../utils/businessId";
 
 export function useDemoDashboard() {
   const { activeBusinessId, dataVersion } = useAppState();
@@ -13,6 +14,10 @@ export function useDemoDashboard() {
 
   const load = useCallback(async (signal?: AbortSignal) => {
     if (!businessId) return;
+    if (!isBusinessIdValid(businessId)) {
+      setErr("Invalid business id. Please re-select a business.");
+      return;
+    }
     const seq = (seqRef.current += 1);
     setLoading(true);
     setErr(null);
