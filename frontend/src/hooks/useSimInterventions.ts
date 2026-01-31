@@ -1,15 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  InterventionCreate,
-  InterventionOut,
-  InterventionPatch,
   createSimIntervention,
   deleteSimIntervention,
   listSimInterventions,
   patchSimIntervention,
 } from "../api/simulator";
+import type { InterventionCreate, InterventionOut, InterventionPatch } from "../api/simulator";
 
-export function useSimInterventions(businessId: string) {
+export function useSimInterventions(businessId: string | null | undefined) {
   const [data, setData] = useState<InterventionOut[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -17,6 +15,7 @@ export function useSimInterventions(businessId: string) {
   const refresh = useCallback(
     async (signal?: AbortSignal) => {
       if (!businessId) return;
+
       setLoading(true);
       setErr(null);
 

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { BusinessStatusOut, getBusinessStatus } from "../api/onboarding";
+import { getBusinessStatus } from "../api/onboarding";
+import type { BusinessStatusOut } from "../api/onboarding";
 
-export function useBusinessStatus(businessId: string) {
+export function useBusinessStatus(businessId: string | null) {
   const [data, setData] = useState<BusinessStatusOut | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);

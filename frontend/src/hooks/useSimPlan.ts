@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { SimPlanOut, SimPlanUpsert, getSimPlan, putSimPlan } from "../api/simulator";
+import { getSimPlan, putSimPlan } from "../api/simulator";
+import type { SimPlanOut, SimPlanUpsert } from "../api/simulator";
 
-export function useSimPlan(businessId: string) {
+export function useSimPlan(businessId: string | null | undefined) {
   const [data, setData] = useState<SimPlanOut | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -9,6 +10,7 @@ export function useSimPlan(businessId: string) {
   const refresh = useCallback(
     async (signal?: AbortSignal) => {
       if (!businessId) return;
+
       setLoading(true);
       setErr(null);
 
@@ -42,11 +44,5 @@ export function useSimPlan(businessId: string) {
     return () => controller.abort();
   }, [businessId, refresh]);
 
-  return {
-    data,
-    loading,
-    err,
-    refresh,
-    updatePlan,
-  };
+  return { data, loading, err, refresh, updatePlan };
 }

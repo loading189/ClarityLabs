@@ -4,14 +4,13 @@ import PageHeader from "../../components/common/PageHeader";
 import { ErrorState, LoadingState } from "../../components/common/DataState";
 import { assertBusinessId } from "../../utils/businessId";
 import {
-  GenerateOut,
-  InterventionTemplate,
-  ScenarioCatalog,
   generateSimHistory,
   getInterventionLibrary,
   getScenarioCatalog,
   getSimTruth,
 } from "../../api/simulator";
+import type { GenerateOut, InterventionTemplate, ScenarioCatalog } from "../../api/simulator";
+
 import { useBusinessStatus } from "../../hooks/useBusinessStatus";
 import { useSimPlan } from "../../hooks/useSimPlan";
 import { useSimInterventions } from "../../hooks/useSimInterventions";
