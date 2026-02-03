@@ -14,7 +14,6 @@ import {
 } from "../../api/categorize";
 import type { NormalizedTxn } from "../../api/transactions";
 import styles from "./TransactionsTab.module.css";
-import { normalizeVendorKey } from "../../utils/vendors";
 
 export type TransactionsDrilldown = {
   merchant_key?: string;
@@ -59,8 +58,41 @@ const DATE_PRESET_DAYS: Record<DatePreset, number> = {
   "90d": 90,
 };
 
+const MERCHANT_STOPWORDS = new Set([
+  "pos",
+  "ach",
+  "debit",
+  "credit",
+  "card",
+  "purchase",
+  "payment",
+  "pmt",
+  "online",
+  "web",
+  "www",
+  "inc",
+  "llc",
+  "co",
+  "company",
+  "corp",
+  "corporation",
+  "the",
+]);
+
 function toMerchantKey(description?: string | null) {
-  return normalizeVendorKey(description);
+  const normalized = (description || "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s*]/g, " ")
+    .replace(/\d+/g, " ")
+    .replace(/\*/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const tokens = normalized
+    .split(" ")
+    .filter((token) => token && !MERCHANT_STOPWORDS.has(token))
+    .slice(0, 6);
+  return tokens.join(" ");
 }
 
 function buildRuleContainsText(description?: string | null) {
