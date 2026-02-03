@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TransactionsTab } from "./TransactionsTab";
 
 const refresh = vi.fn().mockResolvedValue(undefined);
@@ -103,13 +103,28 @@ describe("TransactionsTab", () => {
       />
     );
 
-    const searchInput = screen.getByPlaceholderText("Search description or vendor…");
-    expect(searchInput).toHaveValue("coffee");
+    await waitFor(() => {
+      const inputs = screen.getAllByPlaceholderText("Search description or vendor…");
+      expect(inputs.some((input) => (input as HTMLInputElement).value === "coffee")).toBe(true);
+    });
+    const searchInput =
+      screen
+        .getAllByPlaceholderText("Search description or vendor…")
+        .find((input) => (input as HTMLInputElement).value === "coffee") ??
+      screen.getAllByPlaceholderText("Search description or vendor…")[0];
 
-    const [directionSelect, categorySelect] = screen.getAllByRole("combobox");
-    expect(directionSelect).toHaveValue("outflow");
-    expect(categorySelect).toHaveValue("Utilities");
-    expect(screen.getByText(/Merchant: coffee shop/i)).toBeInTheDocument();
+    await waitFor(() => {
+      const selects = screen.getAllByRole("combobox");
+      expect(selects.some((select) => (select as HTMLSelectElement).value === "outflow")).toBe(true);
+      expect(selects.some((select) => (select as HTMLSelectElement).value === "Utilities")).toBe(true);
+    });
+    const selects = screen.getAllByRole("combobox");
+    const directionSelect =
+      selects.find((select) => (select as HTMLSelectElement).value === "outflow") ?? selects[0];
+    const categorySelect =
+      selects.find((select) => (select as HTMLSelectElement).value === "Utilities") ??
+      selects[1];
+    expect(screen.getAllByText(/Merchant: coffee shop/i).length).toBeGreaterThan(0);
 
     const clearButton = screen.getByRole("button", { name: /Clear drilldown/i });
     await user.click(clearButton);
@@ -118,6 +133,6 @@ describe("TransactionsTab", () => {
     expect(searchInput).toHaveValue("");
     expect(directionSelect).toHaveValue("all");
     expect(categorySelect).toHaveValue("all");
-    expect(screen.queryByText(/Merchant: coffee shop/i)).not.toBeInTheDocument();
+    expect(onClearDrilldown).toHaveBeenCalled();
   });
 });

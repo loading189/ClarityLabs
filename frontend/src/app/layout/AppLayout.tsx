@@ -4,6 +4,7 @@ import { NavLink, Outlet, useParams } from "react-router-dom";
 import styles from "./AppLayout.module.css";
 import { assertBusinessId } from "../../utils/businessId";
 import { useAppState } from "../state/appState";
+import ErrorBoundary from "../../components/common/ErrorBoundary";
 
 type NavItem = { label: string; path: string };
 
@@ -100,7 +101,9 @@ export default function AppLayout() {
           </div>
         </header>
         <main className={styles.content}>
-          <Outlet />
+          <ErrorBoundary>
+            <Outlet />
+          </ErrorBoundary>
         </main>
       </div>
     </div>

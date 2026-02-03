@@ -10,6 +10,7 @@ import { TrendsTab, type TrendsDrilldown } from "../../features/trends";
 import { DashboardTab } from "../../features/dashboard";
 import styles from "./DetailPanel.module.css";
 import { logRefresh } from "../../utils/refreshLog";
+import { useAppState } from "../../app/state/appState";
 
 type PanelMode =
   | "dashboard"
@@ -38,6 +39,7 @@ export default function DetailPanel({
   const [categorizeDrilldown, setCategorizeDrilldown] = useState<CategorizeDrilldown | null>(null);
   const [ledgerDrilldown, setLedgerDrilldown] = useState<LedgerDrilldown | null>(null);
   const [trendsDrilldown, setTrendsDrilldown] = useState<TrendsDrilldown | null>(null);
+  const { bumpDataVersion } = useAppState();
   const [ledgerRefreshToken, setLedgerRefreshToken] = useState(0);
   const [trendsRefreshToken, setTrendsRefreshToken] = useState(0);
   const [signalsRefreshToken, setSignalsRefreshToken] = useState(0);
@@ -93,6 +95,7 @@ export default function DetailPanel({
     setLedgerRefreshToken((value) => value + 1);
     setTrendsRefreshToken((value) => value + 1);
     setSignalsRefreshToken((value) => value + 1);
+    bumpDataVersion();
     onAfterPulse?.();
   }
 
