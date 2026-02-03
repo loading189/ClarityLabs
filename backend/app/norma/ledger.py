@@ -14,6 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Iterable, List
+import math
 
 from .normalize import NormalizedTransaction
 
@@ -78,3 +79,81 @@ def build_cash_ledger(
         )
 
     return ledger
+
+
+class LedgerIntegrityError(ValueError):
+    pass
+
+
+def check_ledger_integrity(
+    ledger: Iterable[LedgerRow],
+    *,
+    opening_balance: float = 0.0,
+) -> dict:
+    """
+    Side-effect-free ledger integrity check.
+
+    Invariants:
+    - Running balances are continuous.
+    - Inflow + outflow = net cash flow.
+    - Amounts are finite signed values.
+    - Ledger rows are deterministically ordered.
+    """
+    rows = list(ledger)
+    last_balance = float(opening_balance or 0.0)
+    prev_key: tuple | None = None
+
+    inflow = 0.0
+    outflow = 0.0
+    total = 0.0
+
+    for idx, row in enumerate(rows):
+        amount = float(row.amount or 0.0)
+        if not math.isfinite(amount):
+            raise LedgerIntegrityError(f"Invariant violation: non-finite amount at row {idx}.")
+
+        key = (
+            row.occurred_at,
+            row.description or "",
+            amount,
+            row.source_event_id or "",
+        )
+        if prev_key and key < prev_key:
+            raise LedgerIntegrityError(
+                "Invariant violation: ledger rows are not deterministically ordered."
+            )
+
+        expected = last_balance + amount
+        if abs(float(row.balance) - expected) > 1e-6:
+            raise LedgerIntegrityError(
+                f"Invariant violation: running balance mismatch at row {idx}."
+            )
+
+        if amount >= 0:
+            inflow += amount
+        else:
+            outflow += amount
+
+        total += amount
+        last_balance = float(row.balance)
+        prev_key = key
+
+    net = inflow + outflow
+    if abs(net - total) > 1e-6:
+        raise LedgerIntegrityError(
+            "Invariant violation: inflow + outflow does not equal net cash flow."
+        )
+
+    if rows:
+        expected_total = rows[-1].balance - float(opening_balance or 0.0)
+        if abs(expected_total - total) > 1e-6:
+            raise LedgerIntegrityError(
+                "Invariant violation: net cash flow does not reconcile to ending balance."
+            )
+
+    return {
+        "rows": len(rows),
+        "net_cash_flow": round(total, 2),
+        "inflow_total": round(inflow, 2),
+        "outflow_total": round(outflow, 2),
+    }

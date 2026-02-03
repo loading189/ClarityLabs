@@ -37,3 +37,18 @@ def resolve_system_key(db: Session, business_id: str, system_key: str) -> Option
         "account_code": c.account.code or "",
         "account_name": c.account.name or "",
     }
+
+
+def require_system_key_mapping(
+    db: Session,
+    business_id: str,
+    system_key: str,
+    *,
+    context: str,
+) -> Dict[str, str]:
+    resolved = resolve_system_key(db, business_id, system_key)
+    if not resolved:
+        raise ValueError(
+            f"Invariant violation: {context} system_key '{system_key}' does not map to a valid category + account."
+        )
+    return resolved

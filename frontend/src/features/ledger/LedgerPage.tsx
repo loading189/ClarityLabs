@@ -55,12 +55,17 @@ export default function LedgerPage() {
 
   const [filters, setFilters] = useFilters();
   const { data: dashboard } = useDemoDashboard();
-  const { dateRange, setDateRange } = useAppState();
+  const { dateRange, setDateRange, activeBusinessId, setActiveBusinessId } = useAppState();
   useDemoDateRange(filters, setFilters, dashboard?.metadata);
   const range = resolveDateRange(filters);
   useEffect(() => {
     setDateRange(range);
   }, [range.end, range.start, setDateRange]);
+  useEffect(() => {
+    if (businessId && activeBusinessId !== businessId) {
+      setActiveBusinessId(businessId);
+    }
+  }, [activeBusinessId, businessId, setActiveBusinessId]);
   const { lines, loading, err } = useLedgerLines();
   const [selected, setSelected] = useState<LedgerLine | null>(null);
   const [page, setPage] = useState(1);
@@ -296,6 +301,39 @@ export default function LedgerPage() {
           </>
         )}
       </Drawer>
+      {import.meta.env.DEV && (
+        <div className={styles.debugOverlay}>
+          <div className={styles.debugRow}>
+            <span>business_id</span>
+            <span>{activeBusinessId ?? "—"}</span>
+          </div>
+          <div className={styles.debugRow}>
+            <span>date_range</span>
+            <span>
+              {dateRange.start} → {dateRange.end}
+            </span>
+          </div>
+          <div className={styles.debugRow}>
+            <span>ledger_rows</span>
+            <span>{lines.length}</span>
+          </div>
+          <div className={styles.debugRow}>
+            <span>filters</span>
+            <span>
+              {JSON.stringify(
+                {
+                  account: filters.account ?? null,
+                  category: filters.category ?? null,
+                  direction: filters.direction ?? null,
+                  query: filters.q ?? null,
+                },
+                null,
+                0
+              )}
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
