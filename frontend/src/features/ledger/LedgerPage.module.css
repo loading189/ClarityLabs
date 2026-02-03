@@ -7,11 +7,12 @@
 .summary {
   display: flex;
   flex-direction: column;
-  font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.6);
   gap: 4px;
+  font-size: 0.8rem;
+  color: var(--text-soft);
 }
 
+/* Description cell */
 .descriptionCell {
   display: flex;
   flex-direction: column;
@@ -20,49 +21,87 @@
 
 .descriptionTitle {
   font-weight: 600;
+  color: var(--text);
 }
 
 .descriptionMeta {
   font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-soft);
 }
 
+/* Direction pills (text only, uses theme colors) */
 .inflow {
-  color: #7ddf8d;
+  color: var(--success);
   font-weight: 600;
 }
 
 .outflow {
-  color: #ff9b85;
+  color: var(--danger);
   font-weight: 600;
 }
 
+/* Small action button inside rows */
 .rowAction {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: inherit;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  color: var(--text);
   padding: 6px 10px;
   border-radius: 8px;
   font-size: 0.75rem;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, transform 80ms ease;
 }
 
+.rowAction:hover {
+  background: var(--card-bg);
+  border-color: var(--border-strong);
+}
+
+.rowAction:active {
+  transform: translateY(1px);
+}
+
+.rowAction:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* Pagination */
 .pagination {
   display: flex;
   justify-content: flex-end;
   align-items: center;
   gap: 12px;
   font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-soft);
 }
 
 .pageButton {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: inherit;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  color: var(--text);
   padding: 6px 12px;
   border-radius: 8px;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
 }
 
+.pageButton:hover:not(:disabled) {
+  background: var(--card-bg);
+  border-color: var(--border-strong);
+}
+
+.pageButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.pageButton:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* Drawer content */
 .drawerBlock {
   display: flex;
   flex-direction: column;
@@ -71,12 +110,12 @@
 
 .drawerLabel {
   font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-soft);
 }
 
 .drawerMeta {
   font-size: 0.75rem;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--text-muted);
 }
 
 .drawerGrid {
@@ -85,19 +124,23 @@
   gap: 12px;
 }
 
+/* Code / payload */
 .payload {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
   border-radius: 8px;
   padding: 10px;
   font-size: 0.75rem;
   white-space: pre-wrap;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--code-text);
 }
 
+/* Drawer actions */
 .drawerActions {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  margin-top: 4px;
 }
 
 .primaryButton,
@@ -108,20 +151,57 @@
   border: 1px solid transparent;
   font-size: 0.85rem;
   cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, transform 80ms ease;
 }
 
 .primaryButton {
-  background: #5d76ff;
+  background: var(--primary);
   color: #fff;
 }
 
+.primaryButton:hover {
+  background: var(--primary-strong);
+}
+
+.primaryButton:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
 .secondaryButton {
-  background: rgba(255, 255, 255, 0.08);
-  color: inherit;
+  background: var(--surface-muted);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.secondaryButton:hover {
+  background: var(--card-bg);
+  border-color: var(--border-strong);
+}
+
+.secondaryButton:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }
 
 .ghostButton {
   background: transparent;
-  border-color: rgba(255, 255, 255, 0.2);
-  color: inherit;
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.ghostButton:hover {
+  background: var(--surface-muted);
+  border-color: var(--border-strong);
+}
+
+.ghostButton:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.primaryButton:active,
+.secondaryButton:active,
+.ghostButton:active {
+  transform: translateY(1px);
 }

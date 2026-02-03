@@ -33,16 +33,38 @@ function formatDateTime(value: string) {
 function uniqueOptions(values: Array<string | null | undefined>) {
   return Array.from(
     new Set(values.filter((value): value is string => Boolean(value && value.trim())))
-  ).map((value) => ({
-    label: value,
-    value,
-  }));
+  ).map((value) => ({ label: value, value }));
 }
 
 export default function LedgerPage() {
   const { businessId: businessIdParam } = useParams();
   const businessId = assertBusinessId(businessIdParam, "LedgerPage");
 
+  const [filters, setFilters] = useFilters();
+  const { data: dashboard } = useDemoDashboard();
+  const { dateRange, setDateRange, dataVersion } = useAppState();
+
+  // Keep demo date range in sync with seeded metadata.
+  useDemoDateRange(filters, setFilters, dashboard?.metadata);
+
+  // Resolve date range from URL filters, then propagate to global app state.
+  const range = useMemo(() => resolveDateRange(filters), [filters]);
+
+  useEffect(() => {
+    setDateRange(range);
+  }, [range.start, range.end, setDateRange]);
+
+  const { lines, loading, err } = useLedgerLines();
+
+  // Vendor brain mappings (canonicalization).
+  const [brainVendors, setBrainVendors] = useState<BrainVendor[]>([]);
+  const [vendorErr, setVendorErr] = useState<string | null>(null);
+
+  // UI state
+  const [selected, setSelected] = useState<LedgerLine | null>(null);
+  const [page, setPage] = useState(1);
+
+  // Guard invalid route param early.
   if (!businessId) {
     return (
       <div className={styles.page}>
@@ -55,57 +77,9 @@ export default function LedgerPage() {
     );
   }
 
-  const [filters, setFilters] = useFilters();
-  const { data: dashboard } = useDemoDashboard();
-  const { dateRange, setDateRange, dataVersion } = useAppState();
-  useDemoDateRange(filters, setFilters, dashboard?.metadata);
-  const range = resolveDateRange(filters);
+  // Fetch vendor mappings (brain vendors) when business or dataVersion changes.
+  // NOTE: avoid depending on full dateRange object to reduce re-fetch churn.
   useEffect(() => {
-    setDateRange(range);
-  }, [range.end, range.start, setDateRange]);
-  const { lines, loading, err } = useLedgerLines();
-  const [brainVendors, setBrainVendors] = useState<BrainVendor[]>([]);
-  const [vendorErr, setVendorErr] = useState<string | null>(null);
-  const [selected, setSelected] = useState<LedgerLine | null>(null);
-  const [page, setPage] = useState(1);
-
-  const accounts = useMemo(
-    () => uniqueOptions(lines.map((line) => line.account_name)),
-    [lines]
-  );
-  const categories = useMemo(
-    () => uniqueOptions(lines.map((line) => line.category_name)),
-    [lines]
-  );
-
-  const filtered = useMemo(() => {
-    const query = (filters.q ?? "").toLowerCase();
-    return lines
-      .filter((line) => {
-        if (filters.account && line.account_name !== filters.account) return false;
-        if (filters.category && line.category_name !== filters.category) return false;
-        if (filters.direction && line.direction !== filters.direction) return false;
-        if (query) {
-          const haystack = `${line.description ?? ""} ${line.counterparty_hint ?? ""}`.toLowerCase();
-          if (!haystack.includes(query)) return false;
-        }
-        return true;
-      })
-      .sort((a, b) => new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime());
-  }, [filters.account, filters.category, filters.direction, filters.q, lines]);
-
-  const vendorsByAlias = useMemo(() => {
-    const map = new Map<string, BrainVendor>();
-    brainVendors.forEach((vendor) => {
-      vendor.alias_keys?.forEach((alias) => {
-        map.set(alias, vendor);
-      });
-    });
-    return map;
-  }, [brainVendors]);
-
-  useEffect(() => {
-    if (!businessId) return;
     setVendorErr(null);
     getBrainVendors(businessId)
       .then((vendors) => setBrainVendors(vendors))
@@ -118,69 +92,117 @@ export default function LedgerPage() {
         });
         setVendorErr(e?.message ?? "Failed to load vendor mappings");
       });
-  }, [businessId, dateRange, dataVersion]);
+  }, [businessId, dataVersion]); // intentionally not dateRange
+
+  const vendorsByAlias = useMemo(() => {
+    const map = new Map<string, BrainVendor>();
+    brainVendors.forEach((vendor) => {
+      vendor.alias_keys?.forEach((alias) => map.set(alias, vendor));
+    });
+    return map;
+  }, [brainVendors]);
+
+  // Options derived from the current dataset (not filtered) — keeps filter UX stable.
+  const accounts = useMemo(
+    () => uniqueOptions(lines.map((line) => line.account_name)),
+    [lines]
+  );
+  const categories = useMemo(
+    () => uniqueOptions(lines.map((line) => line.category_name)),
+    [lines]
+  );
+
+  // Filter + sort (client-side)
+  const filtered = useMemo(() => {
+    const query = (filters.q ?? "").toLowerCase().trim();
+
+    return lines
+      .filter((line) => {
+        if (filters.account && line.account_name !== filters.account) return false;
+        if (filters.category && line.category_name !== filters.category) return false;
+        if (filters.direction && line.direction !== filters.direction) return false;
+
+        if (query) {
+          const haystack = `${line.description ?? ""} ${line.counterparty_hint ?? ""}`.toLowerCase();
+          if (!haystack.includes(query)) return false;
+        }
+
+        return true;
+      })
+      .sort((a, b) => new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime());
+  }, [filters.account, filters.category, filters.direction, filters.q, lines]);
+
+  // Reset pagination when filtered result set changes (prevents “blank page” at end)
+  useEffect(() => {
+    setPage(1);
+  }, [filters.account, filters.category, filters.direction, filters.q]);
 
   const pageSize = 50;
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const paged = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
-  const columns: Array<TableColumn<LedgerLine>> = [
-    {
-      key: "occurred_at",
-      header: "Date/Time",
-      render: (row) => formatDateTime(row.occurred_at),
-    },
-    {
-      key: "description",
-      header: "Description",
-      render: (row) => (
-        <div className={styles.descriptionCell}>
-          <div className={styles.descriptionTitle}>{row.description}</div>
-          <div className={styles.descriptionMeta}>
-            {normalizeVendorDisplay(
-              row.counterparty_hint ?? row.description,
-              vendorsByAlias.get(normalizeVendorKey(row.counterparty_hint ?? row.description))
-                ?.canonical_name
-            )}
-          </div>
-        </div>
-      ),
-    },
-    {
-      key: "account",
-      header: "Account",
-      render: (row) => row.account_name ?? "—",
-    },
-    {
-      key: "direction",
-      header: "Direction",
-      render: (row) => (
-        <span className={row.direction === "inflow" ? styles.inflow : styles.outflow}>
-          {row.direction}
-        </span>
-      ),
-    },
-    {
-      key: "amount",
-      header: "Amount",
-      align: "right",
-      render: (row) => formatMoney(row.signed_amount),
-    },
-    {
-      key: "category",
-      header: "Category",
-      render: (row) => row.category_name ?? "Needs review",
-    },
-    {
-      key: "confidence",
-      header: "Confidence",
-      render: (row) =>
-        row.categorization?.confidence != null
-          ? `${Math.round(row.categorization.confidence * 100)}%`
-          : "Needs review",
-    },
-  ];
+  const columns: Array<TableColumn<LedgerLine>> = useMemo(
+    () => [
+      {
+        key: "occurred_at",
+        header: "Date/Time",
+        render: (row) => formatDateTime(row.occurred_at),
+      },
+      {
+        key: "description",
+        header: "Description",
+        render: (row) => {
+          const raw = row.counterparty_hint ?? row.description ?? "";
+          const key = normalizeVendorKey(raw);
+          const canonical = vendorsByAlias.get(key)?.canonical_name;
+
+          return (
+            <div className={styles.descriptionCell}>
+              <div className={styles.descriptionTitle}>{row.description ?? "—"}</div>
+              <div className={styles.descriptionMeta}>
+                {normalizeVendorDisplay(raw, canonical)}
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        key: "account",
+        header: "Account",
+        render: (row) => row.account_name ?? "—",
+      },
+      {
+        key: "direction",
+        header: "Direction",
+        render: (row) => (
+          <span className={row.direction === "inflow" ? styles.inflow : styles.outflow}>
+            {row.direction}
+          </span>
+        ),
+      },
+      {
+        key: "amount",
+        header: "Amount",
+        align: "right",
+        render: (row) => formatMoney(row.signed_amount),
+      },
+      {
+        key: "category",
+        header: "Category",
+        render: (row) => row.category_name ?? "Needs review",
+      },
+      {
+        key: "confidence",
+        header: "Confidence",
+        render: (row) =>
+          row.categorization?.confidence != null
+            ? `${Math.round(row.categorization.confidence * 100)}%`
+            : "Needs review",
+      },
+    ],
+    [vendorsByAlias]
+  );
 
   return (
     <div className={styles.page}>
@@ -200,7 +222,6 @@ export default function LedgerPage() {
       <FilterBar
         filters={filters}
         onChange={(updates) => {
-          setPage(1);
           setFilters(updates);
         }}
         accounts={accounts}
@@ -258,24 +279,20 @@ export default function LedgerPage() {
         </>
       )}
 
-      <Drawer
-        open={Boolean(selected)}
-        title="Transaction detail"
-        onClose={() => setSelected(null)}
-      >
+      <Drawer open={Boolean(selected)} title="Transaction detail" onClose={() => setSelected(null)}>
         {selected && (
           <>
             <div className={styles.drawerBlock}>
               <div className={styles.drawerLabel}>Occurred at</div>
               <div>{formatDateTime(selected.occurred_at)}</div>
             </div>
+
             <div className={styles.drawerBlock}>
               <div className={styles.drawerLabel}>Description</div>
-              <div>{selected.description}</div>
-              <div className={styles.drawerMeta}>
-                Source ID: {selected.source_event_id}
-              </div>
+              <div>{selected.description ?? "—"}</div>
+              <div className={styles.drawerMeta}>Source ID: {selected.source_event_id}</div>
             </div>
+
             <div className={styles.drawerGrid}>
               <div>
                 <div className={styles.drawerLabel}>Account</div>
@@ -294,6 +311,7 @@ export default function LedgerPage() {
                 <div>{selected.category_name ?? "Needs review"}</div>
               </div>
             </div>
+
             <div className={styles.drawerBlock}>
               <div className={styles.drawerLabel}>Categorization</div>
               <div className={styles.drawerMeta}>
@@ -309,14 +327,14 @@ export default function LedgerPage() {
                 Reason: {selected.categorization?.reason ?? "—"}
               </div>
             </div>
+
             <div className={styles.drawerBlock}>
               <div className={styles.drawerLabel}>Payload snippet</div>
               <pre className={styles.payload}>
-                {selected.payload
-                  ? JSON.stringify(selected.payload, null, 2)
-                  : "Payload not available."}
+                {selected.payload ? JSON.stringify(selected.payload, null, 2) : "Payload not available."}
               </pre>
             </div>
+
             <div className={styles.drawerActions}>
               <button type="button" className={styles.primaryButton}>
                 Set category

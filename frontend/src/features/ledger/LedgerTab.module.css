@@ -5,10 +5,12 @@
   gap: 16px;
 }
 
+/* States */
 .loadingState,
 .errorState {
   padding: 16px;
   font-size: 13px;
+  color: var(--text);
 }
 
 .errorState {
@@ -22,6 +24,7 @@
   margin-bottom: 8px;
 }
 
+/* Header */
 .headerRow {
   display: flex;
   justify-content: space-between;
@@ -30,6 +33,76 @@
   flex-wrap: wrap;
 }
 
+.title {
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--text);
+}
+
+.controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.tabularNums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Inputs */
+.select {
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text);
+}
+
+.select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px var(--focus);
+}
+
+.button {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 80ms ease,
+    opacity 120ms ease;
+}
+
+.button:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px var(--focus);
+}
+
+/* Drilldown */
 .drilldownBanner {
   display: inline-flex;
   align-items: center;
@@ -61,66 +134,17 @@
   font-weight: 600;
 }
 
+.drilldownClear:hover {
+  color: var(--primary);
+}
+
 .drilldownClear:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px var(--focus);
   border-radius: 999px;
 }
 
-.title {
-  font-weight: 700;
-  font-size: 16px;
-}
-
-.meta {
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.tabularNums {
-  font-variant-numeric: tabular-nums;
-}
-
-.controls {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.select {
-  padding: 6px 10px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--card-bg);
-}
-
-.select:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 4px var(--focus);
-}
-
-.button {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 6px 10px;
-  background: var(--card-bg);
-  font-size: 12px;
-  font-weight: 600;
-  transition: border-color 120ms ease, box-shadow 120ms ease;
-}
-
-.button:hover {
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow-sm);
-}
-
-.button:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 4px var(--focus);
-}
-
+/* Summary cards */
 .summaryGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -144,6 +168,7 @@
 
 .statTitle {
   font-weight: 700;
+  color: var(--text);
 }
 
 .statSubtitle {
@@ -155,8 +180,11 @@
   margin-top: 10px;
   font-size: 22px;
   font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
 }
 
+/* Statements */
 .statementsGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -176,6 +204,7 @@
 .statementTitle {
   font-weight: 700;
   margin-bottom: 4px;
+  color: var(--text);
 }
 
 .statementRow {
@@ -196,6 +225,7 @@
   color: var(--text);
 }
 
+/* Table */
 .tableCard {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -209,8 +239,23 @@
   border-collapse: collapse;
 }
 
-.tableHead {
+.tableHeadRow {
   text-align: left;
+  background: var(--surface-muted);
+}
+
+.tableHeadCell {
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.tableRow {
+  transition: background 120ms ease;
+}
+
+.tableRow:hover {
   background: var(--surface-muted);
 }
 
@@ -218,6 +263,7 @@
   padding: 10px 12px;
   font-size: 13px;
   border-top: 1px solid var(--border);
+  color: var(--text);
 }
 
 .tableCellRight {
@@ -244,20 +290,42 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  margin-top: 2px;
 }
 
-.chip {
+/* Chips */
+.chip,
+.chipSuccess,
+.chipDanger {
   display: inline-flex;
   align-items: center;
   padding: 2px 8px;
   border-radius: 999px;
   border: 1px solid var(--border);
   font-size: 11px;
-  color: var(--text-muted);
   background: var(--card-bg);
+  font-weight: 600;
 }
 
+.chip {
+  color: var(--text-muted);
+}
+
+.chipSuccess {
+  color: var(--success);
+  border-color: var(--success-border);
+  background: var(--success-bg);
+}
+
+.chipDanger {
+  color: var(--danger);
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+}
+
+/* Empty */
 .emptyState {
   padding: 12px;
   color: var(--text-muted);
+  font-size: 13px;
 }

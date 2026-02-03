@@ -1,44 +1,160 @@
 :root {
-  --bg: #f5f7fb;
-  --panel-bg: #f8fafc;
-  --card-bg: #ffffff;
-  --surface-muted: #f2f4f7;
+  /* =========================================================
+   * SIMULATOR-INSPIRED FINTECH DARK THEME
+   * Goal: replicate the "polished control-room" UI language
+   * (thin borders, soft surfaces, pills, tactile buttons)
+   * ========================================================= */
 
-  --text: #101828;
-  --text-muted: #475467;
-  --text-soft: #667085;
+  /* --------- Base surfaces --------- */
+  --bg: #0b1220;            /* app background */
+  --panel-bg: rgba(255, 255, 255, 0.045);       /* side panels / header panels */
 
-  --border: #e4e7ec;
-  --border-strong: #d0d5dd;
+  /* Core surface hierarchy */
+  --card-bg: rgba(255, 255, 255, 0.045);      /* base card */
+  --surface-muted: rgba(255, 255, 255, 0.06); /* subtle header rows, table heads */
+  --surface-2: rgba(255, 255, 255, 0.075);    /* hover surfaces */
+  --surface-3: rgba(255, 255, 255, 0.105);    /* pressed/selected surfaces */
 
-  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.1);
-  --shadow-md: 0 10px 30px rgba(16, 24, 40, 0.12);
+  /* Overlays */
+  --overlay: rgba(0, 0, 0, 0.55);
+  --scrim: rgba(11, 18, 32, 0.78);
 
-  --radius-lg: 16px;
-  --radius-md: 12px;
-  --radius-sm: 10px;
-  --radius-xs: 6px;
+  /* --------- Text --------- */
+  --text: rgba(255, 255, 255, 0.92);
+  --text-muted: rgba(255, 255, 255, 0.70);
+  --text-soft: rgba(255, 255, 255, 0.55);
 
-  --primary: #2563eb;
-  --primary-strong: #1d4ed8;
-  --primary-soft: #e0e7ff;
-  --primary-ghost: rgba(37, 99, 235, 0.12);
+  /* “Ink” equivalent of #111827 (for light surfaces if needed) */
+  --ink: rgba(12, 18, 34, 0.96);
 
-  --focus: rgba(37, 99, 235, 0.28);
+  /* --------- Borders (Simulator uses #e5e7eb everywhere) --------- */
+  --border: rgba(255, 255, 255, 0.10);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --divider: rgba(255, 255, 255, 0.08);
+  --divider-strong: rgba(255, 255, 255, 0.12);
 
-  --danger: #b42318;
-  --danger-bg: #fee4e2;
-  --danger-border: #fecdca;
+  /* --------- Shadows (soft + modern) --------- */
+  --shadow-xs: 0 1px 0 rgba(0, 0, 0, 0.10);
+  --shadow-sm: 0 8px 24px rgba(0, 0, 0, 0.30);
+  --shadow-md: 0 18px 45px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 28px 70px rgba(0, 0, 0, 0.55);
 
-  --warning: #b54708;
-  --warning-bg: #fef0c7;
-  --warning-border: #fedf89;
+  /* --------- Radius (Simulator is 12/14/16 heavy) --------- */
+  --radius-xs: 8px;
+  --radius-sm: 12px;  /* inputs/buttons */
+  --radius-md: 14px;  /* story boxes, inner cards */
+  --radius-lg: 16px;  /* primary cards */
+  --radius-pill: 999px;
 
-  --success: #067647;
-  --success-bg: #dcfae6;
-  --success-border: #abefc6;
+  /* --------- Brand --------- */
+  --primary: #5d76ff;
+  --primary-strong: #4b66ff;
+  --primary-soft: rgba(93, 118, 255, 0.18);
+  --primary-ghost: rgba(93, 118, 255, 0.14);
+  --focus: rgba(93, 118, 255, 0.35);
 
-  --code-bg: #f7f9fc;
-  --code-border: #e4e7ec;
-  --code-text: #1d2939;
+  /* --------- Semantics --------- */
+  --danger: #ff6b5f;
+  --danger-bg: rgba(255, 107, 95, 0.14);
+  --danger-border: rgba(255, 107, 95, 0.22);
+
+  --warning: #ffbf4d;
+  --warning-bg: rgba(255, 191, 77, 0.14);
+  --warning-border: rgba(255, 191, 77, 0.22);
+
+  --success: #7ddf8d;
+  --success-bg: rgba(125, 223, 141, 0.14);
+  --success-border: rgba(125, 223, 141, 0.22);
+
+  --info: #60a5fa;
+  --info-bg: rgba(96, 165, 250, 0.14);
+  --info-border: rgba(96, 165, 250, 0.22);
+
+  /* --------- Inputs (Simulator inputs are card-like) --------- */
+  --input-bg: rgba(255, 255, 255, 0.04);
+  --input-bg-focus: rgba(255, 255, 255, 0.06);
+  --input-text: var(--text);
+  --input-placeholder: var(--text-soft);
+  --input-border: var(--border);
+  --input-border-hover: var(--border-strong);
+
+  /* --------- Pills / chips (Simulator pill = bg + border + small text) --------- */
+  --pill-bg: rgba(255, 255, 255, 0.05);
+  --pill-border: rgba(255, 255, 255, 0.12);
+  --pill-text: var(--text-muted);
+
+  --pill-success-bg: var(--success-bg);
+  --pill-success-border: var(--success-border);
+  --pill-success-text: var(--success);
+
+  --pill-warning-bg: rgba(255, 191, 77, 0.12);
+  --pill-warning-border: rgba(255, 191, 77, 0.22);
+  --pill-warning-text: #ffbf4d;
+
+  /* --------- Buttons (Simulator: default, primary, danger) --------- */
+  --btn-bg: rgba(255, 255, 255, 0.04);
+  --btn-bg-hover: rgba(255, 255, 255, 0.07);
+  --btn-bg-active: rgba(255, 255, 255, 0.10);
+  --btn-border: var(--border);
+  --btn-border-hover: var(--border-strong);
+  --btn-text: var(--text);
+
+  --btn-primary-bg: var(--primary);
+  --btn-primary-bg-hover: var(--primary-strong);
+  --btn-primary-text: #ffffff;
+  --btn-primary-border: rgba(93, 118, 255, 0.40);
+
+  --btn-danger-bg: rgba(255, 107, 95, 0.10);
+  --btn-danger-bg-hover: rgba(255, 107, 95, 0.16);
+  --btn-danger-text: var(--danger);
+  --btn-danger-border: var(--danger-border);
+
+  --disabled: rgba(255, 255, 255, 0.35);
+
+  /* --------- Tables / rows --------- */
+  --row-hover: rgba(255, 255, 255, 0.05);
+  --row-selected: rgba(93, 118, 255, 0.16);
+  --table-head-bg: var(--surface-muted);
+
+  /* --------- Story / code-like boxes --------- */
+  --story-bg: rgba(255, 255, 255, 0.04);
+  --story-border: rgba(255, 255, 255, 0.10);
+
+  --code-bg: rgba(255, 255, 255, 0.05);
+  --code-border: rgba(255, 255, 255, 0.10);
+  --code-text: rgba(255, 255, 255, 0.85);
+
+  /* --------- Toasts (Simulator uses light tinted cards) --------- */
+  --toast-ok-bg: rgba(125, 223, 141, 0.12);
+  --toast-ok-border: rgba(125, 223, 141, 0.22);
+  --toast-ok-text: rgba(255, 255, 255, 0.92);
+
+  --toast-err-bg: rgba(255, 107, 95, 0.14);
+  --toast-err-border: rgba(255, 107, 95, 0.24);
+  --toast-err-text: rgba(255, 255, 255, 0.92);
+
+  --toast-info-bg: rgba(96, 165, 250, 0.14);
+  --toast-info-border: rgba(96, 165, 250, 0.24);
+  --toast-info-text: rgba(255, 255, 255, 0.92);
+
+  /* --------- Compatibility aliases (keep) --------- */
+  --background: var(--bg);
+  --surface: var(--card-bg);
+  --panel: var(--panel-bg);
+  --muted-surface: var(--surface-muted);
+
+  --foreground: var(--text);
+  --muted: var(--text-muted);
+  --subtle: var(--text-soft);
+
+  --border-color: var(--border);
+  --border-color-strong: var(--border-strong);
+
+  --ring: var(--focus);
+  --radius: var(--radius-sm);
+
+  --accent: var(--primary);
+  --accent-strong: var(--primary-strong);
+  --accent-soft: var(--primary-soft);
+  --accent-ghost: var(--primary-ghost);
 }

@@ -10,31 +10,45 @@ export type LedgerDrilldown = {
   search?: string;
 };
 
-function fmtMoney(n: number) {
-  const sign = n < 0 ? "-" : "";
-  const abs = Math.abs(n);
-  return `${sign}$${abs.toFixed(2)}`;
+function formatMoney(value: number) {
+  // Avoid "-$0.00" and improve readability with grouping.
+  const normalized = Math.abs(value) < 0.005 ? 0 : value;
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2,
+  }).format(normalized);
 }
 
-function Chip({ label }: { label: string }) {
-  return <span className={styles.chip}>{label}</span>;
-}
-
-function todayISO() {
-  const d = new Date();
+function isoLocalDate(d: Date) {
+  // Produces YYYY-MM-DD in *local* time without timezone surprises.
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
 }
 
-function daysAgoISO(days: number) {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
+function rangeLastNDays(days: number) {
+  const end = new Date();
+  const start = new Date();
+  start.setDate(start.getDate() - days);
+  return { start: isoLocalDate(start), end: isoLocalDate(end) };
+}
+
+function Chip({
+  label,
+  tone = "neutral",
+}: {
+  label: string;
+  tone?: "neutral" | "success" | "danger";
+}) {
+  const cls =
+    tone === "success"
+      ? styles.chipSuccess
+      : tone === "danger"
+      ? styles.chipDanger
+      : styles.chip;
+  return <span className={cls}>{label}</span>;
 }
 
 function StatCard({
@@ -57,6 +71,12 @@ function StatCard({
   );
 }
 
+function presetToDays(preset?: LedgerDrilldown["date_preset"]) {
+  if (preset === "365d") return 365;
+  if (preset === "90d") return 90;
+  return 30;
+}
+
 export function LedgerTab({
   drilldown,
   refreshToken,
@@ -68,6 +88,7 @@ export function LedgerTab({
 }) {
   const [days, setDays] = useState(30);
   const { setDateRange } = useAppState();
+
   const {
     lines,
     incomeStatement,
@@ -80,29 +101,29 @@ export function LedgerTab({
     end_date,
   } = useLedger({ limit: 1000 });
 
+  // Sync days preset from drilldown (Health → Ledger deep link)
   useEffect(() => {
-    if (!drilldown) {
+    if (!drilldown?.date_preset) {
       setDays(30);
       return;
     }
-    if (!drilldown.date_preset) return;
-    const nextDays =
-      drilldown.date_preset === "365d" ? 365 : drilldown.date_preset === "90d" ? 90 : 30;
-    setDays(nextDays);
-  }, [drilldown]);
+    setDays(presetToDays(drilldown.date_preset));
+  }, [drilldown?.date_preset]);
 
+  // Push date range into global app state (so other tabs stay aligned)
   useEffect(() => {
-    setDateRange({ start: daysAgoISO(days), end: todayISO() });
+    setDateRange(rangeLastNDays(days));
   }, [days, setDateRange]);
 
+  // Refresh when refreshToken changes (not when it's merely truthy)
   useEffect(() => {
-    if (!refreshToken) return;
+    if (refreshToken == null) return;
     refresh();
   }, [refreshToken, refresh]);
 
   const drilldownSummary = useMemo(() => {
     if (!drilldown) return "";
-    const parts = [];
+    const parts: string[] = [];
     if (drilldown.direction) parts.push(`Direction: ${drilldown.direction}`);
     if (drilldown.search) parts.push(`Search: "${drilldown.search}"`);
     if (drilldown.date_preset) parts.push(`Range: ${drilldown.date_preset}`);
@@ -111,7 +132,7 @@ export function LedgerTab({
 
   const dateFormatter = useMemo(
     () =>
-      new Intl.DateTimeFormat("en-US", {
+      new Intl.DateTimeFormat(undefined, {
         month: "short",
         day: "2-digit",
         year: "numeric",
@@ -121,30 +142,38 @@ export function LedgerTab({
     []
   );
 
-
+  // IMPORTANT: enforce deterministic sort before computing running balances
+  const baseRows = useMemo(() => {
+    const arr = lines ?? [];
+    // Sort ascending by occurred_at so running balance is meaningful left-to-right.
+    return [...arr].sort(
+      (a, b) => new Date(a.occurred_at).getTime() - new Date(b.occurred_at).getTime()
+    );
+  }, [lines]);
 
   const filteredRows = useMemo(() => {
-    const arr = lines ?? [];
-    if (!drilldown) return arr;
+    if (!drilldown) return baseRows;
+
     const search = (drilldown.search ?? "").trim().toLowerCase();
-    return arr.filter((row) => {
+
+    return baseRows.filter((row) => {
       if (drilldown.direction && row.direction !== drilldown.direction) return false;
+
       if (search) {
         const haystack = `${row.description ?? ""} ${row.category_name ?? ""}`.toLowerCase();
         if (!haystack.includes(search)) return false;
       }
       return true;
     });
-  }, [drilldown, lines]);
+  }, [baseRows, drilldown]);
 
   const totals = useMemo(() => computeLedgerSummary(filteredRows), [filteredRows]);
-  const runningBalanceById = useMemo(
-    () => computeRunningBalance(filteredRows),
-    [filteredRows]
-  );
+  const runningBalanceById = useMemo(() => computeRunningBalance(filteredRows), [filteredRows]);
 
+  // Render states
   if (loading && !lines) return <div className={styles.loadingState}>Loading ledger…</div>;
-  if (err)
+
+  if (err) {
     return (
       <div className={styles.errorState}>
         <div className={styles.errorMessage}>Error: {err}</div>
@@ -153,6 +182,7 @@ export function LedgerTab({
         </button>
       </div>
     );
+  }
 
   return (
     <div className={styles.container}>
@@ -176,8 +206,14 @@ export function LedgerTab({
             <option value={365}>Last 12 months</option>
           </select>
 
-          <button onClick={refresh} className={styles.button} type="button">
-            Refresh
+          <button
+            onClick={refresh}
+            className={styles.button}
+            type="button"
+            disabled={loading}
+            aria-disabled={loading}
+          >
+            {loading ? "Refreshing…" : "Refresh"}
           </button>
         </div>
       </div>
@@ -200,16 +236,16 @@ export function LedgerTab({
 
       {/* Summary cards */}
       <div className={styles.summaryGrid}>
-        <StatCard title="Cash In" value={fmtMoney(totals.inflow.value)} subtitle="Posted lines" />
+        <StatCard title="Cash In" value={formatMoney(totals.inflow.value)} subtitle="Posted lines" />
         <StatCard
           title="Cash Out"
-          value={fmtMoney(-totals.outflow.value)}
+          value={formatMoney(-totals.outflow.value)}
           subtitle="Posted lines"
         />
-        <StatCard title="Net Cash Flow" value={fmtMoney(totals.net.value)} subtitle="Posted lines" />
+        <StatCard title="Net Cash Flow" value={formatMoney(totals.net.value)} subtitle="Posted lines" />
         <StatCard
           title="Balance Sheet (MVP)"
-          value={balanceSheet ? fmtMoney(balanceSheet.cash) : "—"}
+          value={balanceSheet ? formatMoney(balanceSheet.cash) : "—"}
           subtitle={balanceSheet ? `as of ${balanceSheet.as_of}` : "not available"}
         />
       </div>
@@ -222,15 +258,21 @@ export function LedgerTab({
             <>
               <div className={styles.statementRow}>
                 <small>Revenue</small>
-                <div className={styles.statementValue}>{fmtMoney(incomeStatement.revenue_total)}</div>
+                <div className={styles.statementValue}>
+                  {formatMoney(incomeStatement.revenue_total)}
+                </div>
               </div>
               <div className={styles.statementRow}>
                 <small>Expenses</small>
-                <div className={styles.statementValue}>{fmtMoney(-incomeStatement.expense_total)}</div>
+                <div className={styles.statementValue}>
+                  {formatMoney(-incomeStatement.expense_total)}
+                </div>
               </div>
               <div className={styles.statementRow}>
                 <small>Net Income</small>
-                <div className={styles.statementValueStrong}>{fmtMoney(incomeStatement.net_income)}</div>
+                <div className={styles.statementValueStrong}>
+                  {formatMoney(incomeStatement.net_income)}
+                </div>
               </div>
             </>
           ) : (
@@ -244,15 +286,17 @@ export function LedgerTab({
             <>
               <div className={styles.statementRow}>
                 <small>Cash In</small>
-                <div className={styles.statementValue}>{fmtMoney(cashFlow.cash_in)}</div>
+                <div className={styles.statementValue}>{formatMoney(cashFlow.cash_in)}</div>
               </div>
               <div className={styles.statementRow}>
                 <small>Cash Out</small>
-                <div className={styles.statementValue}>{fmtMoney(-cashFlow.cash_out)}</div>
+                <div className={styles.statementValue}>{formatMoney(-cashFlow.cash_out)}</div>
               </div>
               <div className={styles.statementRow}>
                 <small>Net</small>
-                <div className={styles.statementValueStrong}>{fmtMoney(cashFlow.net_cash_flow)}</div>
+                <div className={styles.statementValueStrong}>
+                  {formatMoney(cashFlow.net_cash_flow)}
+                </div>
               </div>
             </>
           ) : (
@@ -266,15 +310,21 @@ export function LedgerTab({
             <>
               <div className={styles.statementRow}>
                 <small>Assets</small>
-                <div className={styles.statementValue}>{fmtMoney(balanceSheet.assets_total)}</div>
+                <div className={styles.statementValue}>
+                  {formatMoney(balanceSheet.assets_total)}
+                </div>
               </div>
               <div className={styles.statementRow}>
                 <small>Liabilities</small>
-                <div className={styles.statementValue}>{fmtMoney(balanceSheet.liabilities_total)}</div>
+                <div className={styles.statementValue}>
+                  {formatMoney(balanceSheet.liabilities_total)}
+                </div>
               </div>
               <div className={styles.statementRow}>
                 <small>Equity</small>
-                <div className={styles.statementValueStrong}>{fmtMoney(balanceSheet.equity_total)}</div>
+                <div className={styles.statementValueStrong}>
+                  {formatMoney(balanceSheet.equity_total)}
+                </div>
               </div>
             </>
           ) : (
@@ -287,55 +337,61 @@ export function LedgerTab({
       <div className={styles.tableCard}>
         <table className={styles.table}>
           <thead>
-            <tr className={styles.tableHead}>
-              <th className={styles.tableCell}>When</th>
-              <th className={styles.tableCell}>Description</th>
-              <th className={styles.tableCell}>Account</th>
-              <th className={styles.tableCell}>Category</th>
-              <th className={styles.tableCell}>Type</th>
-              <th className={`${styles.tableCell} ${styles.tableCellRight}`}>Amount</th>
-              <th className={`${styles.tableCell} ${styles.tableCellRight}`}>Balance (range)</th>
+            <tr className={styles.tableHeadRow}>
+              <th className={styles.tableHeadCell}>When</th>
+              <th className={styles.tableHeadCell}>Description</th>
+              <th className={styles.tableHeadCell}>Account</th>
+              <th className={styles.tableHeadCell}>Category</th>
+              <th className={styles.tableHeadCell}>Type</th>
+              <th className={`${styles.tableHeadCell} ${styles.tableCellRight}`}>Amount</th>
+              <th className={`${styles.tableHeadCell} ${styles.tableCellRight}`}>Balance (range)</th>
             </tr>
           </thead>
+
           <tbody>
-            {filteredRows.map((l) => (
-              <tr key={l.source_event_id}>
-                <td className={`${styles.tableCell} ${styles.tableCellNoWrap}`}>
-                  {dateFormatter.format(new Date(l.occurred_at))}
-                </td>
+            {filteredRows.map((l) => {
+              const chipTone = l.direction === "inflow" ? "success" : "danger";
+              return (
+                <tr key={l.source_event_id} className={styles.tableRow}>
+                  <td className={`${styles.tableCell} ${styles.tableCellNoWrap}`}>
+                    {dateFormatter.format(new Date(l.occurred_at))}
+                  </td>
 
-                <td className={styles.tableCell}>
-                  <div className={styles.tableTitle}>{l.description}</div>
-                  <small className={styles.tableSub}>
-                    event {l.source_event_id.slice(-6)} · <Chip label={l.direction} />
-                  </small>
-                </td>
+                  <td className={styles.tableCell}>
+                    <div className={styles.tableTitle}>{l.description ?? "—"}</div>
+                    <small className={styles.tableSub}>
+                      event {l.source_event_id.slice(-6)} ·{" "}
+                      <Chip label={l.direction} tone={chipTone} />
+                    </small>
+                  </td>
 
-                <td className={styles.tableCell}>{l.account_name}</td>
-                <td className={styles.tableCell}>{l.category_name}</td>
+                  <td className={styles.tableCell}>{l.account_name ?? "—"}</td>
+                  <td className={styles.tableCell}>{l.category_name ?? "Needs review"}</td>
 
-                <td className={styles.tableCell}>
-                  <small className={styles.meta}>
-                    {l.account_type}
-                    {l.account_subtype ? ` · ${l.account_subtype}` : ""}
-                  </small>
-                </td>
+                  <td className={styles.tableCell}>
+                    <small className={styles.meta}>
+                      {l.account_type}
+                      {l.account_subtype ? ` · ${l.account_subtype}` : ""}
+                    </small>
+                  </td>
 
-                <td className={`${styles.tableCell} ${styles.tableCellRight}`}>
-                  {fmtMoney(l.signed_amount)}
-                </td>
-                <td className={`${styles.tableCell} ${styles.tableCellRight} ${styles.balanceCell}`}>
-                  {fmtMoney(runningBalanceById.get(l.source_event_id) ?? 0)}
-                </td>
-              </tr>
-            ))}
+                  <td className={`${styles.tableCell} ${styles.tableCellRight}`}>
+                    {formatMoney(l.signed_amount)}
+                  </td>
+
+                  <td className={`${styles.tableCell} ${styles.tableCellRight} ${styles.balanceCell}`}>
+                    {formatMoney(runningBalanceById.get(l.source_event_id) ?? 0)}
+                  </td>
+                </tr>
+              );
+            })}
 
             {filteredRows.length === 0 && (
               <tr>
                 <td colSpan={7} className={styles.emptyState}>
                   {lines && lines.length > 0
-                    ? "No ledger lines match this drilldown."
-                    : "No posted ledger lines yet. Categorize a few transactions first."}
+                    ? "No ledger lines match the current drilldown."
+                    : "No ledger lines found in this date range."}
                 </td>
               </tr>
             )}
