@@ -9,6 +9,7 @@ from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.orm import Session
 
 from backend.app.models import Business, HealthSignalState
+from backend.app.services import audit_service
 
 ALLOWED_STATUSES = {"open", "in_progress", "resolved", "ignored"}
 
@@ -28,6 +29,16 @@ def _status_default(signal_status: Optional[str]) -> str:
     if signal_status in ALLOWED_STATUSES:
         return signal_status
     return "open"
+
+
+def _serialize_state(state: HealthSignalState) -> dict:
+    return {
+        "signal_id": state.signal_id,
+        "status": state.status,
+        "last_seen_at": state.last_seen_at.isoformat() if state.last_seen_at else None,
+        "resolved_at": state.resolved_at.isoformat() if state.resolved_at else None,
+        "resolution_note": state.resolution_note,
+    }
 
 def _is_missing_health_signal_table(exc: Exception) -> bool:
     orig = getattr(exc, "orig", None)
@@ -95,6 +106,15 @@ def hydrate_signal_states(
             )
             db.add(state)
             existing_map[signal_id] = state
+            audit_service.log_audit_event(
+                db,
+                business_id=business_id,
+                event_type="signal_detected",
+                actor="system",
+                reason="detected",
+                before=None,
+                after=_serialize_state(state),
+            )
         else:
             state.last_seen_at = now
             state.updated_at = now
@@ -113,6 +133,8 @@ def update_signal_status(
     business_id: str,
     signal_id: str,
     status: str,
+    reason: Optional[str] = None,
+    actor: Optional[str] = None,
     resolution_note: Optional[str] = None,
 ) -> dict:
     require_business(db, business_id)
@@ -121,6 +143,9 @@ def update_signal_status(
 
     now = _now()
     state = db.get(HealthSignalState, (business_id, signal_id))
+    before_state = _serialize_state(state) if state else None
+    resolved_reason = reason or resolution_note
+    resolved_actor = actor or "system"
     if not state:
         state = HealthSignalState(
             business_id=business_id,
@@ -128,19 +153,37 @@ def update_signal_status(
             status=status,
             last_seen_at=now,
             resolved_at=now if status == "resolved" else None,
-            resolution_note=resolution_note,
+            resolution_note=resolved_reason,
             updated_at=now,
         )
         db.add(state)
+        audit_service.log_audit_event(
+            db,
+            business_id=business_id,
+            event_type="signal_detected",
+            actor="system",
+            reason="detected",
+            before=None,
+            after=_serialize_state(state),
+        )
     else:
         state.status = status
-        state.resolution_note = resolution_note
+        state.resolution_note = resolved_reason
         state.updated_at = now
         if status == "resolved":
             state.resolved_at = now
         else:
             state.resolved_at = None
 
+    audit_row = audit_service.log_audit_event(
+        db,
+        business_id=business_id,
+        event_type="signal_status_changed",
+        actor=resolved_actor,
+        reason=resolved_reason,
+        before=before_state,
+        after=_serialize_state(state),
+    )
     db.commit()
     return {
         "business_id": business_id,
@@ -149,4 +192,6 @@ def update_signal_status(
         "last_seen_at": state.last_seen_at.isoformat() if state.last_seen_at else None,
         "resolved_at": state.resolved_at.isoformat() if state.resolved_at else None,
         "resolution_note": state.resolution_note,
+        "reason": state.resolution_note,
+        "audit_id": audit_row.id,
     }

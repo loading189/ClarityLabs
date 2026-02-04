@@ -10,8 +10,9 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///./test_health_signal_states.db"
 
 from backend.app.db import Base, SessionLocal, engine
 from backend.app.sim import models as sim_models  # noqa: F401
-from backend.app.models import Organization, Business
+from backend.app.models import AuditLog, Organization, Business
 from backend.app.services import health_signal_service
+from sqlalchemy import select
 
 
 @pytest.fixture()
@@ -64,3 +65,26 @@ def test_health_signal_status_persistence(db_session):
     by_id = {row["id"]: row for row in second}
     assert by_id["high_uncategorized_rate"]["status"] == "resolved"
     assert by_id["high_uncategorized_rate"]["resolution_note"] == "resolved via rule"
+
+
+def test_status_update_writes_audit_log(db_session):
+    biz = _create_business(db_session)
+
+    health_signal_service.update_signal_status(
+        db_session,
+        biz.id,
+        "rule_coverage_low",
+        status="ignored",
+        reason="not relevant",
+        actor="tester",
+    )
+
+    rows = db_session.execute(
+        select(AuditLog).where(AuditLog.business_id == biz.id).order_by(AuditLog.created_at.asc())
+    ).scalars().all()
+
+    assert rows
+    assert any(row.event_type == "signal_status_changed" for row in rows)
+    status_rows = [row for row in rows if row.event_type == "signal_status_changed"]
+    assert status_rows[0].before_state is None or isinstance(status_rows[0].before_state, dict)
+    assert isinstance(status_rows[0].after_state, dict)

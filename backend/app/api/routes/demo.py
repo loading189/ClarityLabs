@@ -46,7 +46,8 @@ router = APIRouter(prefix="/demo", tags=["demo"])
 
 class HealthSignalStatusIn(BaseModel):
     status: str = Field(..., min_length=2, max_length=32)
-    resolution_note: Optional[str] = Field(default=None, max_length=500)
+    reason: Optional[str] = Field(default=None, max_length=500)
+    actor: Optional[str] = Field(default=None, max_length=40)
 
 
 class DashboardMetadataOut(BaseModel):
@@ -734,7 +735,8 @@ def update_health_signal_status(
         business_id,
         signal_id,
         status=req.status,
-        resolution_note=req.resolution_note,
+        reason=req.reason,
+        actor=req.actor,
     )
 
 @router.get("/transactions/{business_id}")
