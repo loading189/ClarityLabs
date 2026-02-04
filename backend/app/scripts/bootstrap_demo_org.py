@@ -3,18 +3,8 @@ from __future__ import annotations
 from datetime import datetime
 
 from backend.app.db import SessionLocal  # or however you create sessions
+from backend.app.coa_templates import DEFAULT_COA
 from backend.app.models import Organization, Business, Account
-
-
-DEFAULT_COA = [
-    {"code": "1000", "name": "Cash", "type": "asset", "subtype": "cash"},
-    {"code": "1100", "name": "Accounts Receivable", "type": "asset", "subtype": "ar"},
-    {"code": "2000", "name": "Accounts Payable", "type": "liability", "subtype": "ap"},
-    {"code": "3000", "name": "Owner Equity", "type": "equity", "subtype": None},
-    {"code": "4000", "name": "Revenue", "type": "revenue", "subtype": None},
-    {"code": "5000", "name": "Cost of Goods Sold", "type": "expense", "subtype": "cogs"},
-    {"code": "5100", "name": "Payroll Expense", "type": "expense", "subtype": "payroll"},
-]
 
 
 def bootstrap_demo(org_name: str = "Demo Org", biz_name: str = "Demo Business") -> None:
