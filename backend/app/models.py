@@ -397,6 +397,38 @@ class TxnCategorization(Base):
     category = relationship("Category")
 
 
+class AuditLog(Base):
+    """
+    Append-only audit log for categorization workflow changes.
+    """
+    __tablename__ = "audit_logs"
+    __table_args__ = (
+        Index("ix_audit_logs_business_id", "business_id"),
+        Index("ix_audit_logs_created_at", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+
+    business_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    event_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    actor: Mapped[str] = mapped_column(String(40), nullable=False)
+    reason: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+
+    source_event_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True, index=True)
+    rule_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, index=True)
+
+    before_state: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    after_state: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
 class SystemCategory(Base):
     """
     Optional curated set of system keys. Keep for UI/reference.

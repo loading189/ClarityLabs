@@ -26,6 +26,7 @@ import { isBusinessIdValid } from "../../utils/businessId";
 import { isValidIsoDate } from "../../app/filters/filters";
 import { normalizeVendorDisplay } from "../../utils/vendors";
 import { hasValidCategoryMapping } from "../../utils/categories";
+import RecentChangesPanel from "../../components/audit/RecentChangesPanel";
 
 export type CategorizeDrilldown = {
   merchant_key?: string;
@@ -1154,6 +1155,7 @@ export default function CategorizeTab({
           </div>
         )}
       </div>
+      <RecentChangesPanel businessId={businessId} dataVersion={dataVersion} />
     </div>
   );
 }

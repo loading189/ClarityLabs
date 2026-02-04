@@ -13,6 +13,8 @@ from backend.app.api.routes.admin import router as admin_router
 from backend.app.api.routes.ledger import router as ledger_router
 from backend.app.api.routes.brief import router as brief_router
 from backend.app.api.routes.signals import router as signals_router
+from backend.app.api.routes.audit import router as audit_router
+from backend.app.api.routes.diagnostics import router as diagnostics_router
 
 
 
@@ -52,3 +54,5 @@ app.include_router(admin_router)
 app.include_router(ledger_router)
 app.include_router(brief_router)
 app.include_router(signals_router)
+app.include_router(audit_router)
+app.include_router(diagnostics_router)
