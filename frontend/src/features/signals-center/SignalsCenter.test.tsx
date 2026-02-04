@@ -45,11 +45,13 @@ const getSignalDetail = vi.fn().mockResolvedValue({
 
 const updateSignalStatus = vi.fn();
 const getAuditLog = vi.fn().mockResolvedValue({ items: [], next_cursor: null });
+const fetchSignals = vi.fn();
 
 vi.mock("../../api/signals", () => ({
   listSignalStates: (...args: unknown[]) => listSignalStates(...args),
   getSignalDetail: (...args: unknown[]) => getSignalDetail(...args),
   updateSignalStatus: (...args: unknown[]) => updateSignalStatus(...args),
+  fetchSignals: (...args: unknown[]) => fetchSignals(...args),
 }));
 
 vi.mock("../../api/audit", () => ({

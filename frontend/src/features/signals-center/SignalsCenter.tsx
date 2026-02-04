@@ -4,9 +4,11 @@ import Drawer from "../../components/common/Drawer";
 import { ErrorState, LoadingState } from "../../components/common/DataState";
 import { getAuditLog, type AuditLogOut } from "../../api/audit";
 import {
+  fetchSignals,
   getSignalDetail,
   listSignalStates,
   updateSignalStatus,
+  type Signal,
   type SignalState,
   type SignalStateDetail,
   type SignalStatus,
@@ -39,6 +41,30 @@ function severityClass(severity: string | null) {
   if (severity === "yellow") return styles.severityYellow;
   if (severity === "green") return styles.severityGreen;
   return styles.severityNeutral;
+}
+
+function toIsoDate(value: Date) {
+  return value.toISOString().slice(0, 10);
+}
+
+function buildLegacyDateRange() {
+  const end = new Date();
+  const start = new Date();
+  start.setDate(end.getDate() - 30);
+  return { start: toIsoDate(start), end: toIsoDate(end) };
+}
+
+function mapLegacySignal(signal: Signal): SignalState {
+  const title = signal.type.replace(/_/g, " ");
+  return {
+    id: signal.id,
+    type: signal.type,
+    severity: signal.severity,
+    status: "open",
+    title,
+    summary: signal.window ? `Window ${signal.window}` : "—",
+    updated_at: null,
+  };
 }
 
 type StatusModalState = {
@@ -151,6 +177,7 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
   const [signals, setSignals] = useState<SignalState[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [useLegacyV1, setUseLegacyV1] = useState(false);
   const [selected, setSelected] = useState<SignalState | null>(null);
   const [detail, setDetail] = useState<SignalStateDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -164,26 +191,44 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
   const [savingStatus, setSavingStatus] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [toastAuditId, setToastAuditId] = useState<string | null>(null);
+  const legacyDateRange = useMemo(() => buildLegacyDateRange(), []);
 
   const loadSignals = useCallback(async () => {
     if (!businessId) return;
     setLoading(true);
     setErr(null);
     try {
-      const data = await listSignalStates(businessId);
-      setSignals(data.signals ?? []);
+      if (useLegacyV1) {
+        const data = await fetchSignals(businessId, {
+          start_date: legacyDateRange.start,
+          end_date: legacyDateRange.end,
+        });
+        setSignals((data.signals ?? []).map(mapLegacySignal));
+      } else {
+        const data = await listSignalStates(businessId);
+        setSignals(data.signals ?? []);
+      }
     } catch (e: any) {
       setErr(e?.message ?? "Failed to load signals");
     } finally {
       setLoading(false);
     }
-  }, [businessId]);
+  }, [businessId, legacyDateRange.end, legacyDateRange.start, useLegacyV1]);
 
   useEffect(() => {
     loadSignals();
   }, [loadSignals]);
 
   useEffect(() => {
+    if (useLegacyV1) {
+      setSelected(null);
+      setDetail(null);
+      setStatusModal({ open: false, nextStatus: null });
+      setActor("");
+      setReason("");
+      setStatusFilter("");
+      return;
+    }
     if (!selected?.id) {
       setDetail(null);
       return;
@@ -207,7 +252,7 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
     return () => {
       active = false;
     };
-  }, [businessId, selected]);
+  }, [businessId, selected, useLegacyV1]);
 
   const [statusFilter, setStatusFilter] = useState("");
   const [severityFilter, setSeverityFilter] = useState("");
@@ -241,6 +286,7 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
   };
 
   const handleStatusSubmit = async () => {
+    if (useLegacyV1) return;
     if (!selected || !statusModal.nextStatus) return;
     if (!actor.trim() || !reason.trim()) return;
     setSavingStatus(true);
@@ -290,6 +336,7 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
             className={styles.select}
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value)}
+            disabled={useLegacyV1}
           >
             <option value="">All</option>
             <option value="open">Open</option>
@@ -328,7 +375,20 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
             ))}
           </select>
         </label>
+        <label className={styles.legacyToggle}>
+          <span>V1 (legacy)</span>
+          <input
+            type="checkbox"
+            checked={useLegacyV1}
+            onChange={(event) => setUseLegacyV1(event.target.checked)}
+          />
+        </label>
       </div>
+      {useLegacyV1 && (
+        <div className={styles.legacyNote}>
+          Legacy signals are read-only. Switch off to manage statuses and view details.
+        </div>
+      )}
 
       {loading && <LoadingState label="Loading signals…" />}
       {err && <ErrorState label={err} />}
@@ -342,8 +402,14 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
             <button
               key={signal.id}
               type="button"
-              className={`${styles.row} ${selected?.id === signal.id ? styles.rowActive : ""}`}
-              onClick={() => setSelected(signal)}
+              className={`${styles.row} ${selected?.id === signal.id ? styles.rowActive : ""} ${
+                useLegacyV1 ? styles.rowDisabled : ""
+              }`}
+              onClick={() => {
+                if (useLegacyV1) return;
+                setSelected(signal);
+              }}
+              disabled={useLegacyV1}
             >
               <span className={`${styles.severityBadge} ${severityClass(signal.severity)}`}>
                 {signal.severity ?? "—"}

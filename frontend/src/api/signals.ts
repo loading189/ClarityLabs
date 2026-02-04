@@ -29,7 +29,7 @@ export async function fetchSignals(
     start_date: params.start_date,
     end_date: params.end_date,
   });
-  return apiGet<SignalsResponse>(`/api/signals?${query.toString()}`, { signal });
+  return apiGet<SignalsResponse>(`/api/signals/v1?${query.toString()}`, { signal });
 }
 
 export type SignalStatus = "open" | "in_progress" | "resolved" | "ignored";
@@ -91,9 +91,36 @@ export function updateSignalStatus(
   businessId: string,
   signalId: string,
   payload: SignalStatusUpdateInput
+): Promise<SignalStatusUpdateResponse>;
+export function updateSignalStatus(
+  businessId: string,
+  signalId: string,
+  payload: SignalStatusUpdateInput,
+  options: { mode: "demo" }
+): Promise<LegacySignalStatusUpdateResponse>;
+export function updateSignalStatus(
+  businessId: string,
+  signalId: string,
+  payload: SignalStatusUpdateInput,
+  options?: { mode?: "demo" }
 ) {
+  if (options?.mode === "demo") {
+    return apiPost<LegacySignalStatusUpdateResponse>(
+      `/demo/health/${businessId}/signals/${signalId}/status`,
+      {
+        status: payload.status,
+        resolution_note: payload.reason ?? null,
+      }
+    );
+  }
   return apiPost<SignalStatusUpdateResponse>(
     `/api/signals/${businessId}/${signalId}/status`,
     payload
   );
 }
+
+export type LegacySignalStatusUpdateResponse = {
+  status: SignalStatus;
+  resolved_at?: string | null;
+  resolution_note?: string | null;
+};

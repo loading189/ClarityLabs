@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { getMonitorStatus, runMonitorPulse, type MonitorStatus } from "../../api/monitor";
+import { runMonitorPulse } from "../../api/monitor";
 import { listSignalStates, type SignalState } from "../../api/signals";
 import styles from "./MonitoringWidget.module.css";
 
@@ -23,24 +23,47 @@ function countOpenBySeverity(signals: SignalState[]) {
   );
 }
 
+function getLatestTimestamp(signals: SignalState[]) {
+  return signals.reduce<string | null>((latest, signal) => {
+    if (!signal.updated_at) return latest;
+    if (!latest) return signal.updated_at;
+    return new Date(signal.updated_at).getTime() > new Date(latest).getTime()
+      ? signal.updated_at
+      : latest;
+  }, null);
+}
+
 export default function MonitoringWidget({ businessId }: { businessId: string }) {
-  const [status, setStatus] = useState<MonitorStatus | null>(null);
   const [signals, setSignals] = useState<SignalState[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [pulseLoading, setPulseLoading] = useState(false);
+  const [lastPulseAt, setLastPulseAt] = useState<string | null>(null);
+  const [newestEventAt, setNewestEventAt] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!businessId) return;
     setLoading(true);
     setErr(null);
     try {
-      const [statusData, signalsData] = await Promise.all([
-        getMonitorStatus(businessId),
-        listSignalStates(businessId),
-      ]);
-      setStatus(statusData);
-      setSignals(signalsData.signals ?? []);
+      const signalsData = await listSignalStates(businessId);
+      const nextSignals = signalsData.signals ?? [];
+      const latestTimestamp = getLatestTimestamp(nextSignals);
+      setSignals(nextSignals);
+      setLastPulseAt((prev) => {
+        if (!latestTimestamp) return prev ?? null;
+        if (!prev) return latestTimestamp;
+        return new Date(latestTimestamp).getTime() > new Date(prev).getTime()
+          ? latestTimestamp
+          : prev;
+      });
+      setNewestEventAt((prev) => {
+        if (!latestTimestamp) return prev ?? null;
+        if (!prev) return latestTimestamp;
+        return new Date(latestTimestamp).getTime() > new Date(prev).getTime()
+          ? latestTimestamp
+          : prev;
+      });
     } catch (e: any) {
       setErr(e?.message ?? "Failed to load monitoring status");
     } finally {
@@ -53,13 +76,19 @@ export default function MonitoringWidget({ businessId }: { businessId: string })
   }, [load]);
 
   const openCounts = useMemo(() => countOpenBySeverity(signals), [signals]);
+  const openTotal = useMemo(
+    () => signals.filter((signal) => signal.status === "open").length,
+    [signals]
+  );
 
   const handlePulse = async () => {
     if (!businessId || pulseLoading) return;
     setPulseLoading(true);
     setErr(null);
     try {
-      await runMonitorPulse(businessId);
+      const pulse = await runMonitorPulse(businessId);
+      setLastPulseAt(pulse.last_pulse_at ?? null);
+      setNewestEventAt(pulse.newest_event_at ?? null);
       await load();
     } catch (e: any) {
       setErr(e?.message ?? "Failed to run monitor check");
@@ -98,15 +127,15 @@ export default function MonitoringWidget({ businessId }: { businessId: string })
           <div className={styles.metrics}>
             <div>
               <div className={styles.metricLabel}>Last check</div>
-              <div className={styles.metricValue}>{formatDateTime(status?.last_pulse_at)}</div>
+              <div className={styles.metricValue}>{formatDateTime(lastPulseAt)}</div>
             </div>
             <div>
               <div className={styles.metricLabel}>Newest event</div>
-              <div className={styles.metricValue}>{formatDateTime(status?.newest_event_at)}</div>
+              <div className={styles.metricValue}>{formatDateTime(newestEventAt)}</div>
             </div>
             <div>
               <div className={styles.metricLabel}>Open alerts</div>
-              <div className={styles.metricValue}>{status?.open_count ?? 0}</div>
+              <div className={styles.metricValue}>{openTotal}</div>
             </div>
           </div>
           <div className={styles.severityRow}>
