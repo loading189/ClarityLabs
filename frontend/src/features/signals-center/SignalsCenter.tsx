@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Drawer from "../../components/common/Drawer";
 import { ErrorState, LoadingState } from "../../components/common/DataState";
 import { getAuditLog, type AuditLogOut } from "../../api/audit";
@@ -472,6 +472,14 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
                   {btn.label}
                 </button>
               ))}
+              {detail && (
+                <Link
+                  className={styles.secondaryButton}
+                  to={`/assistant?businessId=${businessId}&signalId=${detail.id}`}
+                >
+                  Send to Assistant
+                </Link>
+              )}
             </div>
 
             <div>

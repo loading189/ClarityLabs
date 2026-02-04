@@ -17,6 +17,7 @@ import AppIndexRedirect from "./AppIndexRedirect";
 import BusinessSelectPage from "./BusinessSelectPage";
 import OnboardingWizardPage from "./OnboardingWizardPage";
 import ErrorBoundary from "../../components/common/ErrorBoundary";
+import AssistantPage from "./AssistantPage";
 
 export default function AppRoutes() {
   return (
@@ -28,6 +29,7 @@ export default function AppRoutes() {
         <Route path="/app" element={<AppIndexRedirect />} />
         <Route path="/app/select" element={<BusinessSelectPage />} />
         <Route path="/onboarding" element={<OnboardingWizardPage />} />
+        <Route path="/assistant" element={<AssistantPage />} />
 
         {/* workspace */}
         <Route path="/app/:businessId" element={<AppLayout />}>

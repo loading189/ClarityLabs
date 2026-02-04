@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
@@ -33,6 +33,49 @@ class SignalStatusUpdateOut(BaseModel):
     resolution_note: Optional[str]
     reason: Optional[str]
     audit_id: str
+
+
+class SignalExplainStateOut(BaseModel):
+    status: str
+    severity: Optional[str]
+    created_at: Optional[str]
+    updated_at: Optional[str]
+    last_seen_at: Optional[str]
+    resolved_at: Optional[str]
+    metadata: Optional[Dict[str, Any]]
+
+
+class SignalExplainDetectorOut(BaseModel):
+    type: str
+    title: str
+    description: str
+    recommended_actions: List[str]
+
+
+class SignalExplainEvidenceOut(BaseModel):
+    key: str
+    label: str
+    value: Any
+    source: Literal["state", "runtime", "derived"]
+
+
+class SignalExplainAuditOut(BaseModel):
+    id: str
+    event_type: str
+    actor: Optional[str]
+    reason: Optional[str]
+    status: Optional[str]
+    created_at: Optional[str]
+
+
+class SignalExplainOut(BaseModel):
+    business_id: str
+    signal_id: str
+    state: SignalExplainStateOut
+    detector: SignalExplainDetectorOut
+    evidence: List[SignalExplainEvidenceOut]
+    related_audits: List[SignalExplainAuditOut]
+    links: List[str]
 
 
 @router.get("", response_model=SignalsResponse)
@@ -89,3 +132,12 @@ def get_signal_detail(
     db: Session = Depends(get_db),
 ):
     return signals_service.get_signal_state_detail(db, business_id, signal_id)
+
+
+@router.get("/{business_id}/{signal_id}/explain", response_model=SignalExplainOut)
+def get_signal_explain(
+    business_id: str,
+    signal_id: str,
+    db: Session = Depends(get_db),
+):
+    return signals_service.get_signal_explain(db, business_id, signal_id)

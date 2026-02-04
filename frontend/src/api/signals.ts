@@ -87,6 +87,53 @@ export function getSignalDetail(
   return apiGet<SignalStateDetail>(`/api/signals/${businessId}/${signalId}`, { signal });
 }
 
+export type SignalExplainEvidence = {
+  key: string;
+  label: string;
+  value: string | number | boolean;
+  source: "state" | "runtime" | "derived";
+};
+
+export type SignalExplainAudit = {
+  id: string;
+  event_type: string;
+  actor: string | null;
+  reason: string | null;
+  status: string | null;
+  created_at: string | null;
+};
+
+export type SignalExplainOut = {
+  business_id: string;
+  signal_id: string;
+  state: {
+    status: SignalStatus;
+    severity: SignalSeverity | null;
+    created_at: string | null;
+    updated_at: string | null;
+    last_seen_at: string | null;
+    resolved_at: string | null;
+    metadata: Record<string, unknown> | null;
+  };
+  detector: {
+    type: string;
+    title: string;
+    description: string;
+    recommended_actions: string[];
+  };
+  evidence: SignalExplainEvidence[];
+  related_audits: SignalExplainAudit[];
+  links: string[];
+};
+
+export function getSignalExplain(
+  businessId: string,
+  signalId: string,
+  signal?: AbortSignal
+) {
+  return apiGet<SignalExplainOut>(`/api/signals/${businessId}/${signalId}/explain`, { signal });
+}
+
 export function updateSignalStatus(
   businessId: string,
   signalId: string,
