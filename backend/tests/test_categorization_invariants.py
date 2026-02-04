@@ -4,6 +4,7 @@ from pathlib import Path
 import sys
 
 import pytest
+from sqlalchemy import text
 from fastapi import HTTPException
 
 sys.path.append(str(Path(__file__).resolve().parents[2]))
@@ -28,9 +29,14 @@ from backend.app.api.categorize import (
     BulkCategorizationIn,
     CategoryRuleIn,
     BrainVendorSetIn,
+    LabelVendorIn,
 )
 from backend.app.norma.categorize_brain import brain
 from backend.app.norma.merchant import merchant_key
+from backend.app.norma.category_engine import suggest_from_rules
+from backend.app.norma.normalize import NormalizedTransaction
+from backend.app.services import categorize_service
+from backend.app.models import CategoryRule
 
 
 @pytest.fixture()
@@ -148,13 +154,8 @@ def test_suggestion_requires_category_mapping(db_session, brain_store):
         confidence=0.9,
     )
 
-    results = list_txns_to_categorize(biz.id, limit=50, db=db_session)
-
-    assert len(results) == 1
-    suggestion = results[0]
-    assert suggestion.suggested_system_key is None
-    assert suggestion.suggested_category_id is None
-    assert suggestion.suggested_category_name is None
+    with pytest.raises(ValueError, match="does not map to a valid category"):
+        list_txns_to_categorize(biz.id, limit=50, db=db_session)
 
 
 def test_bulk_apply_skips_already_categorized(db_session, brain_store):
@@ -223,3 +224,95 @@ def test_fix_actions_reject_uncategorized(db_session, brain_store):
             BulkCategorizationIn(merchant_key="mystery vendor", category_id=uncategorized.id),
             db_session,
         )
+
+
+def test_missing_category_account_id_fails_fast(db_session):
+    biz = _create_business(db_session)
+    account = Account(
+        business_id=biz.id,
+        name="Ghost Account",
+        type="expense",
+        subtype="software",
+    )
+    db_session.add(account)
+    db_session.flush()
+    category = Category(
+        business_id=biz.id,
+        name="Ghost Category",
+        account_id=account.id,
+    )
+    db_session.add(category)
+    db_session.flush()
+    missing_id = "missing-account"
+    db_session.execute(
+        text("UPDATE categories SET account_id = :missing_id WHERE id = :cat_id"),
+        {"missing_id": missing_id, "cat_id": category.id},
+    )
+    db_session.commit()
+
+    with pytest.raises(HTTPException, match="references missing account"):
+        categorize_service.require_category(db_session, biz.id, category.id)
+
+
+def test_vendor_default_invalid_category_fails(db_session, brain_store):
+    biz = _create_business(db_session)
+    event = _make_event(biz.id, "evt_vendor", "Unknown Vendor")
+    db_session.add(event)
+    db_session.commit()
+
+    with pytest.raises(HTTPException, match="does not map to a valid category"):
+        categorize_service.label_vendor(
+            db_session,
+            biz.id,
+            LabelVendorIn(
+                source_event_id=event.source_event_id,
+                system_key="invalid_key",
+                canonical_name="Unknown Vendor",
+                confidence=0.9,
+            ),
+        )
+
+
+def test_rule_output_invalid_category_fails(db_session):
+    biz = _create_business(db_session)
+    account = Account(
+        business_id=biz.id,
+        name="Orphaned Account",
+        type="expense",
+        subtype="software",
+    )
+    db_session.add(account)
+    db_session.flush()
+    category = Category(
+        business_id=biz.id,
+        name="Orphaned Category",
+        account_id=account.id,
+    )
+    db_session.add(category)
+    db_session.flush()
+
+    rule = CategoryRule(
+        business_id=biz.id,
+        category_id=category.id,
+        contains_text="acme",
+        priority=1,
+        active=True,
+    )
+    db_session.add(rule)
+    db_session.commit()
+
+    txn = NormalizedTransaction(
+        id=None,
+        source_event_id="evt_acme",
+        occurred_at=datetime(2024, 1, 5, 9, 0, tzinfo=timezone.utc),
+        date=datetime(2024, 1, 5, 9, 0, tzinfo=timezone.utc).date(),
+        description="Acme Subscription",
+        amount=120.0,
+        direction="outflow",
+        account="bank",
+        category="uncategorized",
+        counterparty_hint=None,
+    )
+
+    with pytest.raises(ValueError, match="has no valid system_key mapping"):
+        suggest_from_rules(db_session, txn, business_id=biz.id)

@@ -12,6 +12,117 @@
   color: var(--text-soft);
 }
 
+.signalsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+}
+
+.signalsHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.signalsTitle {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.signalsSubtitle {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.signalsMeta {
+  font-size: 0.75rem;
+  color: var(--text-soft);
+  background: var(--surface-muted);
+  border-radius: 10px;
+  padding: 4px 8px;
+}
+
+.signalsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.signalsEmpty {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.signalCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+}
+
+.signalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.signalType {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.signalSeverity {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+}
+
+.green {
+  color: var(--success);
+}
+
+.yellow {
+  color: var(--warning);
+}
+
+.red {
+  color: var(--danger);
+}
+
+.signalBody {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  font-size: 0.75rem;
+  color: var(--text-soft);
+}
+
+.signalMetric {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.signalMetric strong {
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.signalExplanation {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
 /* Description cell */
 .descriptionCell {
   display: flex;

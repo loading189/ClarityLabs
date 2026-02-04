@@ -16,6 +16,8 @@ import { useAppState } from "../../app/state/appState";
 import styles from "./LedgerPage.module.css";
 import { getBrainVendors, type BrainVendor } from "../../api/categorize";
 import { normalizeVendorDisplay, normalizeVendorKey } from "../../utils/vendors";
+import { fetchSignals, type Signal } from "../../api/signals";
+import { isValidIsoDate } from "../../app/filters/filters";
 
 function formatMoney(value: number) {
   const sign = value < 0 ? "-" : "";
@@ -66,6 +68,10 @@ export default function LedgerPage() {
   // Vendor brain mappings (canonicalization).
   const [brainVendors, setBrainVendors] = useState<BrainVendor[]>([]);
   const [vendorErr, setVendorErr] = useState<string | null>(null);
+  const [signals, setSignals] = useState<Signal[]>([]);
+  const [signalsMeta, setSignalsMeta] = useState<Record<string, unknown>>({});
+  const [signalsLoading, setSignalsLoading] = useState(false);
+  const [signalsErr, setSignalsErr] = useState<string | null>(null);
 
   // Fetch vendor mappings (brain vendors) when business or dataVersion changes.
   // NOTE: avoid depending on full dateRange object to reduce re-fetch churn.
@@ -83,6 +89,59 @@ export default function LedgerPage() {
         setVendorErr(e?.message ?? "Failed to load vendor mappings");
       });
   }, [businessId, dataVersion]); // intentionally not dateRange
+
+  useEffect(() => {
+    if (!businessId) {
+      setSignals([]);
+      setSignalsMeta({});
+      setSignalsErr("Select a business to load signals.");
+      return;
+    }
+    if (!dateRange.start || !dateRange.end) {
+      setSignals([]);
+      setSignalsMeta({});
+      setSignalsErr("Select a date range to load signals.");
+      return;
+    }
+    if (!isValidIsoDate(dateRange.start) || !isValidIsoDate(dateRange.end)) {
+      setSignals([]);
+      setSignalsMeta({});
+      setSignalsErr(`Invalid date range: ${dateRange.start} → ${dateRange.end}`);
+      return;
+    }
+
+    const controller = new AbortController();
+    let alive = true;
+
+    setSignalsLoading(true);
+    setSignalsErr(null);
+
+    fetchSignals(
+      businessId,
+      { start_date: dateRange.start, end_date: dateRange.end },
+      controller.signal
+    )
+      .then((payload) => {
+        if (!alive) return;
+        setSignals(payload.signals ?? []);
+        setSignalsMeta(payload.meta ?? {});
+      })
+      .catch((e: unknown) => {
+        if (!alive) return;
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        if (e instanceof Error) setSignalsErr(e.message);
+        else setSignalsErr("Failed to load signals");
+      })
+      .finally(() => {
+        if (!alive) return;
+        setSignalsLoading(false);
+      });
+
+    return () => {
+      alive = false;
+      controller.abort();
+    };
+  }, [businessId, dateRange.end, dateRange.start, dataVersion]);
 
   const vendorsByAlias = useMemo(() => {
     const map = new Map<string, BrainVendor>();
@@ -225,6 +284,58 @@ export default function LedgerPage() {
         categories={categories}
         showDirection
       />
+
+      <section className={styles.signalsSection}>
+        <div className={styles.signalsHeader}>
+          <div>
+            <div className={styles.signalsTitle}>Signals</div>
+            <div className={styles.signalsSubtitle}>
+              Deterministic alerts for the selected business and date window.
+            </div>
+          </div>
+          {signalsMeta?.["reason"] && (
+            <div className={styles.signalsMeta}>{String(signalsMeta["reason"])}</div>
+          )}
+        </div>
+
+        {signalsLoading && <LoadingState label="Loading signals…" />}
+        {signalsErr && <ErrorState label={`Signals unavailable: ${signalsErr}`} />}
+
+        {!signalsLoading && !signalsErr && (
+          <div className={styles.signalsGrid}>
+            {signals.length === 0 && (
+              <div className={styles.signalsEmpty}>No signals available for this window.</div>
+            )}
+            {signals.slice(0, 8).map((signal) => (
+              <div key={signal.id} className={styles.signalCard}>
+                <div className={styles.signalHeader}>
+                  <span className={styles.signalType}>{signal.type}</span>
+                  <span className={`${styles.signalSeverity} ${styles[signal.severity]}`}>
+                    {signal.severity}
+                  </span>
+                </div>
+                <div className={styles.signalBody}>
+                  <div className={styles.signalMetric}>
+                    <span>Baseline</span>
+                    <strong>{signal.baseline_value ?? "—"}</strong>
+                  </div>
+                  <div className={styles.signalMetric}>
+                    <span>Current</span>
+                    <strong>{signal.current_value ?? "—"}</strong>
+                  </div>
+                  <div className={styles.signalMetric}>
+                    <span>Delta</span>
+                    <strong>{signal.delta ?? "—"}</strong>
+                  </div>
+                </div>
+                <div className={styles.signalExplanation}>
+                  {String((signal.explanation_seed as Record<string, unknown>)?.summary ?? "—")}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       {loading && <LoadingState label="Loading ledger lines…" />}
       {err && <ErrorState label={`Failed to load ledger: ${err}`} />}

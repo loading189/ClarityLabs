@@ -139,7 +139,9 @@ def check_ledger_integrity(
         prev_key = key
 
     net = inflow + outflow
-    if abs(net - total) > 1e-6:
+    net_rounded = round(inflow, 2) + round(outflow, 2)
+    total_rounded = round(total, 2)
+    if abs(net - total) > 1e-6 or abs(net_rounded - total_rounded) > 1e-6:
         raise LedgerIntegrityError(
             "Invariant violation: inflow + outflow does not equal net cash flow."
         )

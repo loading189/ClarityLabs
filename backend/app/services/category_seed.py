@@ -318,25 +318,52 @@ def seed_coa_and_categories_and_mappings(db: Session, business_id: str) -> None:
 
     changed = False
 
-    # 1) Ensure COA exists
+    # 1) Ensure COA exists (safe upsert: add missing, update names/subtypes when safe)
     accounts = db.execute(select(Account).where(Account.business_id == business_id)).scalars().all()
-    if not accounts:
-        for a in DEFAULT_COA:
-            db.add(
-                Account(
-                    id=uuid_str(),
-                    business_id=business_id,
-                    code=a.get("code"),
-                    name=a["name"],
-                    type=a["type"],
-                    subtype=a.get("subtype"),
-                    active=True,
-                    created_at=utcnow(),
-                )
+    accounts_by_code = {
+        (a.code or "").strip().lower(): a for a in accounts if a.code
+    }
+    accounts_by_name = {
+        (a.name or "").strip().lower(): a for a in accounts if a.name
+    }
+
+    for a in DEFAULT_COA:
+        code = (a.get("code") or "").strip().lower()
+        name = (a.get("name") or "").strip()
+        acct = accounts_by_code.get(code) if code else None
+        if not acct and name:
+            acct = accounts_by_name.get(name.lower())
+
+        if acct:
+            safe_name = not acct.name or acct.name.strip().lower() in {code, name.lower()}
+            if safe_name and acct.name != name:
+                acct.name = name
+                changed = True
+            if not acct.subtype and a.get("subtype"):
+                acct.subtype = a.get("subtype")
+                changed = True
+            if not acct.type and a.get("type"):
+                acct.type = a.get("type")
+                changed = True
+            continue
+
+        db.add(
+            Account(
+                id=uuid_str(),
+                business_id=business_id,
+                code=a.get("code"),
+                name=a["name"],
+                type=a["type"],
+                subtype=a.get("subtype"),
+                active=True,
+                created_at=utcnow(),
             )
+        )
+        changed = True
+
+    if changed:
         db.flush()
         accounts = db.execute(select(Account).where(Account.business_id == business_id)).scalars().all()
-        changed = True
 
     # 1b) Guarantee Uncategorized anchor account
     unc_acct = _ensure_uncategorized_account(db, business_id)
