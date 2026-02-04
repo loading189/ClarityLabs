@@ -9,6 +9,7 @@ import HomePage from "./HomePage";
 import IntegrationsPage from "./IntegrationsPage";
 import LedgerPage from "../../features/ledger/LedgerPage";
 import RulesPage from "./RulesPage";
+import SignalsCenterPage from "./SignalsCenterPage";
 import SettingsPage from "./SettingsPage";
 import TrendsPage from "../../features/trends/TrendsPage";
 import VendorsPage from "./VendorsPage";
@@ -33,6 +34,7 @@ export default function AppRoutes() {
           <Route path="home" element={<HomePage />} />
           <Route path="health" element={<HealthPage />} />
           <Route path="dashboard" element={<DashboardPage />} />
+          <Route path="signals" element={<SignalsCenterPage />} />
           <Route path="ledger" element={<LedgerPage />} />
           <Route path="trends" element={<TrendsPage />} />
           <Route path="vendors" element={<VendorsPage />} />
