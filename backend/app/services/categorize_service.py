@@ -939,7 +939,7 @@ def upsert_categorization(db: Session, business_id: str, req) -> Dict[str, Any]:
         db.commit()
         updated = False
 
-    audit_service.log_audit_event(
+    audit_row = audit_service.log_audit_event(
         db,
         business_id=business_id,
         event_type="categorization_change",
@@ -990,6 +990,7 @@ def upsert_categorization(db: Session, business_id: str, req) -> Dict[str, Any]:
         "updated": updated,
         "learned": learned,
         "learned_system_key": learned_system_key,
+        "audit_id": audit_row.id,
     }
 
 

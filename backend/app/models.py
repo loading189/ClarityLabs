@@ -413,7 +413,6 @@ class AuditLog(Base):
         String(36),
         ForeignKey("businesses.id", ondelete="CASCADE"),
         nullable=False,
-        index=True,
     )
 
     event_type: Mapped[str] = mapped_column(String(80), nullable=False)

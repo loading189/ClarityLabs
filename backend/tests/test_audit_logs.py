@@ -28,11 +28,15 @@ from backend.app.api.categorize import (
     upsert_categorization,
 )
 from backend.app.norma.categorize_brain import brain
+from backend.app.services import audit_service
 
 
 @pytest.fixture()
 def db_session():
-    Base.metadata.drop_all(bind=engine)
+    db_path = Path("test_audit_logs.db")
+    engine.dispose()
+    if db_path.exists():
+        db_path.unlink()
     Base.metadata.create_all(bind=engine)
     session = SessionLocal()
     try:
@@ -181,3 +185,139 @@ def test_audit_logs_for_categorize_mutations(db_session, brain_store):
     assert vendor_log.source_event_id == "evt_100"
     assert vendor_log.before_state is not None
     assert vendor_log.after_state is not None
+
+
+def _create_audit_log(
+    db_session,
+    business_id: str,
+    *,
+    audit_id: str,
+    created_at: datetime,
+    event_type: str = "categorization_change",
+    actor: str = "system",
+):
+    row = AuditLog(
+        id=audit_id,
+        business_id=business_id,
+        event_type=event_type,
+        actor=actor,
+        reason="test",
+        before_state={"status": "before"},
+        after_state={"status": "after"},
+        created_at=created_at,
+    )
+    db_session.add(row)
+    db_session.commit()
+    return row
+
+
+def test_audit_log_ordering(db_session):
+    biz = _create_business(db_session)
+    _create_audit_log(
+        db_session,
+        biz.id,
+        audit_id="00000000-0000-0000-0000-000000000001",
+        created_at=datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc),
+        event_type="rule_create",
+    )
+    _create_audit_log(
+        db_session,
+        biz.id,
+        audit_id="00000000-0000-0000-0000-000000000002",
+        created_at=datetime(2024, 1, 2, 12, 0, tzinfo=timezone.utc),
+        event_type="rule_update",
+    )
+    _create_audit_log(
+        db_session,
+        biz.id,
+        audit_id="00000000-0000-0000-0000-000000000003",
+        created_at=datetime(2024, 1, 3, 12, 0, tzinfo=timezone.utc),
+        event_type="categorization_change",
+    )
+
+    result = audit_service.list_audit_events(db_session, biz.id, limit=10)
+    event_types = [item["event_type"] for item in result["items"]]
+    assert event_types == ["categorization_change", "rule_update", "rule_create"]
+
+
+def test_audit_log_filters(db_session):
+    biz = _create_business(db_session)
+    _create_audit_log(
+        db_session,
+        biz.id,
+        audit_id="00000000-0000-0000-0000-000000000011",
+        created_at=datetime(2024, 2, 1, 9, 0, tzinfo=timezone.utc),
+        event_type="rule_create",
+        actor="system",
+    )
+    _create_audit_log(
+        db_session,
+        biz.id,
+        audit_id="00000000-0000-0000-0000-000000000012",
+        created_at=datetime(2024, 2, 2, 9, 0, tzinfo=timezone.utc),
+        event_type="vendor_default_set",
+        actor="user",
+    )
+
+    result = audit_service.list_audit_events(
+        db_session,
+        biz.id,
+        limit=10,
+        event_type="vendor_default_set",
+    )
+    assert [item["event_type"] for item in result["items"]] == ["vendor_default_set"]
+
+    result = audit_service.list_audit_events(db_session, biz.id, limit=10, actor="system")
+    assert [item["actor"] for item in result["items"]] == ["system"]
+
+    result = audit_service.list_audit_events(
+        db_session,
+        biz.id,
+        limit=10,
+        since=datetime(2024, 2, 2, 0, 0, tzinfo=timezone.utc),
+    )
+    assert [item["event_type"] for item in result["items"]] == ["vendor_default_set"]
+
+    result = audit_service.list_audit_events(
+        db_session,
+        biz.id,
+        limit=10,
+        until=datetime(2024, 2, 1, 23, 59, tzinfo=timezone.utc),
+    )
+    assert [item["event_type"] for item in result["items"]] == ["rule_create"]
+
+
+def test_audit_log_cursor_pagination(db_session):
+    biz = _create_business(db_session)
+    timestamps = [
+        datetime(2024, 3, 1, 12, 0, tzinfo=timezone.utc),
+        datetime(2024, 3, 2, 12, 0, tzinfo=timezone.utc),
+        datetime(2024, 3, 3, 12, 0, tzinfo=timezone.utc),
+        datetime(2024, 3, 4, 12, 0, tzinfo=timezone.utc),
+    ]
+    ids = [
+        "00000000-0000-0000-0000-000000000021",
+        "00000000-0000-0000-0000-000000000022",
+        "00000000-0000-0000-0000-000000000023",
+        "00000000-0000-0000-0000-000000000024",
+    ]
+    for audit_id, created_at in zip(ids, timestamps):
+        _create_audit_log(
+            db_session,
+            biz.id,
+            audit_id=audit_id,
+            created_at=created_at,
+        )
+
+    first_page = audit_service.list_audit_events(db_session, biz.id, limit=2)
+    assert [item["id"] for item in first_page["items"]] == [ids[3], ids[2]]
+    assert first_page["next_cursor"] is not None
+
+    second_page = audit_service.list_audit_events(
+        db_session,
+        biz.id,
+        limit=2,
+        cursor=first_page["next_cursor"],
+    )
+    assert [item["id"] for item in second_page["items"]] == [ids[1], ids[0]]
+    assert second_page["next_cursor"] is None
