@@ -14,7 +14,6 @@ from backend.app.models import Account, Business, Category, HealthSignalState, R
 from backend.app.norma.from_events import raw_event_to_txn
 from backend.app.norma.ledger import LedgerIntegrityError, build_cash_ledger
 from backend.app.norma.normalize import NormalizedTransaction
-from backend.app.signals.core import generate_core_signals
 from backend.app.services import health_signal_service
 
 
@@ -27,6 +26,10 @@ def _is_dev_env() -> bool:
         or os.getenv("APP_ENV", "").lower() in {"dev", "development", "local"}
         or os.getenv("NODE_ENV", "").lower() in {"dev", "development"}
     )
+
+
+def v1_signals_enabled() -> bool:
+    return os.getenv("ENABLE_V1_SIGNALS", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _require_business(db: Session, business_id: str) -> Business:
@@ -91,6 +94,8 @@ def fetch_signals(
     start_date: date,
     end_date: date,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    if not v1_signals_enabled():
+        raise HTTPException(status_code=404, detail="v1 signals disabled")
     if start_date > end_date:
         raise HTTPException(
             status_code=400,
@@ -108,6 +113,8 @@ def fetch_signals(
 
     try:
         ledger = build_cash_ledger(txns, opening_balance=0.0)
+        from backend.app.signals.core import generate_core_signals
+
         signals = generate_core_signals(txns, ledger)
     except LedgerIntegrityError as exc:
         if _is_dev_env():

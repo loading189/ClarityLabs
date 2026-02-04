@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, Query
@@ -51,6 +52,17 @@ def list_signal_types(
     if not include_inputs:
         return [{"type": row["type"], "window_days": row["window_days"]} for row in types]
     return types
+
+
+@router.get("/v1", response_model=SignalsResponse)
+def list_v1_signals(
+    business_id: str = Query(...),
+    start_date: date = Query(...),
+    end_date: date = Query(...),
+    db: Session = Depends(get_db),
+):
+    signals, meta = signals_service.fetch_signals(db, business_id, start_date, end_date)
+    return SignalsResponse(signals=signals, meta=meta)
 
 
 @router.post("/{business_id}/{signal_id}/status", response_model=SignalStatusUpdateOut)

@@ -11,8 +11,8 @@ from sqlalchemy.orm import Session
 from backend.app.coa_templates import DEFAULT_COA
 from backend.app.db import get_db
 from backend.app.models import Account, Business, Organization, RawEvent
-from backend.app.norma.categorize_brain import brain
 from backend.app.norma.merchant import merchant_key
+from backend.app.services import categorize_service
 from backend.app.models import BusinessIntegrationProfile
 
 router = APIRouter()
@@ -47,6 +47,7 @@ class RawEventIn(BaseModel):
 
 class LabelRequest(BaseModel):
     description: str
+    business_id: str
     canonical_name: str
     category: str
     confidence: float = 0.92
@@ -209,18 +210,5 @@ def ingest_raw_event(req: RawEventIn, db: Session = Depends(get_db)):
 # ----------------------------
 
 @router.post("/brain/label")
-def brain_label(req: LabelRequest):
-    mk = merchant_key(req.description)
-    m = brain.apply_label(
-        alias_key=mk,
-        canonical_name=req.canonical_name,
-        category=req.category,
-        confidence=req.confidence,
-    )
-    brain.save()
-    return {
-        "status": "ok",
-        "merchant_id": m.merchant_id,
-        "merchant_key": mk,
-        "category": m.default_category,
-    }
+def brain_label(req: LabelRequest, db: Session = Depends(get_db)):
+    return categorize_service.legacy_brain_label(db, req)

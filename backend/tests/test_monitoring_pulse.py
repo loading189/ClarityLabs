@@ -25,7 +25,7 @@ from backend.app.models import (
     RawEvent,
     TxnCategorization,
 )
-from backend.app.services import monitoring_service
+from backend.app.services import monitoring_service, signals_service
 from backend.app.signals.v2 import (
     detect_expense_creep_by_vendor,
     detect_low_cash_runway,
@@ -263,3 +263,28 @@ def test_pulse_gating_and_resolution(db_session):
     assert "signal_detected" in event_types
     assert "signal_updated" in event_types
     assert "signal_resolved" in event_types
+
+
+def test_api_signals_list_matches_pulse(db_session):
+    biz = _create_business(db_session)
+    cat = _create_account_and_category(db_session, biz.id)
+    now = datetime(2024, 8, 1, tzinfo=timezone.utc)
+
+    _add_raw_event(db_session, biz.id, "prior", now - timedelta(days=20), 300.0, "outflow", "Acme", "Acme")
+    _add_raw_event(db_session, biz.id, "current", now - timedelta(days=5), 650.0, "outflow", "Acme", "Acme")
+    _categorize(db_session, biz.id, "prior", cat.id)
+    _categorize(db_session, biz.id, "current", cat.id)
+    db_session.commit()
+
+    pulse = monitoring_service.pulse(db_session, biz.id)
+    signals, meta = signals_service.list_signal_states(db_session, biz.id)
+
+    assert pulse["ran"] is True
+    assert meta["count"] == len(signals)
+    total = sum(pulse["counts"]["by_status"].values())
+    assert total == len(signals)
+
+    db_states = db_session.execute(
+        select(HealthSignalState).where(HealthSignalState.business_id == biz.id)
+    ).scalars().all()
+    assert {row["id"] for row in signals} == {state.signal_id for state in db_states}
