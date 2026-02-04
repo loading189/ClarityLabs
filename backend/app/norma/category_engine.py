@@ -3,14 +3,35 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Optional, List, Tuple
 
-from sqlalchemy import select, and_
-from sqlalchemy.orm import Session
+import logging
+
+from sqlalchemy import select, and_, inspect
+from sqlalchemy.orm import Session, load_only
 
 from backend.app.models import CategoryRule, BusinessCategoryMap, Category, Account
 from backend.app.services.category_resolver import require_system_key_mapping
 from backend.app.norma.normalize import NormalizedTransaction, EnrichedTransaction, Categorization
 from backend.app.norma.categorize import categorize_txn as heuristic_categorize_txn
 from backend.app.norma.categorize_brain import categorize_txn_with_brain
+
+logger = logging.getLogger(__name__)
+
+
+def _category_rule_load_columns(db: Session) -> list:
+    inspector = inspect(db.get_bind())
+    column_names = {col["name"] for col in inspector.get_columns(CategoryRule.__tablename__)}
+    names = [
+        "id",
+        "business_id",
+        "category_id",
+        "contains_text",
+        "direction",
+        "account",
+        "priority",
+        "active",
+        "created_at",
+    ]
+    return [getattr(CategoryRule, name) for name in names if name in column_names]
 
 
 def _as_enriched(txn: NormalizedTransaction) -> EnrichedTransaction:
@@ -44,9 +65,12 @@ def _system_key_for_category_id(db: Session, business_id: str, category_id: str)
     ).scalar_one_or_none()
     system_key = (m or "").strip().lower() or None
     if not system_key:
-        raise ValueError(
-            f"Invariant violation: rule category_id '{category_id}' has no valid system_key mapping."
+        logger.warning(
+            "[categorization] invariant failed business=%s context=rule category_id=%s",
+            business_id,
+            category_id,
         )
+        return None
     return system_key
 
 
@@ -70,8 +94,10 @@ def suggest_from_rules(
     account = (txn.account or "").strip().lower()
 
     # Pull active rules, most specific first (lower priority number = higher rank)
+    load_columns = _category_rule_load_columns(db)
     rules = db.execute(
         select(CategoryRule)
+        .options(load_only(*load_columns))
         .where(
             and_(
                 CategoryRule.business_id == business_id,
@@ -202,14 +228,21 @@ def suggest_category(
 
     # 1) Brain
     brain_res = categorize_txn_with_brain(txn, business_id=business_id)
-    if isinstance(brain_res, EnrichedTransaction) and brain_res.categorization and not _is_uncat(brain_res.category):
-        require_system_key_mapping(
-            db,
-            business_id,
-            brain_res.category,
-            context="vendor default",
-        )
-        return brain_res
+    if (
+        isinstance(brain_res, EnrichedTransaction)
+        and brain_res.categorization
+        and not _is_uncat(brain_res.category)
+    ):
+        try:
+            require_system_key_mapping(
+                db,
+                business_id,
+                brain_res.category,
+                context="vendor default",
+            )
+            return brain_res
+        except ValueError as exc:
+            logger.warning("[categorization] ignoring invalid brain mapping: %s", exc)
 
     # 2) Rules
     rule_res = suggest_from_rules(db, txn, business_id=business_id)

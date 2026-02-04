@@ -1,0 +1,37 @@
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  border: 1px solid var(--pill-border);
+  background: var(--pill-bg);
+  color: var(--pill-text);
+}
+
+.green {
+  background: var(--pill-success-bg);
+  border-color: var(--pill-success-border);
+  color: var(--pill-success-text);
+}
+
+.yellow {
+  background: var(--pill-warning-bg);
+  border-color: var(--pill-warning-border);
+  color: var(--pill-warning-text);
+}
+
+.red {
+  background: var(--danger-bg);
+  border-color: var(--danger-border);
+  color: var(--danger);
+}
+
+.neutral {
+  background: var(--pill-bg);
+  border-color: var(--pill-border);
+  color: var(--pill-text);
+}

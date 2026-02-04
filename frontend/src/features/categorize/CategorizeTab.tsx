@@ -58,6 +58,7 @@ export default function CategorizeTab({
   const [metrics, setMetrics] = useState<CategorizeMetricsOut | null>(null);
   const [rules, setRules] = useState<CategoryRuleOut[]>([]);
   const [brainVendors, setBrainVendors] = useState<BrainVendor[]>([]);
+  const [vendorErr, setVendorErr] = useState<string | null>(null);
   const [selectedTxn, setSelectedTxn] = useState<NormalizedTxn | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
   const selectedTxnRef = useRef<NormalizedTxn | null>(null);
@@ -166,9 +167,9 @@ export default function CategorizeTab({
   const suggestedCategory = useMemo(() => {
     if (!suggestedCategoryId) return null;
     const category = catsById.get(suggestedCategoryId) ?? null;
-    if (!category || isCategoryUncategorized(category)) return null;
+    if (!category || !hasValidCategoryMapping(category)) return null;
     return category;
-  }, [catsById, isCategoryUncategorized, suggestedCategoryId]);
+  }, [catsById, suggestedCategoryId]);
 
   const suggestedName = useMemo(() => {
     if (!suggestedCategory) return "No suggestion";
@@ -187,8 +188,13 @@ export default function CategorizeTab({
   const bulkCategoryId = suggestedIdIsValid ? suggestedCategoryId : selectedCategoryId;
   const bulkCategoryIsValid = useMemo(() => {
     if (!bulkCategoryId) return false;
-    return !isCategoryUncategorized(catsById.get(bulkCategoryId));
-  }, [bulkCategoryId, catsById, isCategoryUncategorized]);
+    return hasValidCategoryMapping(catsById.get(bulkCategoryId));
+  }, [bulkCategoryId, catsById]);
+
+  const selectedCategoryValid = useMemo(() => {
+    if (!selectedCategoryId) return false;
+    return hasValidCategoryMapping(catsById.get(selectedCategoryId));
+  }, [catsById, selectedCategoryId]);
 
   const metricsSuggestionPercent = useMemo(() => {
     if (!metrics) return 0;
@@ -212,11 +218,10 @@ export default function CategorizeTab({
 
     try {
       logRefresh("categorize", "reload");
-      const [t, c, m, vendors] = await Promise.all([
+      const [t, c, m] = await Promise.all([
         getTxnsToCategorize(businessId, 50),
         getCategories(businessId),
         getCategorizeMetrics(businessId),
-        getBrainVendors(businessId),
       ]);
 
       // If a newer load started, ignore this result
@@ -225,7 +230,22 @@ export default function CategorizeTab({
       setTxns(t);
       setCats(c);
       setMetrics(m);
-      setBrainVendors(vendors);
+      setVendorErr(null);
+      try {
+        const vendors = await getBrainVendors(businessId);
+        if (seq !== loadSeq.current) return;
+        setBrainVendors(vendors);
+      } catch (e: any) {
+        if (seq !== loadSeq.current) return;
+        console.error("[categorize] vendor fetch failed", {
+          businessId,
+          dateRange,
+          url: `/categorize/business/${businessId}/brain/vendors`,
+          error: e?.message ?? e,
+        });
+        setVendorErr(e?.message ?? "Failed to load vendor mappings");
+        setBrainVendors([]);
+      }
 
       const existingTxn = selectedTxnRef.current
         ? t.find((txn) => txn.source_event_id === selectedTxnRef.current?.source_event_id) ?? null
@@ -354,8 +374,8 @@ export default function CategorizeTab({
   }, [previewRuleId, rules]);
 
   const ruleCategoryOptions = useMemo(
-    () => cats.filter((c) => !isCategoryUncategorized(c)),
-    [cats, isCategoryUncategorized]
+    () => cats.filter((c) => hasValidCategoryMapping(c)),
+    [cats]
   );
 
   const doSave = useCallback(
@@ -631,11 +651,15 @@ export default function CategorizeTab({
     setCreateRuleErr(null);
     setRulesMsg(null);
     try {
+      const direction =
+        selectedTxn.direction === "inflow" || selectedTxn.direction === "outflow"
+          ? selectedTxn.direction
+          : null;
       await createCategoryRule(businessId, {
         contains_text: contains,
         category_id: selectedCategoryId,
         priority: 100,
-        direction: selectedTxn.direction || null,
+        direction,
         account: selectedTxn.account || null,
         active: true,
       });
@@ -740,6 +764,11 @@ export default function CategorizeTab({
         )}
 
         {loadErr && <div className={styles.error}>Load error: {loadErr}</div>}
+        {vendorErr && (
+          <div className={styles.error}>
+            Vendor mappings unavailable: {vendorErr}. Categorization still works.
+          </div>
+        )}
         {missingCoaMappings.length > 0 && (
           <div className={styles.error}>
             Missing COA mapping for {missingCoaMappings.length} categories. Fix Chart of
@@ -910,7 +939,7 @@ export default function CategorizeTab({
               <div className={styles.buttonRow}>
                 <button
                   className={styles.buttonPrimary}
-                  disabled={!selectedCategoryId}
+                  disabled={!selectedCategoryValid}
                   onClick={() => doSave(selectedCategoryId, "manual")}
                 >
                   Save categorization
@@ -929,7 +958,7 @@ export default function CategorizeTab({
 
                 <button
                   className={styles.buttonSecondary}
-                  disabled={createRuleLoading || !selectedCategoryId}
+                  disabled={createRuleLoading || !selectedCategoryValid}
                   onClick={createRuleFromTxn}
                 >
                   {createRuleLoading ? "Creating rule…" : "Create rule from this"}
@@ -1074,7 +1103,8 @@ export default function CategorizeTab({
                         >
                           {ruleCategoryOptions.map((cat) => (
                             <option key={cat.id} value={cat.id}>
-                              {cat.name}
+                              {cat.name} — {cat.account_code ? `${cat.account_code} ` : ""}
+                              {cat.account_name}
                             </option>
                           ))}
                           {!ruleCategoryOptions.find((cat) => cat.id === rule.category_id) && (

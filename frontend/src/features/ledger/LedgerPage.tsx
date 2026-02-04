@@ -72,6 +72,12 @@ export default function LedgerPage() {
   const [signalsMeta, setSignalsMeta] = useState<Record<string, unknown>>({});
   const [signalsLoading, setSignalsLoading] = useState(false);
   const [signalsErr, setSignalsErr] = useState<string | null>(null);
+  const signalsReason = useMemo(() => {
+    const reason = signalsMeta?.["reason"];
+    if (typeof reason === "string") return reason;
+    if (reason == null) return "";
+    return String(reason);
+  }, [signalsMeta]);
 
   // Fetch vendor mappings (brain vendors) when business or dataVersion changes.
   // NOTE: avoid depending on full dateRange object to reduce re-fetch churn.
@@ -293,9 +299,7 @@ export default function LedgerPage() {
               Deterministic alerts for the selected business and date window.
             </div>
           </div>
-          {signalsMeta?.["reason"] && (
-            <div className={styles.signalsMeta}>{String(signalsMeta["reason"])}</div>
-          )}
+          {signalsReason && <div className={styles.signalsMeta}>{signalsReason}</div>}
         </div>
 
         {signalsLoading && <LoadingState label="Loading signals…" />}

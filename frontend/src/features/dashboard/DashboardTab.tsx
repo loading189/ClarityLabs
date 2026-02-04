@@ -121,7 +121,7 @@ export default function DashboardTab({
           <h3 className={styles.title}>Dashboard</h3>
           <div className={styles.subtitle}>Signals and evidence for the selected business.</div>
         </div>
-        <button className={styles.refreshButton} type="button" onClick={refresh}>
+        <button className={styles.refreshButton} type="button" onClick={() => refresh()}>
           Refresh
         </button>
       </div>

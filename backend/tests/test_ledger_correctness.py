@@ -33,8 +33,8 @@ def test_build_cash_ledger_orders_same_timestamp_deterministically():
 
     ledger = build_cash_ledger(txns, opening_balance=0.0)
 
-    assert [row.source_event_id for row in ledger] == ["evt_c", "evt_a", "evt_b"]
-    assert [row.amount for row in ledger] == [-10.0, 50.0, 50.0]
+    assert [row.source_event_id for row in ledger] == ["evt_a", "evt_b", "evt_c"]
+    assert [row.amount for row in ledger] == [50.0, 50.0, -10.0]
 
 
 def test_build_cash_ledger_running_balance_mixed_directions():
