@@ -40,12 +40,12 @@ class LedgerRow:
 
 def _sort_key(t: NormalizedTransaction) -> tuple:
     # Deterministic ordering even when multiple txns share the same date/time.
-    # Prefer occurred_at, then description, then amount, then source_event_id as a stable tie-breaker.
+    # Prefer occurred_at, then source_event_id, then stable tie-breakers.
     return (
         t.occurred_at,
+        t.source_event_id or "",
         t.description or "",
         float(t.amount or 0.0),
-        t.source_event_id or "",
     )
 
 
@@ -114,9 +114,9 @@ def check_ledger_integrity(
 
         key = (
             row.occurred_at,
+            row.source_event_id or "",
             row.description or "",
             amount,
-            row.source_event_id or "",
         )
         if prev_key and key < prev_key:
             raise LedgerIntegrityError(

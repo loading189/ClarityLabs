@@ -109,7 +109,7 @@ def ledger_lines(
             }
         )
 
-    return out
+    return sorted(out, key=lambda row: (row["occurred_at"], row["source_event_id"]))
 
 
 def income_statement(
@@ -290,7 +290,7 @@ def balance_sheet_v1(
             RawEvent.source_event_id == TxnCategorization.source_event_id,
         ))
         .where(TxnCategorization.business_id == business_id)
-        .order_by(RawEvent.occurred_at.asc())
+        .order_by(RawEvent.occurred_at.asc(), RawEvent.source_event_id.asc())
     )
     rows = db.execute(stmt).all()
 
