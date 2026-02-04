@@ -1,6 +1,6 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import SignalsCenter from "./SignalsCenter";
 
@@ -59,6 +59,10 @@ vi.mock("../../api/audit", () => ({
 }));
 
 describe("SignalsCenter", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
   it("renders signals and filters by status", async () => {
     render(
       <MemoryRouter>
@@ -93,5 +97,24 @@ describe("SignalsCenter", () => {
     await waitFor(() => expect(getSignalDetail).toHaveBeenCalledWith("biz-1", "sig-1"));
     expect(screen.getByText(/"vendor": "Acme"/i)).toBeInTheDocument();
     expect(screen.getByText(/"total": 1200/i)).toBeInTheDocument();
+  });
+
+  it("provides a send to assistant deep link", async () => {
+    render(
+      <MemoryRouter>
+        <SignalsCenter businessId="biz-1" />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => expect(listSignalStates).toHaveBeenCalled());
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /Expense creep detected/i }));
+
+    const assistantLink = await screen.findByRole("link", { name: /Send to Assistant/i });
+    expect(assistantLink).toHaveAttribute(
+      "href",
+      "/assistant?businessId=biz-1&signalId=sig-1"
+    );
   });
 });

@@ -1,0 +1,286 @@
+.page {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  gap: 24px;
+}
+
+.contextPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mainPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sectionTitle {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.sectionSubtitle {
+  font-size: 12px;
+  color: #5c6470;
+}
+
+.card {
+  border: 1px solid #e1e5eb;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.04);
+}
+
+.cardTitle {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.cardBody {
+  margin: 0;
+  color: #4b5563;
+}
+
+.alertCount {
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.alertMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #5c6470;
+}
+
+.alertList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.alertRow {
+  border: 1px solid transparent;
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.alertRowActive {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.alertTitle {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.alertSubtitle {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.alertChevron {
+  font-size: 20px;
+  color: #94a3b8;
+}
+
+.explainHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.explainTitle {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.explainMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.explainSection {
+  margin-top: 16px;
+}
+
+.sectionLabel {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.evidenceList,
+.auditList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.evidenceItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: #f9fafb;
+}
+
+.evidenceLabel {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.evidenceValue {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.evidenceSource {
+  font-size: 11px;
+  color: #94a3b8;
+  text-transform: uppercase;
+}
+
+.auditItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.auditLink {
+  color: #2563eb;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.auditMeta {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.actionChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.actionChip {
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.actionForm {
+  margin-top: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.actionFormTitle {
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 8px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.input,
+.textarea {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.actionButtons {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.primaryButton {
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.secondaryButton {
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.linkButton {
+  color: #2563eb;
+  text-decoration: none;
+  font-size: 12px;
+}
+
+.muted {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.error {
+  color: #b91c1c;
+  font-size: 12px;
+}
+
+.success {
+  color: #15803d;
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.emptyState {
+  padding: 32px;
+}
