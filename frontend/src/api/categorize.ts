@@ -161,7 +161,13 @@ export function saveCategorization(
     note?: string | null;
   }
 ) {
-  return apiPost<{ status: string; updated: boolean; learned?: boolean; learned_system_key?: string | null }>(
+  return apiPost<{
+    status: string;
+    updated: boolean;
+    learned?: boolean;
+    learned_system_key?: string | null;
+    audit_id?: string | null;
+  }>(
     `/categorize/business/${businessId}/categorize`,
     payload
   );

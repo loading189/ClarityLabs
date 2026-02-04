@@ -26,10 +26,33 @@ class AuditLogOut(BaseModel):
     created_at: datetime
 
 
-@router.get("/{business_id}", response_model=List[AuditLogOut])
+class AuditLogPageOut(BaseModel):
+    items: List[AuditLogOut]
+    next_cursor: Optional[str] = None
+
+
+@router.get("/{business_id}", response_model=AuditLogPageOut)
 def list_audit_events(
     business_id: str,
     limit: int = Query(100, ge=1, le=500),
+    cursor: Optional[str] = Query(None),
+    event_type: Optional[str] = Query(None),
+    actor: Optional[str] = Query(None),
+    since: Optional[datetime] = Query(None),
+    until: Optional[datetime] = Query(None),
     db: Session = Depends(get_db),
 ):
-    return [AuditLogOut(**item) for item in audit_service.list_audit_events(db, business_id, limit)]
+    result = audit_service.list_audit_events(
+        db,
+        business_id,
+        limit=limit,
+        cursor=cursor,
+        event_type=event_type,
+        actor=actor,
+        since=since,
+        until=until,
+    )
+    return AuditLogPageOut(
+        items=[AuditLogOut(**item) for item in result["items"]],
+        next_cursor=result["next_cursor"],
+    )

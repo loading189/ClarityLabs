@@ -27,7 +27,7 @@ import { isValidIsoDate } from "../../app/filters/filters";
 import { normalizeVendorDisplay } from "../../utils/vendors";
 import { hasValidCategoryMapping } from "../../utils/categories";
 import RecentChangesPanel from "../../components/audit/RecentChangesPanel";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 export type CategorizeDrilldown = {
   merchant_key?: string;
@@ -74,7 +74,9 @@ export default function CategorizeTab({
   const [rulesErr, setRulesErr] = useState<string | null>(null);
   const [rulesMsg, setRulesMsg] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [toastAuditId, setToastAuditId] = useState<string | null>(null);
   const toastTimeoutRef = useRef<number | null>(null);
+  const location = useLocation();
   const [previewRuleId, setPreviewRuleId] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<CategoryRulePreviewOut | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -389,6 +391,7 @@ export default function CategorizeTab({
     }
     toastTimeoutRef.current = window.setTimeout(() => {
       setToastMsg(null);
+      setToastAuditId(null);
       toastTimeoutRef.current = null;
     }, 4000);
   }, []);
@@ -418,6 +421,7 @@ export default function CategorizeTab({
             ? `Saved. Learned vendor → ${res.learned_system_key ?? ""}. Reloading…`
             : "Saved. Reloading…"
         );
+        setToastAuditId(res?.audit_id ?? null);
         showToast("Categorization saved.");
 
         await load(); // ✅ ensures next txn shows updated suggestions
@@ -893,7 +897,12 @@ export default function CategorizeTab({
         {toastMsg && (
           <div className={styles.toast}>
             <span>{toastMsg}</span>
-            <Link className={styles.toastLink} to="#recent-changes">
+            <Link
+              className={styles.toastLink}
+              to={`${location.pathname}${
+                toastAuditId ? `?auditId=${toastAuditId}` : ""
+              }#recent-changes`}
+            >
               View in Recent Changes
             </Link>
           </div>
