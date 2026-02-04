@@ -372,6 +372,56 @@ def forget_brain_vendor(db: Session, business_id: str, req) -> Dict[str, Any]:
     return {"status": "ok", "deleted": deleted}
 
 
+def legacy_brain_label(db: Session, req) -> Dict[str, Any]:
+    business_id = (getattr(req, "business_id", None) or "").strip()
+    if not business_id:
+        raise HTTPException(400, "business_id required")
+    require_business(db, business_id)
+
+    alias_key = merchant_key(getattr(req, "description", "") or "")
+    if not alias_key:
+        raise HTTPException(400, "description required")
+
+    system_key = (getattr(req, "category", "") or "").strip().lower()
+    if not system_key:
+        raise HTTPException(400, "category required")
+
+    canonical = canonical_merchant_name(getattr(req, "canonical_name", "") or alias_key or "Unknown")
+    confidence = float(getattr(req, "confidence", 0.92) or 0.92)
+
+    before_label = brain.lookup_label(business_id=business_id, alias_key=alias_key)
+    label = brain.apply_label(
+        business_id=business_id,
+        alias_key=alias_key,
+        canonical_name=canonical,
+        system_key=system_key,
+        confidence=confidence,
+    )
+    brain.save()
+
+    audit_service.log_audit_event(
+        db,
+        business_id=business_id,
+        event_type="vendor_default_set",
+        actor="user",
+        reason="legacy_brain_label",
+        before=(
+            {"system_key": before_label.system_key, "confidence": before_label.confidence}
+            if before_label
+            else None
+        ),
+        after={"system_key": system_key, "confidence": label.confidence},
+    )
+    db.commit()
+
+    return {
+        "status": "ok",
+        "merchant_id": label.merchant_id,
+        "merchant_key": alias_key,
+        "category": label.system_key,
+    }
+
+
 def list_txns_to_categorize(
     db: Session,
     business_id: str,

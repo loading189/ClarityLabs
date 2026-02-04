@@ -38,7 +38,7 @@ from backend.app.services import analytics_service
 from backend.app.norma.ledger import build_cash_ledger
 from backend.app.norma.merchant import merchant_key
 from backend.app.norma.categorize_brain import brain
-from backend.app.services import categorize_service, health_signal_service
+from backend.app.services import categorize_service, health_signal_service, signals_service
 from backend.app.clarity.health_v1 import build_health_v1_signals
 
 router = APIRouter(prefix="/demo", tags=["demo"])
@@ -610,28 +610,30 @@ def demo_health_by_business(business_id: str, db: Session = Depends(get_db)):
     def _is_known_vendor(key: str) -> bool:
         return brain.lookup_label(business_id=biz.id, alias_key=key) is not None
 
-    health_signals = build_health_v1_signals(
-        facts_json=facts_json,
-        ledger_rows=ledger_rows,
-        txns=txns,
-        updated_at=None if not last_event_occurred_at else last_event_occurred_at.isoformat(),
-        categorization_metrics=categorization_metrics,
-        rule_count=int(rule_count or 0),
-        is_known_vendor=_is_known_vendor,
-    )
-    for signal in health_signals:
-        if signal.get("id") in {"high_uncategorized_rate", "rule_coverage_low", "new_unknown_vendors"}:
-            signal["fix_suggestions"] = fix_suggestions
-            if fix_examples:
-                signal.setdefault("evidence", []).append(
-                    {
-                        "date_range": {"start": "", "end": "", "label": "Top uncategorized merchants"},
-                        "metrics": {},
-                        "examples": fix_examples,
-                    }
-                )
+    health_signals: List[dict] = []
+    if signals_service.v1_signals_enabled():
+        health_signals = build_health_v1_signals(
+            facts_json=facts_json,
+            ledger_rows=ledger_rows,
+            txns=txns,
+            updated_at=None if not last_event_occurred_at else last_event_occurred_at.isoformat(),
+            categorization_metrics=categorization_metrics,
+            rule_count=int(rule_count or 0),
+            is_known_vendor=_is_known_vendor,
+        )
+        for signal in health_signals:
+            if signal.get("id") in {"high_uncategorized_rate", "rule_coverage_low", "new_unknown_vendors"}:
+                signal["fix_suggestions"] = fix_suggestions
+                if fix_examples:
+                    signal.setdefault("evidence", []).append(
+                        {
+                            "date_range": {"start": "", "end": "", "label": "Top uncategorized merchants"},
+                            "metrics": {},
+                            "examples": fix_examples,
+                        }
+                    )
 
-    health_signals = health_signal_service.hydrate_signal_states(db, biz.id, health_signals)
+        health_signals = health_signal_service.hydrate_signal_states(db, biz.id, health_signals)
 
     return {
         "business_id": str(biz.id),
