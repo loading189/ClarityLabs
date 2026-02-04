@@ -7,7 +7,7 @@ import {
   getCategorizeMetrics,
   setBrainVendor,
 } from "../../api/categorize";
-import { updateHealthSignalStatus } from "../../api/demo";
+import { updateSignalStatus } from "../../api/signals";
 import styles from "../../features/signals/HealthTab.module.css";
 
 type Props = {
@@ -68,10 +68,15 @@ export default function SignalDetail({ businessId, signal, onNavigate, onAfterAc
     setStatusSaving(true);
     setStatusErr(null);
     try {
-      await updateHealthSignalStatus(businessId, signal.id, {
-        status,
-        resolution_note: note?.trim() || null,
-      });
+      await updateSignalStatus(
+        businessId,
+        signal.id,
+        {
+          status,
+          reason: note?.trim() || null,
+        },
+        { mode: "demo" }
+      );
       onAfterAction?.();
     } catch (e: any) {
       setStatusErr(e?.message ?? "Failed to update signal status");

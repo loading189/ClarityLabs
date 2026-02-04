@@ -64,17 +64,6 @@ export function fetchVendorDrilldown(
   return apiGet<DrilldownResponse>(`/demo/drilldown/vendor?${params.toString()}`);
 }
 
-export function updateHealthSignalStatus(
-  businessId: string,
-  signalId: string,
-  payload: { status: string; resolution_note?: string | null }
-) {
-  return apiPost<{ status: string; resolved_at?: string | null; resolution_note?: string | null }>(
-    `/demo/health/${businessId}/signals/${signalId}/status`,
-    payload
-  );
-}
-
 export function fetchReviewQueue(businessId: string, minConf = 0.75) {
   return apiGet<any>(`/demo/review_queue?business_id=${businessId}&min_conf=${minConf}`);
 }

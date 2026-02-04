@@ -18,6 +18,28 @@
   gap: 6px;
 }
 
+.legacyToggle {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: #4b5563;
+}
+
+.legacyToggle input {
+  width: 16px;
+  height: 16px;
+}
+
+.legacyNote {
+  font-size: 12px;
+  color: #6b7280;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
 .select {
   border: 1px solid #d1d5db;
   border-radius: 6px;
@@ -42,6 +64,11 @@
   background: #fff;
   text-align: left;
   cursor: pointer;
+}
+
+.rowDisabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .rowActive {
