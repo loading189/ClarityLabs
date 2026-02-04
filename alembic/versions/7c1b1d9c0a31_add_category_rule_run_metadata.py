@@ -15,12 +15,16 @@ down_revision: Union[str, Sequence[str], None] = "5ac69564ef38"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
-
 def upgrade() -> None:
-    op.add_column("category_rules", sa.Column("last_run_at", sa.DateTime(), nullable=True))
-    op.add_column("category_rules", sa.Column("last_run_updated_count", sa.Integer(), nullable=True))
+    # Add columns only if missing (Postgres)
+    op.execute("ALTER TABLE category_rules ADD COLUMN IF NOT EXISTS last_run_at TIMESTAMP NULL")
+    op.execute("ALTER TABLE category_rules ADD COLUMN IF NOT EXISTS last_run_count INTEGER NULL")
+    op.execute("ALTER TABLE category_rules ADD COLUMN IF NOT EXISTS last_run_sample JSON NULL")
+
 
 
 def downgrade() -> None:
-    op.drop_column("category_rules", "last_run_updated_count")
-    op.drop_column("category_rules", "last_run_at")
+    op.execute("ALTER TABLE category_rules DROP COLUMN IF EXISTS last_run_sample")
+    op.execute("ALTER TABLE category_rules DROP COLUMN IF EXISTS last_run_count")
+    op.execute("ALTER TABLE category_rules DROP COLUMN IF EXISTS last_run_at")
+
