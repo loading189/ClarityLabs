@@ -18,6 +18,7 @@ from backend.app.sim.generators.shopify import make_shopify_order_paid_event, ma
 from backend.app.sim.generators.payroll import make_payroll_run_event
 from backend.app.sim.generators.invoicing import make_invoice_paid_event
 from backend.app.sim.generators.restaurant_v1 import generate_restaurant_v1_events
+from backend.app.services import monitoring_service
 
 
 # ============================================================
@@ -1145,64 +1146,4 @@ def upsert_sim_config(db: Session, business_id: str, req) -> Dict[str, Any]:
 
 
 def pulse(db: Session, business_id: str, n: int) -> Dict[str, Any]:
-    require_business(db, business_id)
-
-    cfg = db.execute(select(SimulatorConfig).where(SimulatorConfig.business_id == business_id)).scalar_one_or_none()
-    if not cfg:
-        cfg = _default_config_for(business_id)
-        db.add(cfg)
-        db.commit()
-        db.refresh(cfg)
-
-    if not cfg.enabled:
-        return {"status": "disabled", "business_id": business_id, "inserted": 0}
-
-    prof = _get_or_create_integration_profile(db, business_id)
-
-    enabled_streams = []
-    if prof.bank:
-        enabled_streams.append("bank")
-    if prof.card_processor:
-        enabled_streams.append("card_processor")
-    if prof.ecommerce:
-        enabled_streams.append("ecommerce")
-    if prof.payroll:
-        enabled_streams.append("payroll")
-    if prof.invoicing:
-        enabled_streams.append("invoicing")
-    if not enabled_streams:
-        enabled_streams = ["bank"]
-
-    weights = {"bank": 0.55, "card_processor": 0.20, "ecommerce": 0.15, "payroll": 0.05, "invoicing": 0.05}
-    total_w = sum(weights.get(s, 0.0) for s in enabled_streams) or 1.0
-    norm = {s: weights.get(s, 0.0) / total_w for s in enabled_streams}
-    counts = {s: int(round(n * norm[s])) for s in enabled_streams}
-    allocated = sum(counts.values())
-    if allocated != n:
-        counts[enabled_streams[0]] += (n - allocated)
-
-    now = utcnow()
-    created = 0
-
-    for _ in range(counts.get("bank", 0)):
-        created += _insert_raw_event(db, business_id, make_plaid_transaction_event(business_id=business_id, occurred_at=now, cfg=cfg))
-
-    for i in range(counts.get("card_processor", 0)):
-        created += _insert_raw_event(db, business_id, make_stripe_payout_event(business_id=business_id, occurred_at=now, cfg=cfg))
-        if i % 3 == 0:
-            created += _insert_raw_event(db, business_id, make_stripe_fee_event(business_id=business_id, occurred_at=now))
-
-    for i in range(counts.get("ecommerce", 0)):
-        created += _insert_raw_event(db, business_id, make_shopify_order_paid_event(business_id=business_id, occurred_at=now))
-        if i % 8 == 0:
-            created += _insert_raw_event(db, business_id, make_shopify_refund_event(business_id=business_id, occurred_at=now))
-
-    for _ in range(counts.get("payroll", 0)):
-        created += _insert_raw_event(db, business_id, make_payroll_run_event(business_id=business_id, occurred_at=now))
-
-    for _ in range(counts.get("invoicing", 0)):
-        created += _insert_raw_event(db, business_id, make_invoice_paid_event(business_id=business_id, occurred_at=now))
-
-    db.commit()
-    return {"status": "ok", "business_id": business_id, "inserted": created, "streams": enabled_streams, "counts": counts}
-
+    return monitoring_service.pulse(db, business_id)

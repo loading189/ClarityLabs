@@ -15,6 +15,7 @@ from backend.app.api.routes.brief import router as brief_router
 from backend.app.api.routes.signals import router as signals_router
 from backend.app.api.routes.audit import router as audit_router
 from backend.app.api.routes.diagnostics import router as diagnostics_router
+from backend.app.api.routes.monitor import router as monitor_router
 
 
 
@@ -56,3 +57,4 @@ app.include_router(brief_router)
 app.include_router(signals_router)
 app.include_router(audit_router)
 app.include_router(diagnostics_router)
+app.include_router(monitor_router)
