@@ -3,6 +3,7 @@ import { fetchCategoryDrilldown, fetchVendorDrilldown } from "../../api/demo";
 import { useDemoDashboard } from "../../hooks/useDemoDashboard";
 import type { CategorizeDrilldown } from "../categorize";
 import type { DashboardSignal, DrilldownResponse } from "../../types";
+import MonitoringWidget from "../monitoring/MonitoringWidget";
 import styles from "./DashboardTab.module.css";
 
 function formatMoney(value: number) {
@@ -137,6 +138,8 @@ export default function DashboardTab({
             {kpiLabel("Last 30d outflow", data.kpis.last_30d_outflow.value)}
             {kpiLabel("Last 30d net", data.kpis.last_30d_net.value)}
           </section>
+
+          <MonitoringWidget businessId={businessId} />
 
           <section className={styles.trendsSection}>
             <div className={styles.sectionHeader}>

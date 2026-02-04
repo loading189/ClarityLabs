@@ -1,0 +1,131 @@
+.card {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.title {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+
+.subtitle {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.headerActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.primaryButton {
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  background: #2563eb;
+  color: #fff;
+  cursor: pointer;
+}
+
+.primaryButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.linkButton {
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  text-decoration: none;
+  color: #111827;
+  background: #f9fafb;
+}
+
+.status {
+  font-size: 12px;
+  color: #4b5563;
+}
+
+.error {
+  font-size: 12px;
+  color: #b91c1c;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  padding: 10px 0;
+}
+
+.metricLabel {
+  font-size: 11px;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+
+.metricValue {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.severityRow {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.severityBadge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  font-size: 11px;
+  background: #f9fafb;
+}
+
+.severityBadge strong {
+  font-size: 12px;
+}
+
+.red {
+  border-color: rgba(220, 38, 38, 0.4);
+  color: #b91c1c;
+  background: rgba(220, 38, 38, 0.08);
+}
+
+.yellow {
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #92400e;
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.green {
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #047857;
+  background: rgba(16, 185, 129, 0.08);
+}

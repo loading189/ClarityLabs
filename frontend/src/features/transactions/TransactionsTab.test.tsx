@@ -1,7 +1,9 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 import { TransactionsTab } from "./TransactionsTab";
+import { AppStateProvider } from "../../app/state/appState";
 
 const refresh = vi.fn().mockResolvedValue(undefined);
 const getCategories = vi.fn().mockResolvedValue([
@@ -65,10 +67,14 @@ describe("TransactionsTab", () => {
     const onCategorizationChange = vi.fn();
     const user = userEvent.setup();
     render(
-      <TransactionsTab
-        businessId="biz-1"
-        onCategorizationChange={onCategorizationChange}
-      />
+      <MemoryRouter>
+        <AppStateProvider>
+          <TransactionsTab
+            businessId="biz-1"
+            onCategorizationChange={onCategorizationChange}
+          />
+        </AppStateProvider>
+      </MemoryRouter>
     );
 
     await waitFor(() => expect(getCategories).toHaveBeenCalled());
@@ -90,17 +96,21 @@ describe("TransactionsTab", () => {
     const onClearDrilldown = vi.fn();
     const user = userEvent.setup();
     render(
-      <TransactionsTab
-        businessId="biz-1"
-        drilldown={{
-          direction: "outflow",
-          category_id: "Utilities",
-          search: "coffee",
-          date_preset: "7d",
-          merchant_key: "coffee shop",
-        }}
-        onClearDrilldown={onClearDrilldown}
-      />
+      <MemoryRouter>
+        <AppStateProvider>
+          <TransactionsTab
+            businessId="biz-1"
+            drilldown={{
+              direction: "outflow",
+              category_id: "Utilities",
+              search: "coffee",
+              date_preset: "7d",
+              merchant_key: "coffee shop",
+            }}
+            onClearDrilldown={onClearDrilldown}
+          />
+        </AppStateProvider>
+      </MemoryRouter>
     );
 
     await waitFor(() => {

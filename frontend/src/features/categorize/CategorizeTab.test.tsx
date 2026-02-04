@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 import CategorizeTab from "./CategorizeTab";
 import { AppStateProvider } from "../../app/state/appState";
 
@@ -85,12 +86,14 @@ describe("CategorizeTab", () => {
     const onCategorizationChange = vi.fn();
     const user = userEvent.setup();
     render(
-      <AppStateProvider>
-        <CategorizeTab
-          businessId="11111111-1111-4111-8111-111111111111"
-          onCategorizationChange={onCategorizationChange}
-        />
-      </AppStateProvider>
+      <MemoryRouter>
+        <AppStateProvider>
+          <CategorizeTab
+            businessId="11111111-1111-4111-8111-111111111111"
+            onCategorizationChange={onCategorizationChange}
+          />
+        </AppStateProvider>
+      </MemoryRouter>
     );
 
     await waitFor(() => expect(listCategoryRules).toHaveBeenCalledTimes(1));

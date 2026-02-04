@@ -11,6 +11,7 @@ type NavItem = { label: string; path: string };
 const primaryNav: NavItem[] = [
   { label: "Home", path: "home" },
   { label: "Health", path: "health" },
+  { label: "Signals", path: "signals" },
   { label: "Dashboard", path: "dashboard" },
   { label: "Ledger", path: "ledger" },
   { label: "Trends", path: "trends" },
