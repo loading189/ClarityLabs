@@ -181,6 +181,17 @@
   font-size: 11px;
 }
 
+.anchorButton {
+  border: none;
+  background: none;
+  color: #2563eb;
+  font-weight: 600;
+  font-size: 11px;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
 .evidenceSource {
   font-size: 11px;
   color: #94a3b8;
@@ -278,6 +289,39 @@
 .linkButton {
   color: #2563eb;
   text-decoration: none;
+  font-size: 12px;
+}
+
+.scoreCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.scoreValue {
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.scoreMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 11px;
+  color: #6b7280;
+}
+
+.scoreContributors {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.scoreContributor {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
   font-size: 12px;
 }
 

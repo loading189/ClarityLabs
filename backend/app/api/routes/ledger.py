@@ -74,6 +74,18 @@ class CashPointOut(BaseModel):
     balance: float
 
 
+class LedgerTraceTxnOut(BaseModel):
+    occurred_at: datetime
+    source_event_id: str
+    description: str
+    direction: Direction
+    signed_amount: float
+    display_amount: float
+    category_name: Optional[str] = None
+    account_name: Optional[str] = None
+    counterparty_hint: Optional[str] = None
+
+
 # -------------------------
 # Endpoints
 # -------------------------
@@ -88,6 +100,27 @@ def ledger_lines(
 ):
     # NOTE: limit defaults to 2000 for UI convenience.
     return ledger_service.ledger_lines(db, business_id, start_date, end_date, limit)
+
+
+@router.get("/business/{business_id}/transactions", response_model=List[LedgerTraceTxnOut])
+def ledger_transactions(
+    business_id: str,
+    txn_ids: Optional[str] = Query(None, description="Comma-separated source_event_ids"),
+    date_start: Optional[date] = Query(None, description="Inclusive start date (YYYY-MM-DD)"),
+    date_end: Optional[date] = Query(None, description="Inclusive end date (YYYY-MM-DD)"),
+    limit: int = Query(200, ge=1, le=500),
+    db: Session = Depends(get_db),
+):
+    ids_list = [item.strip() for item in txn_ids.split(",")] if txn_ids else None
+    ids_list = [item for item in ids_list or [] if item]
+    return ledger_service.ledger_trace_transactions(
+        db,
+        business_id,
+        txn_ids=ids_list or None,
+        start_date=date_start,
+        end_date=date_end,
+        limit=limit,
+    )
 
 
 @router.get("/business/{business_id}/income_statement", response_model=IncomeStatementOut)

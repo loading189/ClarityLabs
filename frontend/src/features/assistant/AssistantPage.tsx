@@ -8,9 +8,12 @@ import {
   type SignalState,
   type SignalStatus,
 } from "../../api/signals";
+import { fetchHealthScore, type HealthScoreOut } from "../../api/healthScore";
 import { useAppState } from "../../app/state/appState";
 import { ledgerPath } from "../../app/routes/routeUtils";
 import type { FilterState } from "../../app/filters/filters";
+import HealthScoreBreakdownDrawer from "../../components/health-score/HealthScoreBreakdownDrawer";
+import LedgerTraceDrawer from "../../components/ledger/LedgerTraceDrawer";
 import styles from "./AssistantPage.module.css";
 
 type ActionOption = {
@@ -73,6 +76,14 @@ export default function AssistantPage() {
   const [explain, setExplain] = useState<SignalExplainOut | null>(null);
   const [explainLoading, setExplainLoading] = useState(false);
   const [explainErr, setExplainErr] = useState<string | null>(null);
+  const [healthScore, setHealthScore] = useState<HealthScoreOut | null>(null);
+  const [healthScoreLoading, setHealthScoreLoading] = useState(false);
+  const [healthScoreErr, setHealthScoreErr] = useState<string | null>(null);
+  const [breakdownOpen, setBreakdownOpen] = useState(false);
+  const [traceOpen, setTraceOpen] = useState(false);
+  const [traceAnchors, setTraceAnchors] = useState<
+    SignalExplainOut["evidence"][number]["anchors"] | null
+  >(null);
   const [activeAction, setActiveAction] = useState<ActionOption | null>(null);
   const [actor, setActor] = useState("");
   const [reason, setReason] = useState("");
@@ -104,6 +115,20 @@ export default function AssistantPage() {
     }
   }, [businessId]);
 
+  const loadHealthScore = useCallback(async () => {
+    if (!businessId) return;
+    setHealthScoreLoading(true);
+    setHealthScoreErr(null);
+    try {
+      const data = await fetchHealthScore(businessId);
+      setHealthScore(data);
+    } catch (e: any) {
+      setHealthScoreErr(e?.message ?? "Failed to load health score");
+    } finally {
+      setHealthScoreLoading(false);
+    }
+  }, [businessId]);
+
   const loadExplain = useCallback(
     async (signalId: string) => {
       if (!businessId || !signalId) return;
@@ -123,7 +148,8 @@ export default function AssistantPage() {
 
   useEffect(() => {
     loadSignals();
-  }, [loadSignals]);
+    loadHealthScore();
+  }, [loadHealthScore, loadSignals]);
 
   useEffect(() => {
     if (!selectedSignalId) {
@@ -148,6 +174,10 @@ export default function AssistantPage() {
     }, {});
   }, [activeAlerts]);
 
+  const signalTitleById = useMemo(() => {
+    return new Map(signals.map((signal) => [signal.id, signal.title ?? signal.id]));
+  }, [signals]);
+
   const topAlerts = useMemo(() => {
     return [...activeAlerts].sort(sortSignals).slice(0, 10);
   }, [activeAlerts]);
@@ -157,6 +187,13 @@ export default function AssistantPage() {
     setActiveAction(null);
     setActionMsg(null);
     setActionErr(null);
+  };
+
+  const handleOpenTrace = (
+    anchors: SignalExplainOut["evidence"][number]["anchors"] | null
+  ) => {
+    setTraceAnchors(anchors);
+    setTraceOpen(true);
   };
 
   const handleActionSubmit = async () => {
@@ -178,6 +215,7 @@ export default function AssistantPage() {
       setActor("");
       setReason("");
       await loadSignals();
+      await loadHealthScore();
       await loadExplain(selectedSignalId);
     } catch (e: any) {
       setActionErr(e?.message ?? "Failed to update status");
@@ -227,6 +265,39 @@ export default function AssistantPage() {
                 ))}
               </div>
             </>
+          )}
+        </div>
+
+        <div className={styles.card}>
+          <div className={styles.cardTitle}>Health score</div>
+          {healthScoreLoading && <div className={styles.muted}>Loading health score…</div>}
+          {healthScoreErr && <div className={styles.error}>{healthScoreErr}</div>}
+          {!healthScoreLoading && !healthScoreErr && healthScore && (
+            <div className={styles.scoreCard}>
+              <div className={styles.scoreValue}>{Math.round(healthScore.score)}</div>
+              <div className={styles.scoreMeta}>
+                {healthScore.domains.map((domain) => (
+                  <span key={domain.domain}>
+                    {domain.domain}: {Math.round(domain.score)}
+                  </span>
+                ))}
+              </div>
+              <div className={styles.scoreContributors}>
+                {healthScore.contributors.slice(0, 3).map((item) => (
+                  <div key={item.signal_id} className={styles.scoreContributor}>
+                    <span>{signalTitleById.get(item.signal_id) ?? item.signal_id}</span>
+                    <span>-{item.penalty.toFixed(1)}</span>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                className={styles.linkButton}
+                onClick={() => setBreakdownOpen(true)}
+              >
+                View breakdown
+              </button>
+            </div>
           )}
         </div>
 
@@ -319,6 +390,16 @@ export default function AssistantPage() {
                                   <Link className={styles.anchorLink} to={ledgerLink}>
                                     View in ledger
                                   </Link>
+                                )}
+                                {(item.anchors.txn_ids?.length ||
+                                  (item.anchors.date_start && item.anchors.date_end)) && (
+                                  <button
+                                    type="button"
+                                    className={styles.anchorButton}
+                                    onClick={() => handleOpenTrace(item.anchors ?? null)}
+                                  >
+                                    View transactions
+                                  </button>
                                 )}
                               </div>
                             )}
@@ -421,6 +502,24 @@ export default function AssistantPage() {
           </div>
         )}
       </div>
+
+      <HealthScoreBreakdownDrawer
+        open={breakdownOpen}
+        onClose={() => setBreakdownOpen(false)}
+        score={healthScore}
+        getSignalLabel={(signalId) => signalTitleById.get(signalId) ?? null}
+        onSelectSignal={(signalId) => {
+          handleSelectSignal(signalId);
+          setBreakdownOpen(false);
+        }}
+      />
+
+      <LedgerTraceDrawer
+        open={traceOpen}
+        onClose={() => setTraceOpen(false)}
+        businessId={businessId}
+        anchors={traceAnchors}
+      />
     </div>
   );
 }

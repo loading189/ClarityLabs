@@ -112,6 +112,61 @@ def ledger_lines(
     return sorted(out, key=lambda row: (row["occurred_at"], row["source_event_id"]))
 
 
+def ledger_trace_transactions(
+    db: Session,
+    business_id: str,
+    *,
+    txn_ids: Optional[List[str]] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    limit: int = 200,
+) -> List[Dict[str, Any]]:
+    require_business(db, business_id)
+    if not txn_ids and not (start_date and end_date):
+        raise HTTPException(status_code=400, detail="txn_ids or date range required")
+
+    stmt = (
+        select(TxnCategorization, RawEvent, Category, Account)
+        .join(RawEvent, and_(
+            RawEvent.business_id == TxnCategorization.business_id,
+            RawEvent.source_event_id == TxnCategorization.source_event_id,
+        ))
+        .join(Category, Category.id == TxnCategorization.category_id)
+        .join(Account, Account.id == Category.account_id)
+        .where(TxnCategorization.business_id == business_id)
+    )
+
+    if txn_ids:
+        stmt = stmt.where(RawEvent.source_event_id.in_(txn_ids))
+
+    stmt = stmt.order_by(RawEvent.occurred_at.asc(), RawEvent.source_event_id.asc()).limit(limit)
+
+    rows = db.execute(stmt).all()
+
+    out: List[Dict[str, Any]] = []
+    for _, ev, cat, acct in rows:
+        if not txn_ids and not _date_range_filter(ev.occurred_at, start_date, end_date):
+            continue
+
+        txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
+        direction: Direction = txn.direction
+        out.append(
+            {
+                "occurred_at": ev.occurred_at,
+                "source_event_id": ev.source_event_id,
+                "description": txn.description,
+                "direction": direction,
+                "signed_amount": signed_amount(txn.amount or 0.0, direction),
+                "display_amount": float(txn.amount or 0.0),
+                "category_name": cat.name,
+                "account_name": acct.name,
+                "counterparty_hint": txn.counterparty_hint,
+            }
+        )
+
+    return sorted(out, key=lambda row: (row["occurred_at"], row["source_event_id"]))
+
+
 def income_statement(
     db: Session,
     business_id: str,
