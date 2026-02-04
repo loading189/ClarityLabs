@@ -26,6 +26,7 @@ from backend.app.services.category_seed import (
     ensure_category_mapping_for_category,
 )
 from backend.app.services.category_resolver import resolve_system_key, require_system_key_mapping
+from backend.app.services import audit_service
 
 
 
@@ -139,6 +140,28 @@ def _brain_vendor_out(
     }
 
 
+def _actor_for_source(source: Optional[str]) -> str:
+    if not source:
+        return "user"
+    key = source.strip().lower()
+    if key in {"rule"}:
+        return "rule"
+    if key in {"system", "auto"}:
+        return "system"
+    if key in {"vendor"}:
+        return "vendor"
+    return "user"
+
+
+def _category_snapshot(db: Session, category_id: str) -> Dict[str, Optional[str]]:
+    cat = db.get(Category, category_id)
+    return {
+        "category_id": category_id,
+        "category_name": cat.name if cat else None,
+        "account_id": cat.account_id if cat else None,
+    }
+
+
 def label_vendor(db: Session, business_id: str, req) -> Dict[str, Any]:
     require_business(db, business_id)
 
@@ -167,6 +190,7 @@ def label_vendor(db: Session, business_id: str, req) -> Dict[str, Any]:
 
     canon = canonical_merchant_name(req.canonical_name or txn.description or "Unknown")
 
+    before_label = brain.lookup_label(business_id=business_id, alias_key=mk)
     lbl = brain.apply_label(
         business_id=business_id,
         alias_key=mk,
@@ -177,6 +201,22 @@ def label_vendor(db: Session, business_id: str, req) -> Dict[str, Any]:
     brain.save()
 
     resolved = resolve_system_key(db, business_id, system_key)
+
+    audit_service.log_audit_event(
+        db,
+        business_id=business_id,
+        event_type="vendor_default_set",
+        actor="user",
+        reason="label_vendor",
+        before=(
+            {"system_key": before_label.system_key, "confidence": before_label.confidence}
+            if before_label
+            else None
+        ),
+        after={"system_key": system_key, "confidence": lbl.confidence},
+        source_event_id=req.source_event_id,
+    )
+    db.commit()
 
     return {
         "status": "ok",
@@ -263,6 +303,7 @@ def set_brain_vendor(db: Session, business_id: str, req) -> Dict[str, Any]:
     canonical = canonical_merchant_name(req.canonical_name or alias_key or "Unknown")
     confidence = 0.92
 
+    before_label = brain.lookup_label(business_id=business_id, alias_key=alias_key)
     label = brain.apply_label(
         business_id=business_id,
         alias_key=alias_key,
@@ -271,6 +312,21 @@ def set_brain_vendor(db: Session, business_id: str, req) -> Dict[str, Any]:
         confidence=confidence,
     )
     brain.save()
+
+    audit_service.log_audit_event(
+        db,
+        business_id=business_id,
+        event_type="vendor_default_set",
+        actor="user",
+        reason="set_vendor_default",
+        before=(
+            {"system_key": before_label.system_key, "confidence": before_label.confidence}
+            if before_label
+            else None
+        ),
+        after={"system_key": system_key, "confidence": label.confidence},
+    )
+    db.commit()
 
     return _brain_vendor_out(
         merchant_id=label.merchant_id,
@@ -294,9 +350,24 @@ def forget_brain_vendor(db: Session, business_id: str, req) -> Dict[str, Any]:
     if not per:
         return {"status": "ok", "deleted": False}
 
+    before_label = per.get(merchant_id)
     deleted = per.pop(merchant_id, None) is not None
     if deleted:
         brain.save()
+        audit_service.log_audit_event(
+            db,
+            business_id=business_id,
+            event_type="vendor_default_remove",
+            actor="user",
+            reason="forget_vendor_default",
+            before=(
+                {"system_key": before_label.system_key, "confidence": before_label.confidence}
+                if before_label
+                else None
+            ),
+            after=None,
+        )
+        db.commit()
 
     return {"status": "ok", "deleted": deleted}
 
@@ -548,6 +619,24 @@ def create_category_rule(db: Session, business_id: str, req) -> Dict[str, Any]:
     db.refresh(rule)
 
     column_names = _category_rule_column_names(db)
+    audit_service.log_audit_event(
+        db,
+        business_id=business_id,
+        event_type="rule_create",
+        actor="user",
+        reason="create_rule",
+        before=None,
+        after={
+            **_category_snapshot(db, rule.category_id),
+            "contains_text": rule.contains_text,
+            "direction": rule.direction,
+            "account": rule.account,
+            "priority": rule.priority,
+            "active": rule.active,
+        },
+        rule_id=rule.id,
+    )
+    db.commit()
     return _category_rule_out(rule, column_names)
 
 
@@ -562,6 +651,15 @@ def update_category_rule(db: Session, business_id: str, rule_id: str, req) -> Di
     ).scalar_one_or_none()
     if not rule:
         raise HTTPException(404, "rule not found")
+
+    before_snapshot = {
+        **_category_snapshot(db, rule.category_id),
+        "contains_text": rule.contains_text,
+        "direction": rule.direction,
+        "account": rule.account,
+        "priority": rule.priority,
+        "active": rule.active,
+    }
 
     if req.category_id is not None:
         require_category(db, business_id, req.category_id)
@@ -594,6 +692,25 @@ def update_category_rule(db: Session, business_id: str, rule_id: str, req) -> Di
     db.commit()
     db.refresh(rule)
 
+    audit_service.log_audit_event(
+        db,
+        business_id=business_id,
+        event_type="rule_update",
+        actor="user",
+        reason="update_rule",
+        before=before_snapshot,
+        after={
+            **_category_snapshot(db, rule.category_id),
+            "contains_text": rule.contains_text,
+            "direction": rule.direction,
+            "account": rule.account,
+            "priority": rule.priority,
+            "active": rule.active,
+        },
+        rule_id=rule.id,
+    )
+    db.commit()
+
     return _category_rule_out(rule, column_names)
 
 
@@ -608,7 +725,28 @@ def delete_category_rule(db: Session, business_id: str, rule_id: str) -> Dict[st
     if not rule:
         raise HTTPException(404, "rule not found")
 
+    before_snapshot = {
+        **_category_snapshot(db, rule.category_id),
+        "contains_text": rule.contains_text,
+        "direction": rule.direction,
+        "account": rule.account,
+        "priority": rule.priority,
+        "active": rule.active,
+    }
+
     db.delete(rule)
+    db.commit()
+
+    audit_service.log_audit_event(
+        db,
+        business_id=business_id,
+        event_type="rule_delete",
+        actor="user",
+        reason="delete_rule",
+        before=before_snapshot,
+        after=None,
+        rule_id=rule_id,
+    )
     db.commit()
 
     return {"deleted": True}
@@ -773,7 +911,14 @@ def upsert_categorization(db: Session, business_id: str, req) -> Dict[str, Any]:
         )
     ).scalar_one_or_none()
 
+    before_snapshot = None
     if existing:
+        before_snapshot = {
+            **_category_snapshot(db, existing.category_id),
+            "source": existing.source,
+            "confidence": existing.confidence,
+            "note": existing.note,
+        }
         existing.category_id = req.category_id
         existing.source = req.source
         existing.confidence = req.confidence
@@ -793,6 +938,23 @@ def upsert_categorization(db: Session, business_id: str, req) -> Dict[str, Any]:
         db.add(row)
         db.commit()
         updated = False
+
+    audit_service.log_audit_event(
+        db,
+        business_id=business_id,
+        event_type="categorization_change",
+        actor=_actor_for_source(req.source),
+        reason=req.note or f"source:{req.source}",
+        before=before_snapshot,
+        after={
+            **_category_snapshot(db, req.category_id),
+            "source": req.source,
+            "confidence": req.confidence,
+            "note": req.note,
+        },
+        source_event_id=req.source_event_id,
+    )
+    db.commit()
 
     learned = False
     learned_system_key: Optional[str] = None
@@ -895,6 +1057,25 @@ def bulk_apply_categorization(db: Session, business_id: str, req) -> Dict[str, A
             db.add(row)
             created += 1
 
+    db.commit()
+
+    audit_service.log_audit_event(
+        db,
+        business_id=business_id,
+        event_type="categorization_change",
+        actor=_actor_for_source(req.source),
+        reason="bulk_apply",
+        before=None,
+        after={
+            **_category_snapshot(db, req.category_id),
+            "source": req.source,
+            "confidence": req.confidence,
+            "note": req.note,
+            "matched_events": len(matching_ids),
+            "created": created,
+        },
+        source_event_id=None,
+    )
     db.commit()
 
     return {

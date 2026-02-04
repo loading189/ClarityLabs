@@ -39,7 +39,7 @@ input,
 select,
 textarea {
   font: inherit;
-  color: inherit;
+  color: grey;
 }
 
 button {
