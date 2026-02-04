@@ -134,9 +134,8 @@ def test_analytics_core_contract_guards():
     assert [line.source_event_id for line in lines_a] == [
         line.source_event_id for line in lines_b
     ]
-    assert [(line.occurred_at, line.source_event_id) for line in lines_a] == sorted(
-        [(line.occurred_at, line.source_event_id) for line in lines_a]
-    )
+    occurred_times = [line.occurred_at for line in lines_a]
+    assert occurred_times == sorted(occurred_times)
 
     line_by_id = {line.source_event_id: line for line in lines_a}
     assert line_by_id

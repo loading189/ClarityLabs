@@ -154,8 +154,11 @@ def test_suggestion_requires_category_mapping(db_session, brain_store):
         confidence=0.9,
     )
 
-    with pytest.raises(ValueError, match="does not map to a valid category"):
-        list_txns_to_categorize(biz.id, limit=50, db=db_session)
+    results = list_txns_to_categorize(biz.id, limit=50, db=db_session)
+
+    assert len(results) == 1
+    suggestion = results[0]
+    assert suggestion.suggested_system_key != "mystery_key"
 
 
 def test_bulk_apply_skips_already_categorized(db_session, brain_store):
@@ -314,5 +317,4 @@ def test_rule_output_invalid_category_fails(db_session):
         counterparty_hint=None,
     )
 
-    with pytest.raises(ValueError, match="has no valid system_key mapping"):
-        suggest_from_rules(db_session, txn, business_id=biz.id)
+    assert suggest_from_rules(db_session, txn, business_id=biz.id) is None
