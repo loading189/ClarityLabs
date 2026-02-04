@@ -34,10 +34,18 @@ def _status_default(signal_status: Optional[str]) -> str:
 def _serialize_state(state: HealthSignalState) -> dict:
     return {
         "signal_id": state.signal_id,
+        "signal_type": state.signal_type,
+        "fingerprint": state.fingerprint,
         "status": state.status,
+        "severity": state.severity,
+        "title": state.title,
+        "summary": state.summary,
+        "payload_json": state.payload_json,
+        "detected_at": state.detected_at.isoformat() if state.detected_at else None,
         "last_seen_at": state.last_seen_at.isoformat() if state.last_seen_at else None,
         "resolved_at": state.resolved_at.isoformat() if state.resolved_at else None,
         "resolution_note": state.resolution_note,
+        "updated_at": state.updated_at.isoformat() if state.updated_at else None,
     }
 
 def _is_missing_health_signal_table(exc: Exception) -> bool:
@@ -58,6 +66,14 @@ def _apply_default_states(signals: List[dict]) -> List[dict]:
         signal.setdefault("last_seen_at", None)
         signal.setdefault("resolved_at", None)
         signal.setdefault("resolution_note", None)
+        signal.setdefault("severity", None)
+        signal.setdefault("title", None)
+        signal.setdefault("summary", None)
+        signal.setdefault("payload_json", None)
+        signal.setdefault("detected_at", None)
+        signal.setdefault("signal_type", None)
+        signal.setdefault("fingerprint", None)
+        signal.setdefault("updated_at", None)
     return signals
 
 
@@ -99,7 +115,13 @@ def hydrate_signal_states(
             state = HealthSignalState(
                 business_id=business_id,
                 signal_id=signal_id,
+                signal_type=signal.get("type") or signal.get("signal_type"),
                 status=default_status,
+                severity=signal.get("severity"),
+                title=signal.get("title"),
+                summary=signal.get("summary") or signal.get("short_summary"),
+                payload_json=signal.get("payload_json"),
+                detected_at=now,
                 last_seen_at=now,
                 resolved_at=now if default_status == "resolved" else None,
                 updated_at=now,
@@ -123,6 +145,14 @@ def hydrate_signal_states(
         signal["last_seen_at"] = state.last_seen_at.isoformat() if state.last_seen_at else None
         signal["resolved_at"] = state.resolved_at.isoformat() if state.resolved_at else None
         signal["resolution_note"] = state.resolution_note
+        signal["severity"] = state.severity
+        signal["title"] = state.title
+        signal["summary"] = state.summary
+        signal["payload_json"] = state.payload_json
+        signal["detected_at"] = state.detected_at.isoformat() if state.detected_at else None
+        signal["signal_type"] = state.signal_type
+        signal["fingerprint"] = state.fingerprint
+        signal["updated_at"] = state.updated_at.isoformat() if state.updated_at else None
 
     db.commit()
     return signals
@@ -151,6 +181,7 @@ def update_signal_status(
             business_id=business_id,
             signal_id=signal_id,
             status=status,
+            detected_at=now,
             last_seen_at=now,
             resolved_at=now if status == "resolved" else None,
             resolution_note=resolved_reason,

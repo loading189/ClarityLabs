@@ -10,7 +10,7 @@ from fastapi import HTTPException
 from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
-from backend.app.models import Account, Business, Category, RawEvent, TxnCategorization
+from backend.app.models import Account, Business, Category, HealthSignalState, RawEvent, TxnCategorization
 from backend.app.norma.from_events import raw_event_to_txn
 from backend.app.norma.ledger import LedgerIntegrityError, build_cash_ledger
 from backend.app.norma.normalize import NormalizedTransaction
@@ -124,6 +124,55 @@ def fetch_signals(
     return [asdict(signal) for signal in signals], {"count": len(signals)}
 
 
+def list_signal_states(db: Session, business_id: str) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    _require_business(db, business_id)
+
+    rows = (
+        db.execute(
+            select(HealthSignalState)
+            .where(HealthSignalState.business_id == business_id)
+            .order_by(HealthSignalState.updated_at.desc())
+        )
+        .scalars()
+        .all()
+    )
+
+    signals = [
+        {
+            "id": row.signal_id,
+            "type": row.signal_type,
+            "severity": row.severity,
+            "status": row.status,
+            "title": row.title,
+            "summary": row.summary,
+            "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+        }
+        for row in rows
+    ]
+    return signals, {"count": len(signals)}
+
+
+def get_signal_state_detail(db: Session, business_id: str, signal_id: str) -> Dict[str, Any]:
+    _require_business(db, business_id)
+    state = db.get(HealthSignalState, (business_id, signal_id))
+    if not state:
+        raise HTTPException(status_code=404, detail="signal not found")
+    return {
+        "id": state.signal_id,
+        "type": state.signal_type,
+        "severity": state.severity,
+        "status": state.status,
+        "title": state.title,
+        "summary": state.summary,
+        "payload_json": state.payload_json,
+        "fingerprint": state.fingerprint,
+        "detected_at": state.detected_at.isoformat() if state.detected_at else None,
+        "last_seen_at": state.last_seen_at.isoformat() if state.last_seen_at else None,
+        "resolved_at": state.resolved_at.isoformat() if state.resolved_at else None,
+        "updated_at": state.updated_at.isoformat() if state.updated_at else None,
+    }
+
+
 def available_signal_types() -> List[Dict[str, Any]]:
     return [
         {
@@ -140,6 +189,21 @@ def available_signal_types() -> List[Dict[str, Any]]:
             "type": "revenue_volatility",
             "window_days": 60,
             "required_inputs": ["transactions", "weekly_inflows"],
+        },
+        {
+            "type": "expense_creep_by_vendor",
+            "window_days": 14,
+            "required_inputs": ["transactions", "outflow", "vendor"],
+        },
+        {
+            "type": "low_cash_runway",
+            "window_days": 30,
+            "required_inputs": ["transactions", "cash_series", "burn_rate"],
+        },
+        {
+            "type": "unusual_outflow_spike",
+            "window_days": 30,
+            "required_inputs": ["transactions", "daily_outflow"],
         },
     ]
 

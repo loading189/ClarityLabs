@@ -231,7 +231,14 @@ class HealthSignalState(Base):
         primary_key=True,
     )
     signal_id: Mapped[str] = mapped_column(String(120), primary_key=True)
+    signal_type: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    fingerprint: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="open")
+    severity: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    title: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    payload_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    detected_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow)
     resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     resolution_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -239,6 +246,23 @@ class HealthSignalState(Base):
 
     __table_args__ = (
         Index("ix_health_signal_states_business_id", "business_id"),
+    )
+
+
+class MonitorRuntime(Base):
+    __tablename__ = "monitor_runtime"
+
+    business_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    last_pulse_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    newest_event_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow)
+
+    __table_args__ = (
+        Index("ix_monitor_runtime_business_id", "business_id"),
     )
 
 

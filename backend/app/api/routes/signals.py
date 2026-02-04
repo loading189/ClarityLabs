@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import date
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, Query
@@ -38,11 +37,9 @@ class SignalStatusUpdateOut(BaseModel):
 @router.get("", response_model=SignalsResponse)
 def list_signals(
     business_id: str = Query(...),
-    start_date: date = Query(...),
-    end_date: date = Query(...),
     db: Session = Depends(get_db),
 ):
-    signals, meta = signals_service.fetch_signals(db, business_id, start_date, end_date)
+    signals, meta = signals_service.list_signal_states(db, business_id)
     return SignalsResponse(signals=signals, meta=meta)
 
 
@@ -71,3 +68,12 @@ def update_signal_status(
         reason=req.reason,
         actor=req.actor,
     )
+
+
+@router.get("/{business_id}/{signal_id}")
+def get_signal_detail(
+    business_id: str,
+    signal_id: str,
+    db: Session = Depends(get_db),
+):
+    return signals_service.get_signal_state_detail(db, business_id, signal_id)
