@@ -171,6 +171,32 @@
   border-radius: var(--radius-sm);
 }
 
+.toast {
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.toastLink {
+  color: var(--primary-strong);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.toastLink:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus);
+  border-radius: var(--radius-sm);
+}
+
 .error {
   margin-bottom: 10px;
   color: var(--danger);

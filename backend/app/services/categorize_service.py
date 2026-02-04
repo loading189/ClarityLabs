@@ -625,7 +625,7 @@ def create_category_rule(db: Session, business_id: str, req) -> Dict[str, Any]:
         event_type="rule_create",
         actor="user",
         reason="create_rule",
-        before=None,
+        before={},
         after={
             **_category_snapshot(db, rule.category_id),
             "contains_text": rule.contains_text,

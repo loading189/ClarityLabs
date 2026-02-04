@@ -27,6 +27,7 @@ import { isValidIsoDate } from "../../app/filters/filters";
 import { normalizeVendorDisplay } from "../../utils/vendors";
 import { hasValidCategoryMapping } from "../../utils/categories";
 import RecentChangesPanel from "../../components/audit/RecentChangesPanel";
+import { Link } from "react-router-dom";
 
 export type CategorizeDrilldown = {
   merchant_key?: string;
@@ -72,6 +73,8 @@ export default function CategorizeTab({
   const [rulesLoading, setRulesLoading] = useState(false);
   const [rulesErr, setRulesErr] = useState<string | null>(null);
   const [rulesMsg, setRulesMsg] = useState<string | null>(null);
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const toastTimeoutRef = useRef<number | null>(null);
   const [previewRuleId, setPreviewRuleId] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<CategoryRulePreviewOut | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -379,6 +382,17 @@ export default function CategorizeTab({
     [cats]
   );
 
+  const showToast = useCallback((message: string) => {
+    setToastMsg(message);
+    if (toastTimeoutRef.current) {
+      window.clearTimeout(toastTimeoutRef.current);
+    }
+    toastTimeoutRef.current = window.setTimeout(() => {
+      setToastMsg(null);
+      toastTimeoutRef.current = null;
+    }, 4000);
+  }, []);
+
   const doSave = useCallback(
     async (categoryId: string, source: "manual" | "rule" | "ml") => {
       if (!selectedTxn) return;
@@ -404,6 +418,7 @@ export default function CategorizeTab({
             ? `Saved. Learned vendor → ${res.learned_system_key ?? ""}. Reloading…`
             : "Saved. Reloading…"
         );
+        showToast("Categorization saved.");
 
         await load(); // ✅ ensures next txn shows updated suggestions
         onCategorizationChange?.();
@@ -412,7 +427,7 @@ export default function CategorizeTab({
         setActionErr(e?.message ?? "Save failed");
       }
     },
-    [bumpDataVersion, businessId, catsById, load, onCategorizationChange, selectedTxn]
+    [bumpDataVersion, businessId, catsById, load, onCategorizationChange, selectedTxn, showToast]
   );
 
   const doBulkApply = useCallback(
@@ -444,6 +459,7 @@ export default function CategorizeTab({
         setMsg(
           `Applied to ${res.matched_events} events (${res.created} new, ${res.updated} updated). Reloading…`
         );
+        showToast("Vendor categorization applied.");
         await load();
         onCategorizationChange?.();
         bumpDataVersion();
@@ -451,7 +467,7 @@ export default function CategorizeTab({
         setActionErr(e?.message ?? "Failed to apply vendor categorization");
       }
     },
-    [bumpDataVersion, businessId, catsById, load, onCategorizationChange, selectedTxn]
+    [bumpDataVersion, businessId, catsById, load, onCategorizationChange, selectedTxn, showToast]
   );
 
   const updateRuleEdit = useCallback(
@@ -515,6 +531,7 @@ export default function CategorizeTab({
       try {
         await updateCategoryRule(businessId, rule.id, patch);
         setRulesMsg("Rule updated.");
+        showToast("Rule updated.");
         clearRuleEdit(rule.id);
         await loadRules();
         onCategorizationChange?.();
@@ -523,7 +540,16 @@ export default function CategorizeTab({
         setRulesErr(e?.message ?? "Failed to update rule");
       }
     },
-    [bumpDataVersion, businessId, catsById, clearRuleEdit, loadRules, onCategorizationChange, ruleEdits]
+    [
+      bumpDataVersion,
+      businessId,
+      catsById,
+      clearRuleEdit,
+      loadRules,
+      onCategorizationChange,
+      ruleEdits,
+      showToast,
+    ]
   );
 
   const toggleRuleActive = useCallback(
@@ -533,6 +559,7 @@ export default function CategorizeTab({
       try {
         await updateCategoryRule(businessId, rule.id, { active: !rule.active });
         setRulesMsg(rule.active ? "Rule deactivated." : "Rule activated.");
+        showToast(rule.active ? "Rule deactivated." : "Rule activated.");
         await loadRules();
         onCategorizationChange?.();
         bumpDataVersion();
@@ -540,7 +567,7 @@ export default function CategorizeTab({
         setRulesErr(e?.message ?? "Failed to update rule");
       }
     },
-    [bumpDataVersion, businessId, loadRules, onCategorizationChange]
+    [bumpDataVersion, businessId, loadRules, onCategorizationChange, showToast]
   );
 
   const deleteRule = useCallback(
@@ -552,6 +579,7 @@ export default function CategorizeTab({
       try {
         await deleteCategoryRule(businessId, rule.id);
         setRulesMsg("Rule deleted.");
+        showToast("Rule deleted.");
         await loadRules();
         onCategorizationChange?.();
         bumpDataVersion();
@@ -559,7 +587,7 @@ export default function CategorizeTab({
         setRulesErr(e?.message ?? "Failed to delete rule");
       }
     },
-    [bumpDataVersion, businessId, loadRules, onCategorizationChange]
+    [bumpDataVersion, businessId, loadRules, onCategorizationChange, showToast]
   );
 
   const clearPreview = useCallback(() => {
@@ -665,6 +693,7 @@ export default function CategorizeTab({
         active: true,
       });
       setRulesMsg("Rule created from this transaction.");
+      showToast("Rule created.");
       await loadRules();
       bumpDataVersion();
     } catch (e: any) {
@@ -679,6 +708,7 @@ export default function CategorizeTab({
     loadRules,
     selectedCategoryId,
     selectedTxn,
+    showToast,
   ]);
 
 
@@ -697,6 +727,14 @@ export default function CategorizeTab({
   useEffect(() => {
     selectedTxnRef.current = selectedTxn;
   }, [selectedTxn]);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current) {
+        window.clearTimeout(toastTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // On business change, reload
   useEffect(() => {
@@ -852,6 +890,14 @@ export default function CategorizeTab({
           <h3 className={styles.assignHeader}>Assign category</h3>
 
         {msg && <div className={styles.message}>{msg}</div>}
+        {toastMsg && (
+          <div className={styles.toast}>
+            <span>{toastMsg}</span>
+            <Link className={styles.toastLink} to="#recent-changes">
+              View in Recent Changes
+            </Link>
+          </div>
+        )}
         {actionErr && <div className={styles.error}>Error: {actionErr}</div>}
 
         {!selectedTxn ? (
@@ -1155,7 +1201,9 @@ export default function CategorizeTab({
           </div>
         )}
       </div>
-      <RecentChangesPanel businessId={businessId} dataVersion={dataVersion} />
+      <div id="recent-changes">
+        <RecentChangesPanel businessId={businessId} dataVersion={dataVersion} />
+      </div>
     </div>
   );
 }

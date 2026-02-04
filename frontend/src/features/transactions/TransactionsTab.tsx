@@ -15,6 +15,7 @@ import {
 import type { NormalizedTxn } from "../../api/transactions";
 import styles from "./TransactionsTab.module.css";
 import { normalizeVendorKey } from "../../utils/vendors";
+import { useAppState } from "../../app/state/appState";
 
 export type TransactionsDrilldown = {
   merchant_key?: string;
@@ -83,6 +84,7 @@ export function TransactionsTab({
   onCategorizationChange?: () => void;
 }) {
   const { data, loading, err, refresh } = useTransactions(businessId, 50);
+  const { bumpDataVersion } = useAppState();
   const [filters, setFilters] = useState<TransactionFilters>(DEFAULT_FILTERS);
   const [selectedTxn, setSelectedTxn] = useState<NormalizedTxn | null>(null);
   const [categories, setCategories] = useState<CategoryOut[]>([]);
@@ -508,6 +510,7 @@ export function TransactionsTab({
       setActionMsg("Categorization saved. Refreshing transactions…");
       await refresh();
       onCategorizationChange?.();
+      bumpDataVersion();
     } catch (e: any) {
       setActionErr(e?.message ?? "Failed to save categorization");
     } finally {
@@ -521,6 +524,7 @@ export function TransactionsTab({
     selectedCategoryValid,
     selectedTxn,
     onCategorizationChange,
+    bumpDataVersion,
   ]);
 
   const handleBulkApply = useCallback(async () => {
@@ -548,12 +552,21 @@ export function TransactionsTab({
       );
       await refresh();
       onCategorizationChange?.();
+      bumpDataVersion();
     } catch (e: any) {
       setActionErr(e?.message ?? "Failed to apply vendor categorization");
     } finally {
       setBulkLoading(false);
     }
-  }, [businessId, refresh, selectedCategoryId, selectedCategoryValid, selectedTxn, onCategorizationChange]);
+  }, [
+    businessId,
+    refresh,
+    selectedCategoryId,
+    selectedCategoryValid,
+    selectedTxn,
+    onCategorizationChange,
+    bumpDataVersion,
+  ]);
 
   const toggleVendorPanel = useCallback(async () => {
     if (vendorPanelOpen) {
@@ -598,6 +611,7 @@ export function TransactionsTab({
       setVendorActionMsg(message);
       await refresh();
       onCategorizationChange?.();
+      bumpDataVersion();
     } catch (e: any) {
       setVendorActionErr(e?.message ?? "Failed to update vendor memory");
     } finally {
@@ -611,6 +625,7 @@ export function TransactionsTab({
     vendorCategoryId,
     vendorCanonicalName,
     onCategorizationChange,
+    bumpDataVersion,
   ]);
 
   const handleVendorForget = useCallback(async () => {
@@ -666,6 +681,7 @@ export function TransactionsTab({
       setRuleActionMsg("Rule created. Refreshing transactions…");
       await refresh();
       onCategorizationChange?.();
+      bumpDataVersion();
     } catch (e: any) {
       setRuleActionErr(e?.message ?? "Failed to create rule");
     } finally {
@@ -683,6 +699,7 @@ export function TransactionsTab({
     ruleDirection,
     rulePriority,
     selectedTxn,
+    bumpDataVersion,
   ]);
 
   const clearFilters = useCallback(() => {
