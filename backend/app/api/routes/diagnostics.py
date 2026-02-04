@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
@@ -43,7 +43,20 @@ class DiagnosticsOut(BaseModel):
     ledger_integrity: LedgerIntegrityOut
 
 
-@router.get("/{business_id}", response_model=DiagnosticsOut)
+class DiagnosticsErrorOut(BaseModel):
+    status: str
+    message: str
+    details: Optional[Dict[str, Any]] = None
+
+
+@router.get("/{business_id}", response_model=Union[DiagnosticsOut, DiagnosticsErrorOut])
 def get_diagnostics(business_id: str, db: Session = Depends(get_db)):
-    payload = diagnostics_service.collect_diagnostics(db, business_id)
-    return DiagnosticsOut(**payload)
+    try:
+        payload = diagnostics_service.collect_diagnostics(db, business_id)
+        return DiagnosticsOut(**payload)
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        return DiagnosticsErrorOut(
+            status="error",
+            message=str(exc),
+            details={"type": exc.__class__.__name__},
+        )
