@@ -4,6 +4,9 @@ from pathlib import Path
 import sys
 
 import pytest
+
+pytest.importorskip("httpx")
+
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
