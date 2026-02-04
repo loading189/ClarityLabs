@@ -14,6 +14,7 @@ from backend.app.models import (
     TxnCategorization,
     BusinessCategoryMap,
     CategoryRule,
+    Account,
     utcnow,
 )
 from backend.app.norma.from_events import raw_event_to_txn
@@ -24,7 +25,8 @@ from backend.app.services.category_seed import (
     seed_coa_and_categories_and_mappings,
     ensure_category_mapping_for_category,
 )
-from backend.app.services.category_resolver import resolve_system_key
+from backend.app.services.category_resolver import resolve_system_key, require_system_key_mapping
+
 
 
 def require_business(db: Session, business_id: str) -> Business:
@@ -45,10 +47,20 @@ def require_category(db: Session, business_id: str, category_id: str) -> Categor
     ).scalar_one_or_none()
     if not cat or not cat.account_id:
         raise HTTPException(404, "category not found for business")
+    acct = db.get(Account, cat.account_id)
+    if not acct:
+        raise HTTPException(
+            409,
+            f"Invariant violation: category '{category_id}' references missing account '{cat.account_id}'.",
+        )
+
+    # Ensure there is a valid system_key mapping for this category.
+    # Try auto-repair once; if it can't be repaired, fail.
     if not system_key_for_category(db, business_id, category_id):
         repaired = ensure_category_mapping_for_category(db, business_id, category_id)
         if not repaired:
-            raise HTTPException(400, "category missing account mapping")
+            raise HTTPException(409, "Invariant violation: category missing system_key mapping")
+
     return cat
 
 
@@ -147,8 +159,11 @@ def label_vendor(db: Session, business_id: str, req) -> Dict[str, Any]:
     if not system_key:
         raise HTTPException(400, "system_key required")
 
-    if not resolve_system_key(db, business_id, system_key):
-        raise HTTPException(400, "system_key must map to a valid category")
+    try:
+        require_system_key_mapping(db, business_id, system_key, context="vendor default")
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
 
     canon = canonical_merchant_name(req.canonical_name or txn.description or "Unknown")
 
@@ -183,6 +198,10 @@ def list_brain_vendors(db: Session, business_id: str) -> List[Dict[str, Any]]:
         system_key = (label.system_key or "").strip().lower()
         if not system_key or system_key == "uncategorized":
             continue
+        try:
+            require_system_key_mapping(db, business_id, system_key, context="vendor default")
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from exc
         vendors.append(_brain_vendor_out(merchant_id=merchant_id, label=label))
 
     vendors.sort(key=lambda v: (v.get("canonical_name") or "").lower())
@@ -204,6 +223,16 @@ def get_brain_vendor(db: Session, business_id: str, merchant_key_value: str) -> 
     label = brain.labels.get(business_id, {}).get(merchant_id)
     if not label or (label.system_key or "").strip().lower() == "uncategorized":
         raise HTTPException(404, "vendor not found")
+
+    try:
+        require_system_key_mapping(
+            db,
+            business_id,
+            (label.system_key or "").strip().lower(),
+            context="vendor default",
+        )
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
 
     return _brain_vendor_out(
         merchant_id=merchant_id,
@@ -362,6 +391,13 @@ def list_categories(db: Session, business_id: str) -> List[Dict[str, Any]]:
     cats = db.execute(
         select(Category).where(Category.business_id == business_id).order_by(Category.name.asc())
     ).scalars().all()
+
+    missing_accounts = [c.id for c in cats if not c.account_id or not getattr(c, "account", None)]
+    if missing_accounts:
+        raise HTTPException(
+            409,
+            f"Invariant violation: categories missing account_id or account: {missing_accounts}",
+        )
 
     return [
         {

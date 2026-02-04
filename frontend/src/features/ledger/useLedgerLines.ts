@@ -14,7 +14,16 @@ export function useLedgerLines(limit = 2000) {
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!businessId || !startDate || !endDate) return;
+    if (!businessId) {
+      setLines([]);
+      setErr("Select a business to load ledger lines.");
+      return;
+    }
+    if (!startDate || !endDate) {
+      setLines([]);
+      setErr("Select a date range to load ledger lines.");
+      return;
+    }
     if (!isBusinessIdValid(businessId)) {
       setLines([]);
       setErr("Invalid business id. Please re-select a business.");

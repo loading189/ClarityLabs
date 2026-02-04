@@ -6,7 +6,8 @@ from typing import Optional, List, Tuple
 from sqlalchemy import select, and_
 from sqlalchemy.orm import Session
 
-from backend.app.models import CategoryRule, BusinessCategoryMap
+from backend.app.models import CategoryRule, BusinessCategoryMap, Category, Account
+from backend.app.services.category_resolver import require_system_key_mapping
 from backend.app.norma.normalize import NormalizedTransaction, EnrichedTransaction, Categorization
 from backend.app.norma.categorize import categorize_txn as heuristic_categorize_txn
 from backend.app.norma.categorize_brain import categorize_txn_with_brain
@@ -30,14 +31,23 @@ def _system_key_for_category_id(db: Session, business_id: str, category_id: str)
     This keeps your "system_key as lingua franca" approach consistent.
     """
     m = db.execute(
-        select(BusinessCategoryMap.system_key).where(
+        select(BusinessCategoryMap.system_key)
+        .join(Category, Category.id == BusinessCategoryMap.category_id)
+        .join(Account, Account.id == Category.account_id)
+        .where(
             and_(
                 BusinessCategoryMap.business_id == business_id,
                 BusinessCategoryMap.category_id == category_id,
+                Category.business_id == business_id,
             )
         )
     ).scalar_one_or_none()
-    return (m or "").strip().lower() or None
+    system_key = (m or "").strip().lower() or None
+    if not system_key:
+        raise ValueError(
+            f"Invariant violation: rule category_id '{category_id}' has no valid system_key mapping."
+        )
+    return system_key
 
 
 def suggest_from_rules(
@@ -193,6 +203,12 @@ def suggest_category(
     # 1) Brain
     brain_res = categorize_txn_with_brain(txn, business_id=business_id)
     if isinstance(brain_res, EnrichedTransaction) and brain_res.categorization and not _is_uncat(brain_res.category):
+        require_system_key_mapping(
+            db,
+            business_id,
+            brain_res.category,
+            context="vendor default",
+        )
         return brain_res
 
     # 2) Rules

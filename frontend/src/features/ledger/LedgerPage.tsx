@@ -42,7 +42,7 @@ export default function LedgerPage() {
 
   const [filters, setFilters] = useFilters();
   const { data: dashboard } = useDemoDashboard();
-  const { dateRange, setDateRange, dataVersion } = useAppState();
+  const { dateRange, setDateRange, dataVersion, activeBusinessId, setActiveBusinessId } = useAppState();
 
   // Keep demo date range in sync with seeded metadata.
   useDemoDateRange(filters, setFilters, dashboard?.metadata);
@@ -54,28 +54,18 @@ export default function LedgerPage() {
     setDateRange(range);
   }, [range.start, range.end, setDateRange]);
 
+  // Keep global active business in sync with the route param.
+  useEffect(() => {
+    if (businessId && activeBusinessId !== businessId) {
+      setActiveBusinessId(businessId);
+    }
+  }, [activeBusinessId, businessId, setActiveBusinessId]);
+
   const { lines, loading, err } = useLedgerLines();
 
   // Vendor brain mappings (canonicalization).
   const [brainVendors, setBrainVendors] = useState<BrainVendor[]>([]);
   const [vendorErr, setVendorErr] = useState<string | null>(null);
-
-  // UI state
-  const [selected, setSelected] = useState<LedgerLine | null>(null);
-  const [page, setPage] = useState(1);
-
-  // Guard invalid route param early.
-  if (!businessId) {
-    return (
-      <div className={styles.page}>
-        <PageHeader
-          title="Ledger"
-          subtitle="Source-of-truth timeline with filters, search, and transaction drilldowns."
-        />
-        <ErrorState label="Invalid business id in URL. Go back to /app to re-select a business." />
-      </div>
-    );
-  }
 
   // Fetch vendor mappings (brain vendors) when business or dataVersion changes.
   // NOTE: avoid depending on full dateRange object to reduce re-fetch churn.
@@ -101,6 +91,13 @@ export default function LedgerPage() {
     });
     return map;
   }, [brainVendors]);
+
+  // UI state
+  const [selected, setSelected] = useState<LedgerLine | null>(null);
+  const [page, setPage] = useState(1);
+
+
+
 
   // Options derived from the current dataset (not filtered) — keeps filter UX stable.
   const accounts = useMemo(
@@ -349,6 +346,39 @@ export default function LedgerPage() {
           </>
         )}
       </Drawer>
+      {import.meta.env.DEV && (
+        <div className={styles.debugOverlay}>
+          <div className={styles.debugRow}>
+            <span>business_id</span>
+            <span>{activeBusinessId ?? "—"}</span>
+          </div>
+          <div className={styles.debugRow}>
+            <span>date_range</span>
+            <span>
+              {dateRange.start} → {dateRange.end}
+            </span>
+          </div>
+          <div className={styles.debugRow}>
+            <span>ledger_rows</span>
+            <span>{lines.length}</span>
+          </div>
+          <div className={styles.debugRow}>
+            <span>filters</span>
+            <span>
+              {JSON.stringify(
+                {
+                  account: filters.account ?? null,
+                  category: filters.category ?? null,
+                  direction: filters.direction ?? null,
+                  query: filters.q ?? null,
+                },
+                null,
+                0
+              )}
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
