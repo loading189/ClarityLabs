@@ -4,7 +4,7 @@ from dataclasses import asdict
 from datetime import date
 import logging
 import os
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import HTTPException
 from sqlalchemy import and_, select
@@ -15,6 +15,7 @@ from backend.app.norma.from_events import raw_event_to_txn
 from backend.app.norma.ledger import LedgerIntegrityError, build_cash_ledger
 from backend.app.norma.normalize import NormalizedTransaction
 from backend.app.signals.core import generate_core_signals
+from backend.app.services import health_signal_service
 
 
 logger = logging.getLogger(__name__)
@@ -141,3 +142,21 @@ def available_signal_types() -> List[Dict[str, Any]]:
             "required_inputs": ["transactions", "weekly_inflows"],
         },
     ]
+
+
+def update_signal_status(
+    db: Session,
+    business_id: str,
+    signal_id: str,
+    status: str,
+    reason: Optional[str] = None,
+    actor: Optional[str] = None,
+) -> Dict[str, Any]:
+    return health_signal_service.update_signal_status(
+        db,
+        business_id,
+        signal_id,
+        status=status,
+        reason=reason,
+        actor=actor,
+    )
