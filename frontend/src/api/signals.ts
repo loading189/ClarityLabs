@@ -37,6 +37,7 @@ export type SignalStatus = "open" | "in_progress" | "resolved" | "ignored";
 export type SignalState = {
   id: string;
   type: string | null;
+  domain?: string | null;
   severity: SignalSeverity | null;
   status: SignalStatus;
   title: string | null;
@@ -90,8 +91,18 @@ export function getSignalDetail(
 export type SignalExplainEvidence = {
   key: string;
   label: string;
-  value: string | number | boolean;
-  source: "state" | "runtime" | "derived";
+  value: string | number | boolean | null;
+  unit?: string | null;
+  as_of?: string | null;
+  source: "ledger" | "state" | "derived" | "detector";
+  anchors?: {
+    txn_ids?: string[] | null;
+    date_start?: string | null;
+    date_end?: string | null;
+    account_id?: string | null;
+    vendor?: string | null;
+    category?: string | null;
+  } | null;
 };
 
 export type SignalExplainAudit = {
@@ -119,7 +130,11 @@ export type SignalExplainOut = {
     type: string;
     title: string;
     description: string;
+    domain: string;
+    default_severity: string | null;
     recommended_actions: string[];
+    evidence_schema: string[];
+    scoring_profile: Record<string, unknown>;
   };
   evidence: SignalExplainEvidence[];
   related_audits: SignalExplainAudit[];

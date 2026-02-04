@@ -10,6 +10,7 @@ const listSignalStates = vi.fn().mockResolvedValue({
     {
       id: "sig-1",
       type: "expense_creep_by_vendor",
+      domain: "expense",
       severity: "high",
       status: "open",
       title: "Expense creep",
@@ -19,6 +20,7 @@ const listSignalStates = vi.fn().mockResolvedValue({
     {
       id: "sig-2",
       type: "low_cash_runway",
+      domain: "liquidity",
       severity: "medium",
       status: "in_progress",
       title: "Low runway",
@@ -28,6 +30,7 @@ const listSignalStates = vi.fn().mockResolvedValue({
     {
       id: "sig-3",
       type: "unusual_outflow_spike",
+      domain: "expense",
       severity: "high",
       status: "resolved",
       title: "Outflow spike",
@@ -54,11 +57,21 @@ const explainPayload = {
     type: "expense_creep_by_vendor",
     title: "Expense creep by vendor",
     description: "Vendor outflows increased.",
+    domain: "expense",
+    default_severity: "warning",
     recommended_actions: ["Review spend"],
+    evidence_schema: ["delta", "vendor_name"],
+    scoring_profile: { weight: 1.1 },
   },
   evidence: [
-    { key: "delta", label: "Delta", value: 300, source: "derived" },
-    { key: "vendor_name", label: "Vendor", value: "Acme", source: "runtime" },
+    {
+      key: "delta",
+      label: "Delta",
+      value: 300,
+      source: "derived",
+      anchors: { date_start: "2024-05-01", date_end: "2024-05-30" },
+    },
+    { key: "vendor_name", label: "Vendor", value: "Acme", source: "ledger" },
   ],
   related_audits: [
     {

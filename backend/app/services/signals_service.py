@@ -20,71 +20,252 @@ from backend.app.services import audit_service, health_signal_service
 logger = logging.getLogger(__name__)
 
 
-DETECTOR_METADATA: Dict[str, Dict[str, Any]] = {
+SIGNAL_CATALOG: Dict[str, Dict[str, Any]] = {
     "expense_creep_by_vendor": {
-        "type": "expense_creep_by_vendor",
+        "signal_id": "expense_creep_by_vendor",
+        "domain": "expense",
         "title": "Expense creep by vendor",
         "description": "Identifies vendors with a sustained increase in outflows over a recent window.",
+        "default_severity": "warning",
         "recommended_actions": [
             "Review vendor invoices for pricing changes.",
             "Confirm contract terms and check for duplicate charges.",
             "Identify opportunities to renegotiate or consolidate spend.",
         ],
+        "evidence_schema": [
+            "vendor_name",
+            "current_total",
+            "prior_total",
+            "delta",
+            "increase_pct",
+            "window_days",
+            "threshold_pct",
+            "min_delta",
+            "current_window.start",
+            "current_window.end",
+            "prior_window.start",
+            "prior_window.end",
+        ],
+        "scoring_profile": {"weight": 1.1, "domain_weight": 1.0},
     },
     "low_cash_runway": {
-        "type": "low_cash_runway",
+        "signal_id": "low_cash_runway",
+        "domain": "liquidity",
         "title": "Low cash runway",
         "description": "Detects when cash runway falls below defined thresholds based on recent burn.",
+        "default_severity": "critical",
         "recommended_actions": [
             "Reforecast cash flow and adjust discretionary spend.",
             "Accelerate collections or delay noncritical outflows.",
             "Review burn assumptions and update runway targets.",
         ],
+        "evidence_schema": [
+            "current_cash",
+            "runway_days",
+            "burn_window_days",
+            "total_inflow",
+            "total_outflow",
+            "net_burn",
+            "burn_per_day",
+            "burn_start",
+            "burn_end",
+            "thresholds.high",
+            "thresholds.medium",
+        ],
+        "scoring_profile": {"weight": 1.6, "domain_weight": 1.3},
     },
     "unusual_outflow_spike": {
-        "type": "unusual_outflow_spike",
+        "signal_id": "unusual_outflow_spike",
+        "domain": "expense",
         "title": "Unusual outflow spike",
         "description": "Flags outflow spikes that deviate from recent spending patterns.",
+        "default_severity": "warning",
         "recommended_actions": [
             "Validate the transaction details for one-off expenses.",
             "Confirm approvals for unusually large payments.",
             "Investigate potential anomalies or fraud.",
         ],
+        "evidence_schema": [
+            "latest_date",
+            "latest_total",
+            "mean_30d",
+            "std_30d",
+            "sigma_threshold",
+            "trailing_mean_days",
+            "trailing_mean",
+            "mult_threshold",
+            "window_days",
+            "spike_sigma",
+            "spike_mult",
+        ],
+        "scoring_profile": {"weight": 0.9, "domain_weight": 1.0},
     },
 }
 
-EVIDENCE_FIELDS: Dict[str, List[Dict[str, str]]] = {
+EVIDENCE_FIELDS: Dict[str, List[Dict[str, Any]]] = {
     "expense_creep_by_vendor": [
-        {"key": "vendor_name", "label": "Vendor", "path": "vendor_name", "source": "runtime"},
-        {"key": "current_total", "label": "Current total", "path": "current_total", "source": "runtime"},
-        {"key": "prior_total", "label": "Prior total", "path": "prior_total", "source": "runtime"},
-        {"key": "delta", "label": "Delta", "path": "delta", "source": "derived"},
-        {"key": "increase_pct", "label": "Increase (%)", "path": "increase_pct", "source": "derived"},
+        {
+            "key": "vendor_name",
+            "label": "Vendor",
+            "path": "vendor_name",
+            "source": "ledger",
+            "anchors": {"vendor_path": "vendor_name"},
+        },
+        {
+            "key": "current_total",
+            "label": "Current total",
+            "path": "current_total",
+            "source": "ledger",
+            "unit": "USD",
+            "anchors": {
+                "date_start_path": "current_window.start",
+                "date_end_path": "current_window.end",
+                "vendor_path": "vendor_name",
+            },
+        },
+        {
+            "key": "prior_total",
+            "label": "Prior total",
+            "path": "prior_total",
+            "source": "ledger",
+            "unit": "USD",
+            "anchors": {
+                "date_start_path": "prior_window.start",
+                "date_end_path": "prior_window.end",
+                "vendor_path": "vendor_name",
+            },
+        },
+        {
+            "key": "delta",
+            "label": "Delta",
+            "path": "delta",
+            "source": "derived",
+            "unit": "USD",
+            "anchors": {
+                "date_start_path": "prior_window.start",
+                "date_end_path": "current_window.end",
+                "vendor_path": "vendor_name",
+            },
+        },
+        {
+            "key": "increase_pct",
+            "label": "Increase (%)",
+            "path": "increase_pct",
+            "source": "derived",
+            "unit": "%",
+        },
         {"key": "window_days", "label": "Window (days)", "path": "window_days", "source": "state"},
-        {"key": "threshold_pct", "label": "Threshold (%)", "path": "threshold_pct", "source": "state"},
+        {
+            "key": "threshold_pct",
+            "label": "Threshold (%)",
+            "path": "threshold_pct",
+            "source": "state",
+            "unit": "%",
+        },
         {"key": "min_delta", "label": "Minimum delta", "path": "min_delta", "source": "state"},
-        {"key": "current_window.start", "label": "Current window start", "path": "current_window.start", "source": "runtime"},
-        {"key": "current_window.end", "label": "Current window end", "path": "current_window.end", "source": "runtime"},
-        {"key": "prior_window.start", "label": "Prior window start", "path": "prior_window.start", "source": "runtime"},
-        {"key": "prior_window.end", "label": "Prior window end", "path": "prior_window.end", "source": "runtime"},
+        {
+            "key": "current_window.start",
+            "label": "Current window start",
+            "path": "current_window.start",
+            "source": "state",
+            "as_of_path": "current_window.start",
+        },
+        {
+            "key": "current_window.end",
+            "label": "Current window end",
+            "path": "current_window.end",
+            "source": "state",
+            "as_of_path": "current_window.end",
+        },
+        {
+            "key": "prior_window.start",
+            "label": "Prior window start",
+            "path": "prior_window.start",
+            "source": "state",
+            "as_of_path": "prior_window.start",
+        },
+        {
+            "key": "prior_window.end",
+            "label": "Prior window end",
+            "path": "prior_window.end",
+            "source": "state",
+            "as_of_path": "prior_window.end",
+        },
     ],
     "low_cash_runway": [
-        {"key": "current_cash", "label": "Current cash", "path": "current_cash", "source": "runtime"},
-        {"key": "runway_days", "label": "Runway (days)", "path": "runway_days", "source": "derived"},
+        {
+            "key": "current_cash",
+            "label": "Current cash",
+            "path": "current_cash",
+            "source": "ledger",
+            "unit": "USD",
+            "anchors": {"date_end_path": "burn_end"},
+        },
+        {
+            "key": "runway_days",
+            "label": "Runway (days)",
+            "path": "runway_days",
+            "source": "derived",
+        },
         {"key": "burn_window_days", "label": "Burn window (days)", "path": "burn_window_days", "source": "state"},
-        {"key": "total_inflow", "label": "Total inflow", "path": "total_inflow", "source": "runtime"},
-        {"key": "total_outflow", "label": "Total outflow", "path": "total_outflow", "source": "runtime"},
-        {"key": "net_burn", "label": "Net burn", "path": "net_burn", "source": "derived"},
-        {"key": "burn_per_day", "label": "Burn per day", "path": "burn_per_day", "source": "derived"},
-        {"key": "burn_start", "label": "Burn start", "path": "burn_start", "source": "runtime"},
-        {"key": "burn_end", "label": "Burn end", "path": "burn_end", "source": "runtime"},
+        {
+            "key": "total_inflow",
+            "label": "Total inflow",
+            "path": "total_inflow",
+            "source": "ledger",
+            "unit": "USD",
+            "anchors": {"date_start_path": "burn_start", "date_end_path": "burn_end"},
+        },
+        {
+            "key": "total_outflow",
+            "label": "Total outflow",
+            "path": "total_outflow",
+            "source": "ledger",
+            "unit": "USD",
+            "anchors": {"date_start_path": "burn_start", "date_end_path": "burn_end"},
+        },
+        {"key": "net_burn", "label": "Net burn", "path": "net_burn", "source": "derived", "unit": "USD"},
+        {
+            "key": "burn_per_day",
+            "label": "Burn per day",
+            "path": "burn_per_day",
+            "source": "derived",
+            "unit": "USD",
+        },
+        {
+            "key": "burn_start",
+            "label": "Burn start",
+            "path": "burn_start",
+            "source": "state",
+            "as_of_path": "burn_start",
+        },
+        {
+            "key": "burn_end",
+            "label": "Burn end",
+            "path": "burn_end",
+            "source": "state",
+            "as_of_path": "burn_end",
+        },
         {"key": "thresholds.high", "label": "High threshold (days)", "path": "thresholds.high", "source": "state"},
         {"key": "thresholds.medium", "label": "Medium threshold (days)", "path": "thresholds.medium", "source": "state"},
     ],
     "unusual_outflow_spike": [
-        {"key": "latest_date", "label": "Latest date", "path": "latest_date", "source": "runtime"},
-        {"key": "latest_total", "label": "Latest total", "path": "latest_total", "source": "runtime"},
-        {"key": "mean_30d", "label": "30d mean", "path": "mean_30d", "source": "derived"},
+        {
+            "key": "latest_date",
+            "label": "Latest date",
+            "path": "latest_date",
+            "source": "ledger",
+            "anchors": {"date_start_path": "latest_date", "date_end_path": "latest_date"},
+        },
+        {
+            "key": "latest_total",
+            "label": "Latest total",
+            "path": "latest_total",
+            "source": "ledger",
+            "unit": "USD",
+            "anchors": {"date_start_path": "latest_date", "date_end_path": "latest_date"},
+        },
+        {"key": "mean_30d", "label": "30d mean", "path": "mean_30d", "source": "derived", "unit": "USD"},
         {"key": "std_30d", "label": "30d std dev", "path": "std_30d", "source": "derived"},
         {"key": "sigma_threshold", "label": "Sigma threshold", "path": "sigma_threshold", "source": "state"},
         {"key": "trailing_mean_days", "label": "Trailing mean days", "path": "trailing_mean_days", "source": "state"},
@@ -228,18 +409,23 @@ def list_signal_states(db: Session, business_id: str) -> Tuple[List[Dict[str, An
         .all()
     )
 
-    signals = [
-        {
-            "id": row.signal_id,
-            "type": row.signal_type,
-            "severity": row.severity,
-            "status": row.status,
-            "title": row.title,
-            "summary": row.summary,
-            "updated_at": row.updated_at.isoformat() if row.updated_at else None,
-        }
-        for row in rows
-    ]
+    signals = []
+    for row in rows:
+        domain = None
+        if row.signal_type:
+            domain = SIGNAL_CATALOG.get(row.signal_type, {}).get("domain")
+        signals.append(
+            {
+                "id": row.signal_id,
+                "type": row.signal_type,
+                "domain": domain,
+                "severity": row.severity,
+                "status": row.status,
+                "title": row.title,
+                "summary": row.summary,
+                "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+            }
+        )
     return signals, {"count": len(signals)}
 
 
@@ -248,9 +434,13 @@ def get_signal_state_detail(db: Session, business_id: str, signal_id: str) -> Di
     state = db.get(HealthSignalState, (business_id, signal_id))
     if not state:
         raise HTTPException(status_code=404, detail="signal not found")
+    domain = None
+    if state.signal_type:
+        domain = SIGNAL_CATALOG.get(state.signal_type, {}).get("domain")
     return {
         "id": state.signal_id,
         "type": state.signal_type,
+        "domain": domain,
         "severity": state.severity,
         "status": state.status,
         "title": state.title,
@@ -328,6 +518,33 @@ def _read_payload_value(payload: Dict[str, Any], path: str) -> Any:
     return current
 
 
+def _build_anchors(payload: Dict[str, Any], field: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    anchor_cfg = field.get("anchors")
+    if not isinstance(anchor_cfg, dict):
+        return None
+
+    anchors: Dict[str, Any] = {}
+    if "txn_ids_path" in anchor_cfg:
+        txn_ids = _read_payload_value(payload, anchor_cfg["txn_ids_path"])
+        if isinstance(txn_ids, list):
+            anchors["txn_ids"] = [str(txn_id) for txn_id in txn_ids]
+    for key, target in (
+        ("date_start", "date_start_path"),
+        ("date_end", "date_end_path"),
+        ("account_id", "account_id_path"),
+        ("vendor", "vendor_path"),
+        ("category", "category_path"),
+    ):
+        path = anchor_cfg.get(target)
+        if not path:
+            continue
+        value = _read_payload_value(payload, path)
+        if value is not None:
+            anchors[key] = value
+
+    return anchors or None
+
+
 def _build_evidence(signal_type: Optional[str], payload: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
     if not signal_type or not isinstance(payload, dict):
         return []
@@ -339,25 +556,46 @@ def _build_evidence(signal_type: Optional[str], payload: Optional[Dict[str, Any]
             continue
         if isinstance(value, (dict, list)):
             continue
-        evidence.append(
-            {
-                "key": field["key"],
-                "label": field["label"],
-                "value": value,
-                "source": field["source"],
-            }
-        )
-    return sorted(evidence, key=lambda item: item["key"])
+        item: Dict[str, Any] = {
+            "key": field["key"],
+            "label": field["label"],
+            "value": value,
+            "source": field["source"],
+        }
+        if field.get("unit") is not None:
+            item["unit"] = field["unit"]
+        as_of_path = field.get("as_of_path")
+        if as_of_path:
+            item["as_of"] = _read_payload_value(payload, as_of_path)
+        anchors = _build_anchors(payload, field)
+        if anchors:
+            item["anchors"] = anchors
+        evidence.append(item)
+    return sorted(evidence, key=lambda item: (item["key"], item["label"]))
 
 
 def _detector_meta(signal_type: Optional[str], state: HealthSignalState) -> Dict[str, Any]:
-    if signal_type and signal_type in DETECTOR_METADATA:
-        return DETECTOR_METADATA[signal_type]
+    if signal_type and signal_type in SIGNAL_CATALOG:
+        catalog = SIGNAL_CATALOG[signal_type]
+        return {
+            "type": catalog["signal_id"],
+            "title": catalog["title"],
+            "description": catalog["description"],
+            "domain": catalog["domain"],
+            "default_severity": catalog["default_severity"],
+            "recommended_actions": catalog["recommended_actions"],
+            "evidence_schema": catalog["evidence_schema"],
+            "scoring_profile": catalog["scoring_profile"],
+        }
     return {
         "type": signal_type or "unknown",
         "title": state.title or "Signal",
         "description": state.summary or "",
         "recommended_actions": [],
+        "domain": "unknown",
+        "default_severity": None,
+        "evidence_schema": [],
+        "scoring_profile": {},
     }
 
 
@@ -377,6 +615,13 @@ def _list_related_audits(
 ) -> List[Dict[str, Any]]:
     payload = audit_service.list_audit_events(db, business_id, limit=50)
     items = payload.get("items", [])
+    def _audit_sort_key(entry: Dict[str, Any]) -> Tuple[int, str]:
+        created_at = entry.get("created_at")
+        timestamp = int(created_at.timestamp()) if created_at else 0
+        entry_id = str(entry.get("id") or "")
+        return (-timestamp, entry_id)
+
+    items = sorted(items, key=_audit_sort_key)
     related: List[Dict[str, Any]] = []
     for entry in items:
         if entry.get("event_type") not in AUDIT_EVENT_TYPES:

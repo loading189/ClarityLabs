@@ -43,6 +43,11 @@ function severityClass(severity: string | null) {
   return styles.severityNeutral;
 }
 
+function formatDomainLabel(domain?: string | null) {
+  if (!domain) return "—";
+  return domain.charAt(0).toUpperCase() + domain.slice(1);
+}
+
 function toIsoDate(value: Date) {
   return value.toISOString().slice(0, 10);
 }
@@ -416,6 +421,7 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
               </span>
               <div className={styles.rowMain}>
                 <div className={styles.rowTitle}>{signal.title ?? signal.type ?? "Signal"}</div>
+                <div className={styles.rowDomain}>{formatDomainLabel(signal.domain)}</div>
                 <div className={styles.rowSummary}>{signal.summary ?? "—"}</div>
               </div>
               <div className={styles.rowMeta}>
@@ -457,6 +463,7 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
               <div className={styles.detailSummary}>{detail.summary ?? "—"}</div>
               <div className={styles.detailMeta}>
                 <span>Status: {STATUS_LABELS[detail.status] ?? detail.status}</span>
+                <span>Domain: {formatDomainLabel(detail.domain)}</span>
                 <span>Last updated: {formatDate(detail.updated_at)}</span>
               </div>
             </div>
