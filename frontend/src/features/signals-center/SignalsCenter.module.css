@@ -123,6 +123,13 @@
   color: #111827;
 }
 
+.rowDomain {
+  font-size: 11px;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .rowSummary {
   font-size: 12px;
   color: #6b7280;

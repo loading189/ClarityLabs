@@ -142,8 +142,13 @@ def test_explain_endpoint_returns_payload(db_session):
     assert "related_audits" in explain
     assert "links" in explain
 
-    evidence_keys = [item["key"] for item in explain["evidence"]]
+    evidence_keys = [(item["key"], item["label"]) for item in explain["evidence"]]
     assert evidence_keys == sorted(evidence_keys)
+    detector = explain["detector"]
+    assert detector["domain"] == "expense"
+    assert detector["default_severity"] is not None
+    assert detector["evidence_schema"]
+    assert detector["scoring_profile"]
 
 
 def test_explain_evidence_order_is_deterministic(db_session):
@@ -154,8 +159,26 @@ def test_explain_evidence_order_is_deterministic(db_session):
     signal_id = signals[0]["id"]
 
     explain = signals_service.get_signal_explain(db_session, biz.id, signal_id)
-    evidence_keys = [item["key"] for item in explain["evidence"]]
+    evidence_keys = [(item["key"], item["label"]) for item in explain["evidence"]]
     assert evidence_keys == sorted(evidence_keys)
+
+
+def test_explain_evidence_contains_anchors(db_session):
+    biz = _create_business(db_session)
+    _seed_expense_creep(db_session, biz.id)
+
+    signals, _ = signals_service.list_signal_states(db_session, biz.id)
+    signal_id = signals[0]["id"]
+
+    explain = signals_service.get_signal_explain(db_session, biz.id, signal_id)
+    evidence_by_key = {item["key"]: item for item in explain["evidence"]}
+
+    current_total = evidence_by_key.get("current_total")
+    assert current_total
+    anchors = current_total.get("anchors")
+    assert anchors
+    assert anchors.get("date_start")
+    assert anchors.get("date_end")
 
 
 def test_explain_includes_recent_audit_for_status_update(db_session):

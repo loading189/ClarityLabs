@@ -9,6 +9,8 @@ import {
   type SignalStatus,
 } from "../../api/signals";
 import { useAppState } from "../../app/state/appState";
+import { ledgerPath } from "../../app/routes/routeUtils";
+import type { FilterState } from "../../app/filters/filters";
 import styles from "./AssistantPage.module.css";
 
 type ActionOption = {
@@ -36,6 +38,26 @@ function sortSignals(a: SignalState, b: SignalState) {
     return bTime - aTime;
   }
   return (a.id ?? "").localeCompare(b.id ?? "");
+}
+
+function formatDomainLabel(domain?: string | null) {
+  if (!domain) return "—";
+  return domain.charAt(0).toUpperCase() + domain.slice(1);
+}
+
+function buildLedgerFilters(
+  anchors: SignalExplainOut["evidence"][number]["anchors"]
+): FilterState | null {
+  if (!anchors) return null;
+  const filters: FilterState = {};
+  if (anchors.date_start) filters.start = anchors.date_start;
+  if (anchors.date_end) filters.end = anchors.date_end;
+  if (anchors.category) filters.category = anchors.category;
+  if (anchors.vendor) filters.q = anchors.vendor;
+  if (anchors.txn_ids && anchors.txn_ids.length > 0) {
+    filters.q = anchors.txn_ids.join(" ");
+  }
+  return Object.keys(filters).length > 0 ? filters : null;
 }
 
 export default function AssistantPage() {
@@ -258,6 +280,7 @@ export default function AssistantPage() {
                     <div className={styles.explainMeta}>
                       <span>Status: {explain.state.status.replace(/_/g, " ")}</span>
                       <span>Severity: {explain.state.severity ?? "—"}</span>
+                      <span>Domain: {formatDomainLabel(explain.detector.domain)}</span>
                       <span>Updated: {formatDate(explain.state.updated_at)}</span>
                     </div>
                   </div>
@@ -269,15 +292,41 @@ export default function AssistantPage() {
                     <div className={styles.muted}>No evidence available.</div>
                   )}
                   <ul className={styles.evidenceList}>
-                    {explain.evidence.map((item) => (
-                      <li key={item.key} className={styles.evidenceItem}>
-                        <div>
-                          <div className={styles.evidenceLabel}>{item.label}</div>
-                          <div className={styles.evidenceValue}>{String(item.value)}</div>
-                        </div>
-                        <span className={styles.evidenceSource}>{item.source}</span>
-                      </li>
-                    ))}
+                    {explain.evidence.map((item) => {
+                      const filters = buildLedgerFilters(item.anchors ?? null);
+                      const ledgerLink =
+                        filters && businessId ? ledgerPath(businessId, filters) : null;
+                      return (
+                        <li key={item.key} className={styles.evidenceItem}>
+                          <div>
+                            <div className={styles.evidenceLabel}>{item.label}</div>
+                            <div className={styles.evidenceValue}>{String(item.value)}</div>
+                            {item.anchors && (
+                              <div className={styles.evidenceAnchor}>
+                                {item.anchors.date_start && item.anchors.date_end && (
+                                  <span>
+                                    Ledger window: {item.anchors.date_start} →{" "}
+                                    {item.anchors.date_end}
+                                  </span>
+                                )}
+                                {item.anchors.vendor && (
+                                  <span>Vendor: {item.anchors.vendor}</span>
+                                )}
+                                {item.anchors.category && (
+                                  <span>Category: {item.anchors.category}</span>
+                                )}
+                                {ledgerLink && (
+                                  <Link className={styles.anchorLink} to={ledgerLink}>
+                                    View in ledger
+                                  </Link>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <span className={styles.evidenceSource}>{item.source}</span>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
 

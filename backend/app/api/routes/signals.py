@@ -49,14 +49,30 @@ class SignalExplainDetectorOut(BaseModel):
     type: str
     title: str
     description: str
+    domain: str
+    default_severity: Optional[str]
     recommended_actions: List[str]
+    evidence_schema: List[str]
+    scoring_profile: Dict[str, Any]
+
+
+class SignalExplainEvidenceAnchorOut(BaseModel):
+    txn_ids: Optional[List[str]] = None
+    date_start: Optional[str] = None
+    date_end: Optional[str] = None
+    account_id: Optional[str] = None
+    vendor: Optional[str] = None
+    category: Optional[str] = None
 
 
 class SignalExplainEvidenceOut(BaseModel):
     key: str
     label: str
     value: Any
-    source: Literal["state", "runtime", "derived"]
+    unit: Optional[str] = None
+    as_of: Optional[str] = None
+    source: Literal["ledger", "state", "derived", "detector"]
+    anchors: Optional[SignalExplainEvidenceAnchorOut] = None
 
 
 class SignalExplainAuditOut(BaseModel):
