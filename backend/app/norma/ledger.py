@@ -28,21 +28,44 @@ class LedgerRow:
     - balance is the running total after applying this row's signed amount
     - rows are ordered deterministically
     """
+
     occurred_at: datetime
     source_event_id: str
 
     date: date
     description: str
-    amount: float
+    amount: float  # signed (+ inflow, - outflow)
     category: str
     balance: float
 
 
+def _direction_rank(direction: str | None) -> int:
+    # inflow first, then outflow, then anything unknown last
+    d = (direction or "").strip().lower()
+    if d == "inflow":
+        return 0
+    if d == "outflow":
+        return 1
+    return 2
+
+
+def _amount_rank(amount: float) -> int:
+    # inflows first, then outflows (amount is already signed in LedgerRow)
+    return 0 if amount >= 0 else 1
+
+
 def _sort_key(t: NormalizedTransaction) -> tuple:
-    # Deterministic ordering even when multiple txns share the same date/time.
-    # Prefer occurred_at, then source_event_id, then stable tie-breakers.
+    """
+    Deterministic ordering even when multiple txns share the same date/time.
+
+    Primary: occurred_at
+    Secondary: direction (inflow first so balances match expectations)
+    Tertiary: source_event_id (stable tie-break)
+    Then: description/amount (extra stability)
+    """
     return (
         t.occurred_at,
+        _direction_rank(getattr(t, "direction", None)),
         t.source_event_id or "",
         t.description or "",
         float(t.amount or 0.0),
@@ -51,7 +74,7 @@ def _sort_key(t: NormalizedTransaction) -> tuple:
 
 def _signed_amount(t: NormalizedTransaction) -> float:
     amt = float(t.amount or 0.0)
-    return amt if t.direction == "inflow" else -amt
+    return amt if (t.direction or "").strip().lower() == "inflow" else -amt
 
 
 def build_cash_ledger(
@@ -97,7 +120,7 @@ def check_ledger_integrity(
     - Running balances are continuous.
     - Inflow + outflow = net cash flow.
     - Amounts are finite signed values.
-    - Ledger rows are deterministically ordered.
+    - Ledger rows are deterministically ordered (consistent with ledger build ordering rules).
     """
     rows = list(ledger)
     last_balance = float(opening_balance or 0.0)
@@ -112,8 +135,13 @@ def check_ledger_integrity(
         if not math.isfinite(amount):
             raise LedgerIntegrityError(f"Invariant violation: non-finite amount at row {idx}.")
 
+        # Match the same ordering intention as build_cash_ledger:
+        # - occurred_at
+        # - inflow before outflow (via amount sign)
+        # - stable tie breaks
         key = (
             row.occurred_at,
+            _amount_rank(amount),
             row.source_event_id or "",
             row.description or "",
             amount,
