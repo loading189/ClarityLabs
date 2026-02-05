@@ -125,6 +125,26 @@ export type SignalExplainNextAction = {
   guardrails?: string[] | null;
 };
 
+
+export type SignalExplainClearCondition = {
+  summary: string;
+  type: "threshold" | "trend" | "categorical";
+  fields?: string[] | null;
+  window_days?: number | null;
+  comparator?: ">=" | "<=" | "==" | null;
+  target?: number | string | null;
+};
+
+export type SignalExplainPlaybook = {
+  id: string;
+  title: string;
+  description: string;
+  kind: "inspect" | "adjust" | "decide";
+  ui_target: "ledger" | "vendors" | "rules" | "categorize" | "assistant";
+  deep_link?: string | null;
+  requires_confirmation?: boolean | null;
+};
+
 export type SignalExplainAudit = {
   id: string;
   event_type: string;
@@ -145,6 +165,7 @@ export type SignalExplainOut = {
     last_seen_at: string | null;
     resolved_at: string | null;
     metadata: Record<string, unknown> | null;
+    resolved_condition_met: boolean;
   };
   detector: {
     type: string;
@@ -159,6 +180,8 @@ export type SignalExplainOut = {
   evidence: SignalExplainEvidence[];
   related_audits: SignalExplainAudit[];
   next_actions: SignalExplainNextAction[];
+  clear_condition: SignalExplainClearCondition | null;
+  playbooks: SignalExplainPlaybook[];
   links: string[];
 };
 

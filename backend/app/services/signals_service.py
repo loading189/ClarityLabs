@@ -4,7 +4,7 @@ from dataclasses import asdict
 from datetime import date
 import logging
 import os
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Literal, Optional, Tuple
 
 from fastapi import HTTPException
 from sqlalchemy import and_, select
@@ -20,6 +20,72 @@ from backend.app.services import audit_service, health_signal_service
 logger = logging.getLogger(__name__)
 
 
+
+
+PlaybookKind = Literal["inspect", "adjust", "decide"]
+PlaybookTarget = Literal["ledger", "vendors", "rules", "categorize", "assistant"]
+
+
+def _default_clear_condition(signal_type: str) -> Dict[str, Any]:
+    if "runway" in signal_type:
+        return {
+            "summary": "Cash runway must recover to the configured medium threshold or above.",
+            "type": "threshold",
+            "fields": ["runway_days", "thresholds.medium"],
+            "window_days": 30,
+            "comparator": ">=",
+            "target": "thresholds.medium",
+        }
+    if "decline" in signal_type or "trend" in signal_type:
+        return {
+            "summary": "The negative trend must flatten and remain stable across the next evaluation window.",
+            "type": "trend",
+            "fields": ["delta"],
+            "window_days": 14,
+        }
+    return {
+        "summary": "The monitored metric must return within baseline bounds in the next detector window.",
+        "type": "threshold",
+        "window_days": 30,
+    }
+
+
+def _default_playbooks_for_domain(domain: str) -> List[Dict[str, Any]]:
+    domain_lower = (domain or "assistant").lower()
+    if domain_lower == "expense":
+        return [
+            {"id": "expense_inspect_ledger", "title": "Inspect recent outflows", "description": "Review outflow transactions in the ledger for the detection window.", "kind": "inspect", "ui_target": "ledger", "deep_link": "/app/{businessId}/ledger?window=30d"},
+            {"id": "expense_adjust_vendor_rules", "title": "Adjust vendor/rule mapping", "description": "Tighten categorization and rules for recurring spend sources.", "kind": "adjust", "ui_target": "rules", "deep_link": "/app/{businessId}/rules"},
+            {"id": "expense_decide_resolution", "title": "Decide resolution status", "description": "Return to Assistant to resolve or snooze with an audited reason.", "kind": "decide", "ui_target": "assistant", "requires_confirmation": True},
+        ]
+    if domain_lower == "revenue":
+        return [
+            {"id": "revenue_inspect_ledger", "title": "Inspect inflow drivers", "description": "Review inflows and customer concentration in the ledger window.", "kind": "inspect", "ui_target": "ledger", "deep_link": "/app/{businessId}/ledger?window=30d"},
+            {"id": "revenue_adjust_categorization", "title": "Adjust categorization", "description": "Correct categorization for revenue lines that distort trend analysis.", "kind": "adjust", "ui_target": "categorize", "deep_link": "/app/{businessId}/categorize"},
+            {"id": "revenue_decide_resolution", "title": "Decide resolution status", "description": "Resolve when baseline behavior is restored, otherwise snooze with reason.", "kind": "decide", "ui_target": "assistant", "requires_confirmation": True},
+        ]
+    if domain_lower == "liquidity":
+        return [
+            {"id": "liquidity_inspect_ledger", "title": "Inspect cash movements", "description": "Review recent inflows/outflows affecting cash runway.", "kind": "inspect", "ui_target": "ledger", "deep_link": "/app/{businessId}/ledger?window=30d"},
+            {"id": "liquidity_adjust_vendors", "title": "Adjust vendor payouts", "description": "Review vendor payment timing and discretionary spend.", "kind": "adjust", "ui_target": "vendors", "deep_link": "/app/{businessId}/vendors"},
+            {"id": "liquidity_decide_resolution", "title": "Decide resolution status", "description": "Mark resolved only after runway condition is sustained.", "kind": "decide", "ui_target": "assistant", "requires_confirmation": True},
+        ]
+    return [
+        {"id": f"{domain_lower}_inspect_assistant", "title": "Inspect supporting evidence", "description": "Review signal evidence and related audits before changing status.", "kind": "inspect", "ui_target": "assistant"},
+        {"id": f"{domain_lower}_decide_resolution", "title": "Decide resolution status", "description": "Return here to resolve or snooze with actor and reason.", "kind": "decide", "ui_target": "assistant", "requires_confirmation": True},
+    ]
+
+
+def _detector_guidance(signal_type: str, catalog: Dict[str, Any]) -> Dict[str, Any]:
+    clear_condition = catalog.get("clear_condition")
+    playbooks = catalog.get("playbooks")
+    if clear_condition and playbooks:
+        ordered = sorted(playbooks, key=lambda item: str(item.get("id", "")))
+        return {"clear_condition": clear_condition, "playbooks": ordered}
+    return {
+        "clear_condition": _default_clear_condition(signal_type),
+        "playbooks": sorted(_default_playbooks_for_domain(catalog.get("domain", "assistant")), key=lambda item: str(item.get("id", ""))),
+    }
 SIGNAL_CATALOG: Dict[str, Dict[str, Any]] = {
     "expense_creep_by_vendor": {
         "signal_id": "expense_creep_by_vendor",
@@ -1333,6 +1399,7 @@ def _build_evidence(signal_type: Optional[str], payload: Optional[Dict[str, Any]
 def _detector_meta(signal_type: Optional[str], state: HealthSignalState) -> Dict[str, Any]:
     if signal_type and signal_type in SIGNAL_CATALOG:
         catalog = SIGNAL_CATALOG[signal_type]
+        guidance = _detector_guidance(signal_type, catalog)
         return {
             "type": catalog["signal_id"],
             "title": catalog["title"],
@@ -1342,6 +1409,8 @@ def _detector_meta(signal_type: Optional[str], state: HealthSignalState) -> Dict
             "recommended_actions": catalog["recommended_actions"],
             "evidence_schema": catalog["evidence_schema"],
             "scoring_profile": catalog["scoring_profile"],
+            "clear_condition": guidance["clear_condition"],
+            "playbooks": guidance["playbooks"],
         }
     return {
         "type": signal_type or "unknown",
@@ -1352,7 +1421,29 @@ def _detector_meta(signal_type: Optional[str], state: HealthSignalState) -> Dict
         "default_severity": None,
         "evidence_schema": [],
         "scoring_profile": {},
+        "clear_condition": None,
+        "playbooks": [],
     }
+
+
+def is_signal_resolved_condition_met(state: HealthSignalState) -> bool:
+    payload = state.payload_json if isinstance(state.payload_json, dict) else {}
+    signal_type = (state.signal_type or "").lower()
+    if "runway" in signal_type:
+        runway = payload.get("runway_days")
+        medium_threshold = _read_payload_value(payload, "thresholds.medium")
+        if isinstance(runway, (int, float)) and isinstance(medium_threshold, (int, float)):
+            return float(runway) >= float(medium_threshold)
+    if "decline" in signal_type:
+        decline_pct = payload.get("decline_pct")
+        if isinstance(decline_pct, (int, float)):
+            return float(decline_pct) <= 0.0
+    if "spike" in signal_type:
+        latest_total = payload.get("latest_total")
+        sigma_threshold = payload.get("sigma_threshold")
+        if isinstance(latest_total, (int, float)) and isinstance(sigma_threshold, (int, float)):
+            return float(latest_total) <= float(sigma_threshold)
+    return False
 
 
 def _audit_references_signal(entry: Dict[str, Any], signal_id: str) -> bool:
@@ -1479,11 +1570,14 @@ def get_signal_explain(db: Session, business_id: str, signal_id: str) -> Dict[st
             "last_seen_at": state.last_seen_at.isoformat() if state.last_seen_at else None,
             "resolved_at": state.resolved_at.isoformat() if state.resolved_at else None,
             "metadata": state.payload_json,
+            "resolved_condition_met": is_signal_resolved_condition_met(state),
         },
         "detector": detector,
         "evidence": evidence,
         "related_audits": related_audits,
         "next_actions": next_actions,
+        "clear_condition": detector.get("clear_condition"),
+        "playbooks": sorted(detector.get("playbooks") or [], key=lambda item: str(item.get("id", ""))),
         "links": [
             "/signals",
             f"/app/{business_id}/signals",

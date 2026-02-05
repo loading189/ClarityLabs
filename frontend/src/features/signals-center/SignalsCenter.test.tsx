@@ -43,6 +43,7 @@ const getSignalDetail = vi.fn().mockResolvedValue({
   updated_at: new Date("2024-05-01T10:00:00Z").toISOString(),
 });
 
+const getSignalExplain = vi.fn().mockResolvedValue({ clear_condition: { summary: "Spend returns to baseline", type: "threshold" } });
 const updateSignalStatus = vi.fn();
 const getAuditLog = vi.fn().mockResolvedValue({ items: [], next_cursor: null });
 const fetchSignals = vi.fn();
@@ -70,6 +71,7 @@ const fetchHealthScore = vi.fn().mockResolvedValue({
 vi.mock("../../api/signals", () => ({
   listSignalStates: (...args: unknown[]) => listSignalStates(...args),
   getSignalDetail: (...args: unknown[]) => getSignalDetail(...args),
+  getSignalExplain: (...args: unknown[]) => getSignalExplain(...args),
   updateSignalStatus: (...args: unknown[]) => updateSignalStatus(...args),
   fetchSignals: (...args: unknown[]) => fetchSignals(...args),
 }));
@@ -152,7 +154,7 @@ describe("SignalsCenter", () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /Expense creep detected/i }));
 
-    const assistantLink = await screen.findByRole("link", { name: /Send to Assistant/i });
+    const assistantLink = await screen.findByRole("link", { name: /Open in Assistant/i });
     expect(assistantLink).toHaveAttribute(
       "href",
       "/app/biz-1/assistant?signalId=sig-1"

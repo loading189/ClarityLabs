@@ -43,6 +43,26 @@ class SignalExplainStateOut(BaseModel):
     last_seen_at: Optional[str]
     resolved_at: Optional[str]
     metadata: Optional[Dict[str, Any]]
+    resolved_condition_met: bool = False
+
+
+class SignalExplainClearConditionOut(BaseModel):
+    summary: str
+    type: Literal["threshold", "trend", "categorical"]
+    fields: Optional[List[str]] = None
+    window_days: Optional[int] = None
+    comparator: Optional[Literal[">=", "<=", "=="]] = None
+    target: Optional[Any] = None
+
+
+class SignalExplainPlaybookOut(BaseModel):
+    id: str
+    title: str
+    description: str
+    kind: Literal["inspect", "adjust", "decide"]
+    ui_target: Literal["ledger", "vendors", "rules", "categorize", "assistant"]
+    deep_link: Optional[str] = None
+    requires_confirmation: Optional[bool] = None
 
 
 class SignalExplainDetectorOut(BaseModel):
@@ -103,6 +123,8 @@ class SignalExplainOut(BaseModel):
     evidence: List[SignalExplainEvidenceOut]
     related_audits: List[SignalExplainAuditOut]
     next_actions: List[SignalExplainNextActionOut]
+    clear_condition: Optional[SignalExplainClearConditionOut] = None
+    playbooks: List[SignalExplainPlaybookOut] = Field(default_factory=list)
     links: List[str]
 
 
