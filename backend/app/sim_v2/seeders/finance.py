@@ -137,21 +137,41 @@ def baseline_events(
 
 
 def apply_cash_crunch(events: List[SeedEvent], *, anchor_date: date, intensity: int) -> None:
-    for d in range(0, 21):
-        day = anchor_date - timedelta(days=d)
-        events.append(SeedEvent(day, 1300.0 + (200 * intensity), "outflow", "Emergency vendor payment", "Acme Vendor", "cogs"))
-        if d % 3 == 0:
-            events.append(SeedEvent(day, 500.0 + (120 * intensity), "outflow", "Short-term debt service", "Lender", "taxes"))
-    for d in range(0, 14):
-        day = anchor_date - timedelta(days=d)
-        events.append(SeedEvent(day, 450.0 - (40 * intensity), "inflow", "Reduced card deposit", "stripe", "sales"))
+    baseline_start = anchor_date - timedelta(days=120)
+    baseline_end = anchor_date - timedelta(days=31)
+    stressed_start = anchor_date - timedelta(days=30)
+
+    day = baseline_start
+    while day <= baseline_end:
+        if day.weekday() < 5:
+            events.append(SeedEvent(day, 1100.0, "inflow", "Baseline card deposit", "stripe", "sales"))
+            events.append(SeedEvent(day, 1050.0, "outflow", "Baseline operating spend", "Acme Vendor", "cogs"))
+        day += timedelta(days=1)
+
+    day = stressed_start
+    while day <= anchor_date:
+        if day.weekday() < 5:
+            inflow = max(120.0, 540.0 - 110.0 * intensity)
+            outflow = 2100.0 + 280.0 * intensity
+            events.append(SeedEvent(day, inflow, "inflow", "Stressed card deposit", "stripe", "sales"))
+            events.append(SeedEvent(day, outflow, "outflow", "Stressed operating spend", "Acme Vendor", "cogs"))
+            events.append(SeedEvent(day, 700.0 + 120.0 * intensity, "outflow", "Working capital loan payment", "Lender", "taxes"))
+        day += timedelta(days=1)
+
+    spike_day = anchor_date - timedelta(days=10)
+    events.append(SeedEvent(spike_day, 18000.0 + 1600.0 * intensity, "outflow", "Emergency inventory purchase", "Acme Vendor", "cogs"))
 
 
 def apply_revenue_drop(events: List[SeedEvent], *, anchor_date: date, intensity: int) -> None:
-    for d in range(0, 45):
+    for d in range(0, 30):
         day = anchor_date - timedelta(days=d)
         if day.weekday() < 5:
-            events.append(SeedEvent(day, max(120.0, 900.0 - 120 * intensity), "inflow", "Revenue slump deposit", "stripe", "sales"))
+            events.append(SeedEvent(day, max(80.0, 320.0 - 60 * intensity), "inflow", "Revenue slump deposit", "stripe", "sales"))
+
+    for d in range(31, 61):
+        day = anchor_date - timedelta(days=d)
+        if day.weekday() < 5:
+            events.append(SeedEvent(day, 2200.0 + 180.0 * intensity, "inflow", "Prior period strong sales", "stripe", "sales"))
 
 
 def apply_expense_spike(events: List[SeedEvent], *, anchor_date: date, intensity: int) -> None:
@@ -169,9 +189,13 @@ def apply_vendor_concentration(events: List[SeedEvent], *, anchor_date: date, in
 
 
 def apply_messy_books(events: List[SeedEvent], *, anchor_date: date, intensity: int) -> None:
-    for d in range(0, 20):
+    for d in range(0, 30):
         day = anchor_date - timedelta(days=d)
-        events.append(SeedEvent(day, 80 + 30 * intensity, "outflow", "Unknown charge", "Unknown", "uncategorized"))
+        events.append(SeedEvent(day, 180 + 45 * intensity, "outflow", "Unknown charge", "Unknown", "uncategorized"))
+        events.append(SeedEvent(day, 140 + 35 * intensity, "outflow", "Unknown fee", "Unknown", "uncategorized"))
+        events.append(SeedEvent(day, 120 + 25 * intensity, "outflow", "Unknown transfer", "Unknown", "uncategorized"))
+        events.append(SeedEvent(day, 95 + 20 * intensity, "outflow", "Unknown service", "Unknown", "uncategorized"))
+        events.append(SeedEvent(day, 70 + 15 * intensity, "outflow", "Unknown adjustment", "Unknown", "uncategorized"))
 
 
 def apply_timing_mismatch(events: List[SeedEvent], *, anchor_date: date, intensity: int) -> None:

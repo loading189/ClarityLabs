@@ -20,7 +20,7 @@ from backend.app.models import (
 from backend.app.norma.from_events import raw_event_to_txn
 from backend.app.norma.normalize import NormalizedTransaction
 from backend.app.services import audit_service
-from backend.app.signals.v2 import DetectedSignal, run_v2_detectors
+from backend.app.signals.v2 import DetectorRunSummary, DetectedSignal, run_v2_detectors_with_summary
 
 
 MONITOR_SIGNAL_TYPES = {
@@ -284,7 +284,14 @@ def _count_states(states: List[HealthSignalState]) -> Dict[str, Dict[str, int]]:
     return {"by_status": by_status, "by_severity": by_severity}
 
 
-def pulse(db: Session, business_id: str, now: Optional[datetime] = None) -> Dict[str, Any]:
+def pulse(
+    db: Session,
+    business_id: str,
+    now: Optional[datetime] = None,
+    *,
+    include_detector_results: bool = False,
+    force_run: bool = False,
+) -> Dict[str, Any]:
     require_business(db, business_id)
     now = _normalize_dt(now) or _now()
 
@@ -297,7 +304,8 @@ def pulse(db: Session, business_id: str, now: Optional[datetime] = None) -> Dict
     runtime_last = _normalize_dt(runtime.last_pulse_at)
     runtime_newest = _normalize_dt(runtime.newest_event_at)
     if (
-        runtime_last
+        not force_run
+        and runtime_last
         and runtime_newest == newest_event_at
         and (now - runtime_last) < timedelta(minutes=10)
     ):
@@ -306,18 +314,25 @@ def pulse(db: Session, business_id: str, now: Optional[datetime] = None) -> Dict
             .scalars()
             .all()
         )
-        return {
+        response = {
             "ran": False,
             "last_pulse_at": runtime.last_pulse_at,
             "newest_event_at": runtime.newest_event_at,
             "counts": _count_states(states),
             "touched_signal_ids": [],
         }
+        if include_detector_results:
+            response["detector_results"] = []
+        return response
 
     txns = _fetch_posted_transactions(db, business_id)
     audit_entries = _fetch_signal_audit_entries(db, business_id, now - timedelta(days=14))
-    detected = run_v2_detectors(business_id, txns, audit_entries=audit_entries)
-    touched = _upsert_signal_states(db, business_id, detected, now)
+    detector_summary: DetectorRunSummary = run_v2_detectors_with_summary(
+        business_id,
+        txns,
+        audit_entries=audit_entries,
+    )
+    touched = _upsert_signal_states(db, business_id, detector_summary.signals, now)
 
     runtime.last_pulse_at = now
     runtime.newest_event_at = newest_event_at
@@ -329,13 +344,28 @@ def pulse(db: Session, business_id: str, now: Optional[datetime] = None) -> Dict
         .scalars()
         .all()
     )
-    return {
+    response = {
         "ran": True,
         "last_pulse_at": runtime.last_pulse_at,
         "newest_event_at": runtime.newest_event_at,
         "counts": _count_states(states),
         "touched_signal_ids": touched,
     }
+    if include_detector_results:
+        response["detector_results"] = [
+            {
+                "detector_id": row.detector_id,
+                "signal_id": row.signal_id,
+                "domain": row.domain,
+                "ran": row.ran,
+                "skipped_reason": row.skipped_reason,
+                "fired": row.fired,
+                "severity": row.severity,
+                "evidence_keys": row.evidence_keys,
+            }
+            for row in detector_summary.detectors
+        ]
+    return response
 
 
 def get_monitor_status(db: Session, business_id: str) -> Dict[str, Any]:

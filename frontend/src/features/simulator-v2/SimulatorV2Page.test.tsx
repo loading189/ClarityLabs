@@ -12,6 +12,28 @@ const seedSimV2 = vi.fn().mockResolvedValue({
   window: { start_date: "2025-01-01", end_date: "2025-02-01" },
   stats: { raw_events_inserted: 12, pulse_ran: true },
   signals: { total: 3 },
+  coverage: {
+    window_observed: { start_date: "2025-01-01", end_date: "2025-02-01" },
+    inputs: {
+      raw_events_count: 20,
+      normalized_txns_count: 18,
+      deposits_count_last30: 8,
+      expenses_count_last30: 12,
+      distinct_vendors_last30: 4,
+      balance_series_points: 18,
+    },
+    detectors: [
+      {
+        detector_id: "detect_liquidity_runway_low",
+        signal_id: "liquidity.runway_low",
+        domain: "liquidity",
+        ran: true,
+        fired: true,
+        severity: "warning",
+        evidence_keys: ["runway_days"],
+      },
+    ],
+  },
 });
 const resetSimV2 = vi.fn().mockResolvedValue({});
 
@@ -37,5 +59,7 @@ describe("SimulatorV2Page", () => {
     fireEvent.click(await screen.findByText("Seed Healthy"));
     await waitFor(() => expect(seedSimV2).toHaveBeenCalled());
     expect(await screen.findByText(/Signals produced: 3/)).toBeInTheDocument();
+    expect(await screen.findByText(/Coverage Report/)).toBeInTheDocument();
+    expect(await screen.findByText(/detect_liquidity_runway_low/)).toBeInTheDocument();
   });
 });
