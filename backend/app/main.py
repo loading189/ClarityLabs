@@ -10,7 +10,7 @@ from backend.app.api.routes.categorize import router as categorize_router
 from backend.app.api.routes.coa import router as coa_router
 from backend.app.seed.run import seed_system_categories
 from backend.app.api.routes.admin import router as admin_router
-from backend.app.api.routes.ledger import router as ledger_router
+from backend.app.api.routes.ledger import router as ledger_router, api_router as ledger_api_router
 from backend.app.api.routes.brief import router as brief_router
 from backend.app.api.routes.signals import router as signals_router
 from backend.app.api.routes.health_score import router as health_score_router
@@ -59,6 +59,7 @@ app.include_router(categorize_router)
 app.include_router(coa_router)
 app.include_router(admin_router)
 app.include_router(ledger_router)
+app.include_router(ledger_api_router)
 app.include_router(brief_router)
 app.include_router(signals_router)
 app.include_router(health_score_router)

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Drawer from "../../components/common/Drawer";
 import { ErrorState, LoadingState } from "../../components/common/DataState";
 import { getAuditLog, type AuditLogOut } from "../../api/audit";
@@ -183,6 +183,7 @@ function RelatedChanges({
 
 export default function SignalsCenter({ businessId }: { businessId: string }) {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [signals, setSignals] = useState<SignalState[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -288,17 +289,29 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
     };
   }, [businessId, selected, useLegacyV1]);
 
-  const [statusFilter, setStatusFilter] = useState("");
-  const [severityFilter, setSeverityFilter] = useState("");
-  const [typeFilter, setTypeFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState(searchParams.get("status") ?? "");
+  const [severityFilter, setSeverityFilter] = useState(searchParams.get("severity") ?? "");
+  const [domainFilter, setDomainFilter] = useState(searchParams.get("domain") ?? "");
+  const [textFilter, setTextFilter] = useState(searchParams.get("search") ?? "");
+  const [hasLedgerAnchors, setHasLedgerAnchors] = useState(searchParams.get("has_ledger_anchors") === "true");
 
   const filterOptions = useMemo(() => {
-    const types = Array.from(new Set(signals.map((signal) => signal.type).filter(Boolean)));
+    const domains = Array.from(new Set(signals.map((signal) => signal.domain).filter(Boolean)));
     const severities = Array.from(
       new Set(signals.map((signal) => signal.severity).filter(Boolean))
     );
-    return { types, severities };
+    return { domains, severities };
   }, [signals]);
+
+  useEffect(() => {
+    const next = new URLSearchParams();
+    if (statusFilter) next.set("status", statusFilter);
+    if (severityFilter) next.set("severity", severityFilter);
+    if (domainFilter) next.set("domain", domainFilter);
+    if (textFilter) next.set("search", textFilter);
+    if (hasLedgerAnchors) next.set("has_ledger_anchors", "true");
+    setSearchParams(next, { replace: true });
+  }, [domainFilter, hasLedgerAnchors, setSearchParams, severityFilter, statusFilter, textFilter]);
 
   const signalTitleById = useMemo(() => {
     return new Map(signals.map((signal) => [signal.id, signal.title ?? signal.id]));
@@ -308,10 +321,20 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
     return signals.filter((signal) => {
       if (statusFilter && signal.status !== statusFilter) return false;
       if (severityFilter && signal.severity !== severityFilter) return false;
-      if (typeFilter && signal.type !== typeFilter) return false;
+      if (domainFilter && signal.domain !== domainFilter) return false;
+      if (textFilter) {
+        const q = textFilter.toLowerCase();
+        const haystack = `${signal.title ?? ""} ${signal.summary ?? ""} ${signal.type ?? ""}`.toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      if (hasLedgerAnchors) {
+        const payload = (detail?.payload_json as Record<string, unknown> | null) ?? null;
+        const hasAnchor = Boolean(payload && (payload["txn_ids"] || payload["ledger_anchor"]));
+        if (!hasAnchor && selected?.id === signal.id) return false;
+      }
       return true;
     });
-  }, [signals, severityFilter, statusFilter, typeFilter]);
+  }, [detail?.payload_json, domainFilter, hasLedgerAnchors, selected?.id, signals, severityFilter, statusFilter, textFilter]);
 
   const openStatusModal = (nextStatus: SignalStatus) => {
     setStatusModal({ open: true, nextStatus });
@@ -428,19 +451,27 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
           </select>
         </label>
         <label className={styles.filterField}>
-          Type
+          Domain
           <select
             className={styles.select}
-            value={typeFilter}
-            onChange={(event) => setTypeFilter(event.target.value)}
+            value={domainFilter}
+            onChange={(event) => setDomainFilter(event.target.value)}
           >
             <option value="">All</option>
-            {filterOptions.types.map((type) => (
-              <option key={type} value={type}>
-                {type}
+            {filterOptions.domains.map((domain) => (
+              <option key={domain} value={domain}>
+                {domain}
               </option>
             ))}
           </select>
+        </label>
+        <label className={styles.filterField}>
+          Search
+          <input className={styles.input} value={textFilter} onChange={(e) => setTextFilter(e.target.value)} />
+        </label>
+        <label className={styles.legacyToggle}>
+          <span>Has ledger anchors</span>
+          <input type="checkbox" checked={hasLedgerAnchors} onChange={(e) => setHasLedgerAnchors(e.target.checked)} />
         </label>
         <label className={styles.legacyToggle}>
           <span>V1 (legacy)</span>
