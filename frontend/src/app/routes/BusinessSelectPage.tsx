@@ -1,7 +1,8 @@
-// frontend/src/app/routes/BusinessSelectPage.tsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchDashboard } from "../../api/demo";
+import { createBusiness, deleteBusiness } from "../../api/businesses";
+import { seedSimV2 } from "../../api/simV2";
 import { assertBusinessId } from "../../utils/businessId";
 import { useAppState } from "../state/appState";
 
@@ -17,17 +18,16 @@ export default function BusinessSelectPage() {
   const [cards, setCards] = useState<Card[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [newName, setNewName] = useState("New Demo Business");
+  const [isDemo, setIsDemo] = useState(true);
 
-  useEffect(() => {
+  const load = () => {
     const controller = new AbortController();
     setLoading(true);
     setErr(null);
 
     fetchDashboard(controller.signal)
-      .then((res) => {
-        const list = (res?.cards ?? []) as Card[];
-        setCards(list);
-      })
+      .then((res) => setCards((res?.cards ?? []) as Card[]))
       .catch((e: any) => {
         if (e instanceof DOMException && e.name === "AbortError") return;
         setErr(e?.message ?? "Failed to load businesses");
@@ -35,7 +35,9 @@ export default function BusinessSelectPage() {
       .finally(() => setLoading(false));
 
     return () => controller.abort();
-  }, []);
+  };
+
+  useEffect(() => load(), []);
 
   const handleSelect = (rawId: string) => {
     const id = assertBusinessId(rawId, "BusinessSelectPage");
@@ -44,43 +46,54 @@ export default function BusinessSelectPage() {
     navigate(`/app/${id}/assistant`);
   };
 
+  const handleCreate = async () => {
+    const created = await createBusiness({ name: newName, is_demo: isDemo });
+    setActiveBusinessId(created.id);
+    if (isDemo) {
+      await seedSimV2({ business_id: created.id, preset_id: "healthy", mode: "replace" });
+    }
+    navigate(`/app/${created.id}/assistant`);
+  };
+
+  const handleDelete = async (businessId: string, businessName?: string | null) => {
+    const confirmation = window.prompt(`Type DELETE to remove ${businessName ?? businessId}`);
+    if (confirmation !== "DELETE") return;
+    await deleteBusiness(businessId);
+    navigate("/app/select");
+    load();
+  };
+
   return (
     <div style={{ padding: 24, maxWidth: 900, margin: "0 auto" }}>
       <h2 style={{ margin: 0 }}>Select a business</h2>
-      <p style={{ opacity: 0.8, marginTop: 8 }}>
-        Choose a workspace to view Health, Dashboard, Ledger, Trends, and Simulator.
-      </p>
+      <p style={{ opacity: 0.8, marginTop: 8 }}>Choose a workspace, onboard a business, or delete one.</p>
+
+      <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+        <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Business name" />
+        <label>
+          <input type="checkbox" checked={isDemo} onChange={(e) => setIsDemo(e.target.checked)} /> Demo
+        </label>
+        <button onClick={handleCreate}>Create business</button>
+      </div>
 
       {loading && <div>Loading…</div>}
       {err && <div style={{ color: "crimson" }}>Error: {err}</div>}
 
-      {!loading && !err && cards.length === 0 && (
-        <div style={{ opacity: 0.85 }}>
-          No demo businesses found. Run your demo bootstrap / simulator generate, then refresh.
-        </div>
-      )}
+      {!loading && !err && cards.length === 0 && <div style={{ opacity: 0.85 }}>No businesses yet — create one.</div>}
 
       <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
         {cards.map((c) => (
-          <button
-            key={c.business_id}
-            type="button"
-            onClick={() => handleSelect(c.business_id)}
-            style={{
-              textAlign: "left",
-              padding: 14,
-              borderRadius: 12,
-              border: "1px solid rgba(255,255,255,0.12)",
-              background: "rgba(255,255,255,0.04)",
-              cursor: "pointer",
-            }}
-          >
-            <div style={{ fontWeight: 700 }}>
-              {c.name ?? "Demo business"}{" "}
-              <span style={{ opacity: 0.6, fontWeight: 400 }}>({c.business_id})</span>
-            </div>
-            {c.subtitle ? <div style={{ opacity: 0.75, marginTop: 6 }}>{c.subtitle}</div> : null}
-          </button>
+          <div key={c.business_id} style={{ border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12, padding: 14 }}>
+            <button type="button" onClick={() => handleSelect(c.business_id)} style={{ textAlign: "left", width: "100%" }}>
+              <div style={{ fontWeight: 700 }}>
+                {c.name ?? "Demo business"} <span style={{ opacity: 0.6, fontWeight: 400 }}>({c.business_id})</span>
+              </div>
+              {c.subtitle ? <div style={{ opacity: 0.75, marginTop: 6 }}>{c.subtitle}</div> : null}
+            </button>
+            <button style={{ marginTop: 8 }} onClick={() => handleDelete(c.business_id, c.name)}>
+              Delete business
+            </button>
+          </div>
         ))}
       </div>
     </div>

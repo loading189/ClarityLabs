@@ -294,7 +294,9 @@ export default function SignalsTab({
       </div>
 
       {sorted.length === 0 ? (
-        <div className={styles.emptyState}>No signals yet.</div>
+        <div className={styles.emptyState}>
+          No signals yet — <a href={`/app/${detail.business_id}/admin/simulator`}>Seed demo data</a>.
+        </div>
       ) : (
         <div className={styles.signalDashboardLayout}>
           <SignalGrid
