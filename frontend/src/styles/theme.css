@@ -48,6 +48,7 @@
 
   /* --------- Brand --------- */
   --primary: #5d76ff;
+  --primary-contrast: #ffffff;
   --primary-strong: #4b66ff;
   --primary-soft: rgba(93, 118, 255, 0.18);
   --primary-ghost: rgba(93, 118, 255, 0.14);
@@ -101,7 +102,7 @@
 
   --btn-primary-bg: var(--primary);
   --btn-primary-bg-hover: var(--primary-strong);
-  --btn-primary-text: #ffffff;
+  --btn-primary-text: var(--primary-contrast);
   --btn-primary-border: rgba(93, 118, 255, 0.40);
 
   --btn-danger-bg: rgba(255, 107, 95, 0.10);

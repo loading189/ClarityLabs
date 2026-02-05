@@ -1,23 +1,4 @@
-.header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 24px;
-}
-
-.title {
-  margin: 0;
-  font-size: 1.6rem;
-  font-weight: 600;
-}
-
-.subtitle {
-  margin: 6px 0 0;
-  color: rgba(255, 255, 255, 0.65);
-  max-width: 720px;
-}
-
-.actions {
-  display: flex;
-  gap: 12px;
-}
+.header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+.title { margin: 0; font-size: 1.5rem; font-weight: 600; color: var(--text); }
+.subtitle { margin: 6px 0 0; color: var(--text-muted); max-width: 720px; }
+.actions { display: flex; gap: 12px; }

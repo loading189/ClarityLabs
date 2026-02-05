@@ -1,0 +1,29 @@
+.input,
+.textarea,
+.select {
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 12px;
+  background: var(--input-bg);
+  color: var(--input-text);
+}
+
+.input:hover,
+.textarea:hover,
+.select:hover {
+  border-color: var(--input-border-hover);
+}
+
+.input:focus-visible,
+.textarea:focus-visible,
+.select:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+  border-color: var(--primary);
+  background: var(--input-bg-focus);
+}
+
+.textarea {
+  resize: vertical;
+}

@@ -16,6 +16,7 @@ import {
 } from "../../api/signals";
 import styles from "./SignalsCenter.module.css";
 import HealthScoreBreakdownDrawer from "../../components/health-score/HealthScoreBreakdownDrawer";
+import { Button, Chip, Panel } from "../../components/ui";
 
 const STATUS_LABELS: Record<string, string> = {
   open: "Open",
@@ -135,9 +136,9 @@ function RelatedChanges({
           <div className={styles.auditTitle}>Related changes</div>
           <div className={styles.auditSubtitle}>Latest signal detections and updates.</div>
         </div>
-        <button className={styles.secondaryButton} type="button" onClick={load}>
+        <Button variant="secondary" className={styles.secondaryButton} type="button" onClick={load}>
           Refresh
-        </button>
+        </Button>
       </div>
 
       {loading && <LoadingState label="Loading related changes…" />}
@@ -166,14 +167,14 @@ function RelatedChanges({
       )}
 
       {nextCursor && (
-        <button
+        <Button
           className={styles.loadMore}
           type="button"
           onClick={loadMore}
           disabled={loadingMore}
         >
           {loadingMore ? "Loading…" : "Load more"}
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -360,7 +361,7 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
 
   return (
     <div className={styles.container}>
-      <div className={styles.scoreHeader}>
+      <Panel className={styles.scoreHeader}>
         <div>
           <div className={styles.scoreTitle}>Health score</div>
           {healthScoreLoading && <div className={styles.scoreMuted}>Loading…</div>}
@@ -372,21 +373,22 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
         {healthScore && (
           <div className={styles.scoreDomains}>
             {healthScore.domains.map((domain) => (
-              <span key={domain.domain} className={styles.scorePill}>
+              <Chip key={domain.domain} className={styles.scorePill}>
                 {domain.domain}: {Math.round(domain.score)}
-              </span>
+              </Chip>
             ))}
           </div>
         )}
-        <button
+        <Button
           type="button"
+          variant="primary"
           className={styles.primaryButton}
           onClick={() => setBreakdownOpen(true)}
           disabled={!healthScore}
         >
           View breakdown
-        </button>
-      </div>
+        </Button>
+      </Panel>
       <div className={styles.filters}>
         <label className={styles.filterField}>
           Status

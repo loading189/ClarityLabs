@@ -1,0 +1,17 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--pill-border);
+  background: var(--pill-bg);
+  color: var(--pill-text);
+  padding: 3px 10px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.info {
+  border-color: var(--info-border);
+  background: var(--info-bg);
+  color: var(--info);
+}

@@ -67,12 +67,12 @@ export default function AppLayout() {
   if (!businessId) {
     return (
       <div className={styles.shell}>
-        <div style={{ padding: 24 }}>
-          <h2 style={{ marginTop: 0 }}>No business selected</h2>
-          <p style={{ opacity: 0.8 }}>
+        <div className={styles.emptyState}>
+          <h2 className={styles.emptyTitle}>No business selected</h2>
+          <p className={styles.emptyText}>
             Your URL is missing a valid business id. Go pick a business workspace.
           </p>
-          <a href="/app/select">Go to Business Picker</a>
+          <a href="/app/select" className={styles.switchLink}>Go to Business Picker</a>
         </div>
       </div>
     );
@@ -86,7 +86,7 @@ export default function AppLayout() {
           <div>
             <div className={styles.brandName}>Clarity Labs</div>
             <div className={styles.brandMeta}>Business {businessId}</div>
-            <a href="/app/select" style={{ fontSize: 12, opacity: 0.8 }}>
+            <a href="/app/select" className={styles.switchLink}>
               Switch business
             </a>
           </div>
