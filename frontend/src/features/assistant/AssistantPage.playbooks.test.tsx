@@ -28,6 +28,10 @@ const getSignalExplain = vi.fn().mockResolvedValue({
 });
 const updateSignalStatus = vi.fn().mockResolvedValue({ business_id: "biz-1", signal_id: "sig-1", status: "resolved", last_seen_at: null, resolved_at: null, resolution_note: "done", reason: "done", audit_id: "audit-1" });
 const getMonitorStatus = vi.fn();
+const listPlans = vi.fn().mockResolvedValue([]);
+const createPlan = vi.fn();
+const markPlanStepDone = vi.fn();
+const addPlanNote = vi.fn();
 const publishDailyBrief = vi.fn().mockResolvedValue({
   message: { id: "msg-brief", business_id: "biz-1", created_at: new Date().toISOString(), author: "system", kind: "daily_brief", signal_id: null, audit_id: null, content_json: {} },
   brief: {
@@ -58,6 +62,7 @@ vi.mock("../../api/assistantThread", () => ({
 }));
 vi.mock("../../api/monitor", () => ({ getMonitorStatus: (...args: unknown[]) => getMonitorStatus(...args) }));
 vi.mock("../../api/dailyBrief", () => ({ publishDailyBrief: (...args: unknown[]) => publishDailyBrief(...args) }));
+vi.mock("../../api/plans", () => ({ listPlans: (...args: unknown[]) => listPlans(...args), createPlan: (...args: unknown[]) => createPlan(...args), markPlanStepDone: (...args: unknown[]) => markPlanStepDone(...args), addPlanNote: (...args: unknown[]) => addPlanNote(...args) }));
 
 function renderAssistant(path = "/app/biz-1/assistant") {
   return render(

@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from backend.app.models import AssistantMessage, Business
 
 ALLOWED_AUTHORS = {"system", "assistant", "user"}
-ALLOWED_KINDS = {"summary", "changes", "priority", "explain", "action_result", "note", "playbook_started", "daily_brief"}
+ALLOWED_KINDS = {"summary", "changes", "priority", "explain", "action_result", "note", "playbook_started", "daily_brief", "plan", "plan_created", "plan_step_done", "plan_note_added", "plan_status_updated"}
 MAX_MESSAGE_BYTES = 16_000
 MAX_THREAD_LIMIT = 200
 
@@ -38,7 +38,7 @@ class AssistantMessageIn(BaseModel):
     def validate_kind(cls, value: str) -> str:
         normalized = value.strip()
         if normalized not in ALLOWED_KINDS:
-            raise ValueError("kind must be one of summary|changes|priority|explain|action_result|note|playbook_started|daily_brief")
+            raise ValueError("kind must be one of summary|changes|priority|explain|action_result|note|playbook_started|daily_brief|plan|plan_created|plan_step_done|plan_note_added|plan_status_updated")
         return normalized
 
     @field_validator("content_json")
