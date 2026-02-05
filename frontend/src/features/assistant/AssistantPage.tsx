@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { fetchAssistantThread, postAssistantMessage, type AssistantThreadMessage } from "../../api/assistantThread";
 import { listChanges, type ChangeEvent } from "../../api/changes";
 import {
@@ -38,9 +38,16 @@ function actionToStatus(action: SignalExplainOut["next_actions"][number]["action
   return "in_progress" as const;
 }
 
+function playbookIcon(kind: "inspect" | "adjust" | "decide") {
+  if (kind === "inspect") return "🔎";
+  if (kind === "adjust") return "🛠️";
+  return "✅";
+}
+
 export default function AssistantPage() {
   const { businessId: businessIdParam } = useParams();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const businessId = businessIdParam?.trim() || searchParams.get("businessId")?.trim() || "";
   const initialSignalId = searchParams.get("signalId")?.trim() || null;
   const { setActiveBusinessId } = useAppState();
@@ -54,6 +61,7 @@ export default function AssistantPage() {
   const [scoreExplain, setScoreExplain] = useState<HealthScoreExplainChangeOut | null>(null);
   const [actor, setActor] = useState("analyst");
   const [reason, setReason] = useState("");
+  const [showCompletionPrompt, setShowCompletionPrompt] = useState(false);
 
   useEffect(() => setActiveBusinessId(businessId || null), [businessId, setActiveBusinessId]);
 
@@ -123,6 +131,7 @@ export default function AssistantPage() {
       const data = await getSignalExplain(businessId, signalId);
       setExplain(data);
       setSelectedSignalId(signalId);
+      setShowCompletionPrompt(false);
       await postAssistantMessage(businessId, {
         author: "assistant",
         kind: "explain",
@@ -168,8 +177,41 @@ export default function AssistantPage() {
       },
     });
     setReason("");
+    setShowCompletionPrompt(false);
     await Promise.all([loadAll(), loadThread(), appendExplainMessage(selectedSignalId, "priority")]);
   };
+
+  const handleStartPlaybook = useCallback(async (playbook: NonNullable<SignalExplainOut["playbooks"]>[number]) => {
+    if (!businessId || !selectedSignalId) return;
+    await postAssistantMessage(businessId, {
+      author: "system",
+      kind: "playbook_started",
+      signal_id: selectedSignalId,
+      content_json: { playbook_id: playbook.id, title: playbook.title },
+    });
+    await loadThread();
+    setShowCompletionPrompt(true);
+    const deepLink = playbook.deep_link?.replace("{businessId}", businessId);
+    if (deepLink) {
+      navigate(deepLink);
+      return;
+    }
+  }, [businessId, loadThread, navigate, selectedSignalId]);
+
+  const handleCompletionResponse = useCallback(async (decision: "yes" | "not_yet") => {
+    if (!businessId || !selectedSignalId || !explain) return;
+    if (decision === "yes") {
+      const resolveAction = explain.next_actions.find((action) => action.action === "resolve");
+      if (resolveAction) {
+        setReason((prev) => prev || "Resolved through guided playbook.");
+      }
+      return;
+    }
+    const snoozeAction = explain.next_actions.find((action) => action.action === "snooze");
+    if (snoozeAction) {
+      setReason((prev) => prev || "Playbook attempted; follow-up required.");
+    }
+  }, [businessId, explain, selectedSignalId]);
 
   if (!businessId) {
     return (
@@ -251,6 +293,9 @@ export default function AssistantPage() {
                 <div className={styles.muted}>Open explain card for deterministic evidence and actions.</div>
               </div>
             )}
+            {message.kind === "playbook_started" && (
+              <div>Started playbook: {String(message.content_json.title ?? "")}</div>
+            )}
             {message.kind === "action_result" && (
               <div>Updated to {String(message.content_json.status)} (audit {String(message.audit_id)}).</div>
             )}
@@ -259,7 +304,37 @@ export default function AssistantPage() {
 
         {explain && (
           <div className={styles.card}>
-            <div className={styles.cardTitle}>Next actions</div>
+            <div className={styles.cardTitle}>What resolves this</div>
+            <div>{explain.clear_condition?.summary ?? "Resolution criteria are not explicitly defined."}</div>
+            <div className={styles.actionChips} style={{ marginTop: 8 }}>
+              {(explain.clear_condition?.fields ?? []).map((field) => (
+                <span key={field} className={styles.actionChip}>{field}</span>
+              ))}
+              {explain.clear_condition?.window_days ? (
+                <span className={styles.actionChip}>window: {explain.clear_condition.window_days}d</span>
+              ) : null}
+            </div>
+
+            <div className={styles.cardTitle} style={{ marginTop: 14 }}>Playbooks</div>
+            <div className={styles.actionChips}>
+              {explain.playbooks.map((playbook) => (
+                <button key={playbook.id} className={styles.actionChip} onClick={() => handleStartPlaybook(playbook)}>
+                  {playbookIcon(playbook.kind)} {playbook.title}
+                </button>
+              ))}
+            </div>
+
+            {showCompletionPrompt && (
+              <div style={{ marginTop: 12 }}>
+                <div className={styles.muted}>Did this help resolve the issue?</div>
+                <div className={styles.actionChips}>
+                  <button className={styles.actionChip} onClick={() => handleCompletionResponse("yes")}>Yes</button>
+                  <button className={styles.actionChip} onClick={() => handleCompletionResponse("not_yet")}>Not yet</button>
+                </div>
+              </div>
+            )}
+
+            <div className={styles.cardTitle} style={{ marginTop: 14 }}>Next actions</div>
             <div className={styles.actionChips}>
               {explain.next_actions.map((action) => (
                 <button key={action.key} className={styles.actionChip} onClick={() => handleAction(action)}>

@@ -7,6 +7,7 @@ import { fetchHealthScore, type HealthScoreOut } from "../../api/healthScore";
 import {
   fetchSignals,
   getSignalDetail,
+  getSignalExplain,
   listSignalStates,
   updateSignalStatus,
   type Signal,
@@ -190,6 +191,7 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
   const [detail, setDetail] = useState<SignalStateDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailErr, setDetailErr] = useState<string | null>(null);
+  const [detailExplain, setDetailExplain] = useState<any | null>(null);
   const [statusModal, setStatusModal] = useState<StatusModalState>({
     open: false,
     nextStatus: null,
@@ -258,6 +260,7 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
     }
     if (!selected?.id) {
       setDetail(null);
+      setDetailExplain(null);
       return;
     }
     let active = true;
@@ -265,9 +268,13 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
       setDetailLoading(true);
       setDetailErr(null);
       try {
-        const data = await getSignalDetail(businessId, selected.id);
+        const [data, explainData] = await Promise.all([
+          getSignalDetail(businessId, selected.id),
+          getSignalExplain(businessId, selected.id),
+        ]);
         if (!active) return;
         setDetail(data);
+        setDetailExplain(explainData);
       } catch (e: any) {
         if (!active) return;
         setDetailErr(e?.message ?? "Failed to load signal details");
@@ -539,9 +546,14 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
                   className={styles.secondaryButton}
                   to={`/app/${businessId}/assistant?signalId=${detail.id}`}
                 >
-                  Send to Assistant
+                  Open in Assistant
                 </Link>
               )}
+            </div>
+
+            <div>
+              <div className={styles.sectionTitle}>What resolves this</div>
+              <div className={styles.detailSummary}>{detailExplain?.clear_condition?.summary ?? "Resolution criteria not defined."}</div>
             </div>
 
             <div>
