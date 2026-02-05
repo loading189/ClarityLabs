@@ -452,6 +452,28 @@ class AuditLog(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 
 
+class AssistantMessage(Base):
+    __tablename__ = "assistant_messages"
+    __table_args__ = (
+        Index("ix_assistant_messages_business_created", "business_id", "created_at", "id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    business_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    author: Mapped[str] = mapped_column(String(20), nullable=False)
+    kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    signal_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    audit_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    content_json: Mapped[dict] = mapped_column(JSON, nullable=False)
+    checksum: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+
+
 class SystemCategory(Base):
     """
     Optional curated set of system keys. Keep for UI/reference.

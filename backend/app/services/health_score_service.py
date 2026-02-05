@@ -7,8 +7,9 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from backend.app.models import Business, HealthSignalState
+from backend.app.models import AuditLog, Business, HealthSignalState
 from backend.app.services.signals_service import SIGNAL_CATALOG
+from backend.app.services import changes_service
 
 
 DOMAIN_WEIGHTS: Dict[str, float] = {
@@ -167,5 +168,104 @@ def compute_health_score(db: Session, business_id: str) -> Dict[str, Any]:
                 "status": STATUS_MULTIPLIERS,
                 "persistence": "clamp(1 + age_days/14, 1, 2)",
             },
+        },
+    }
+
+
+
+def _signal_penalty_estimate(state: Optional[HealthSignalState], signal_type: Optional[str], severity: Optional[str], status: Optional[str]) -> float:
+    catalog = _catalog_meta(signal_type or (state.signal_type if state else None))
+    domain = catalog.get("domain") or "unknown"
+    resolved_status = status or (state.status if state else "open")
+    resolved_severity = severity or (state.severity if state else None) or catalog.get("default_severity") or "warning"
+    domain_weight = _domain_weight(domain)
+    severity_weight = _severity_weight(resolved_severity)
+    profile = catalog.get("scoring_profile") or {}
+    profile_weight = float(profile.get("weight", 1.0)) * float(profile.get("domain_weight", 1.0))
+    persistence = _persistence_multiplier(state) if state else 1.0
+    return round(domain_weight * severity_weight * profile_weight * _status_multiplier(resolved_status) * persistence, 2)
+
+
+def explain_health_score_change(db: Session, business_id: str, since_hours: int = 72, limit: int = 20) -> Dict[str, Any]:
+    _require_business(db, business_id)
+    bounded_limit = max(1, min(limit, 20))
+    changes = changes_service.list_changes_window(db, business_id, since_hours=since_hours, limit=bounded_limit)
+    signal_states = (
+        db.execute(select(HealthSignalState).where(HealthSignalState.business_id == business_id))
+        .scalars()
+        .all()
+    )
+    state_map = {state.signal_id: state for state in signal_states}
+
+    impacts: List[Dict[str, Any]] = []
+    for change in changes:
+        signal_id = str(change.get("signal_id") or "")
+        if not signal_id:
+            continue
+        change_type = str(change.get("type") or "signal_status_updated")
+        state = state_map.get(signal_id)
+        signal_type = state.signal_type if state else None
+        if change_type == "signal_detected":
+            penalty = _signal_penalty_estimate(state, signal_type, change.get("severity"), "open")
+            delta = -penalty
+            rationale = f"Detected signal increases penalty by {penalty}."
+        elif change_type == "signal_resolved":
+            penalty = _signal_penalty_estimate(state, signal_type, change.get("severity"), "open")
+            delta = penalty
+            rationale = f"Resolved signal removes estimated penalty {penalty}."
+        else:
+            audit = db.get(AuditLog, change.get("id"))
+            before = audit.before_state if audit and isinstance(audit.before_state, dict) else {}
+            after = audit.after_state if audit and isinstance(audit.after_state, dict) else {}
+            before_status = str(before.get("status") or "open")
+            after_status = str(after.get("status") or (state.status if state else "open"))
+            before_penalty = _signal_penalty_estimate(state, signal_type, change.get("severity"), before_status)
+            after_penalty = _signal_penalty_estimate(state, signal_type, change.get("severity"), after_status)
+            delta = round(before_penalty - after_penalty, 2)
+            rationale = f"Status changed from {before_status} to {after_status}; estimated penalty delta {delta}."
+
+        impacts.append(
+            {
+                "signal_id": signal_id,
+                "domain": (state and _catalog_meta(state.signal_type).get("domain")) or change.get("domain"),
+                "severity": (state.severity if state else None) or change.get("severity"),
+                "change_type": change_type,
+                "estimated_penalty_delta": round(delta, 2),
+                "rationale": rationale,
+            }
+        )
+
+    impacts_sorted = sorted(
+        impacts,
+        key=lambda row: (
+            -abs(float(row.get("estimated_penalty_delta", 0.0))),
+            str(row.get("change_type", "")),
+            str(row.get("signal_id", "")),
+        ),
+    )[:bounded_limit]
+
+    net_delta = round(sum(float(item["estimated_penalty_delta"]) for item in impacts_sorted), 2)
+    if net_delta > 0:
+        headline = f"Health score likely improved by {net_delta} points from recent changes."
+    elif net_delta < 0:
+        headline = f"Health score likely declined by {abs(net_delta)} points from recent changes."
+    else:
+        headline = "Health score appears stable from recent changes."
+
+    top_drivers = [
+        f"{item['signal_id']} ({item['change_type'].replace('_', ' ')}, {item['estimated_penalty_delta']})"
+        for item in impacts_sorted[:3]
+    ]
+
+    return {
+        "business_id": business_id,
+        "computed_at": datetime.now(timezone.utc).isoformat(),
+        "window": {"since_hours": since_hours},
+        "changes": changes,
+        "impacts": impacts_sorted,
+        "summary": {
+            "headline": headline,
+            "net_estimated_delta": net_delta,
+            "top_drivers": top_drivers,
         },
     }

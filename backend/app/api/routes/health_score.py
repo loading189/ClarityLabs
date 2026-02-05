@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.db import get_db
 from backend.app.services import health_score_service
+from backend.app.api.routes.changes import ChangeEventOut
 
 router = APIRouter(prefix="/api/health_score", tags=["health_score"])
 
@@ -42,6 +43,36 @@ class HealthScoreMetaOut(BaseModel):
     weights: Dict[str, Any]
 
 
+
+
+class HealthScoreImpactOut(BaseModel):
+    signal_id: str
+    domain: Optional[str] = None
+    severity: Optional[str] = None
+    change_type: Literal["signal_detected", "signal_resolved", "signal_status_updated"]
+    estimated_penalty_delta: float
+    rationale: str
+
+
+class HealthScoreChangeWindowOut(BaseModel):
+    since_hours: int
+
+
+class HealthScoreChangeSummaryOut(BaseModel):
+    headline: str
+    net_estimated_delta: float
+    top_drivers: List[str]
+
+
+class HealthScoreChangeExplainOut(BaseModel):
+    business_id: str
+    computed_at: datetime
+    window: HealthScoreChangeWindowOut
+    changes: List[ChangeEventOut]
+    impacts: List[HealthScoreImpactOut]
+    summary: HealthScoreChangeSummaryOut
+
+
 class HealthScoreOut(BaseModel):
     business_id: str
     score: float
@@ -59,3 +90,18 @@ def get_health_score(
     db: Session = Depends(get_db),
 ):
     return health_score_service.compute_health_score(db, business_id)
+
+
+@router.get("/explain_change", response_model=HealthScoreChangeExplainOut)
+def get_health_score_change_explain(
+    business_id: str = Query(...),
+    since_hours: int = Query(72, ge=1, le=720),
+    limit: int = Query(20, ge=1, le=20),
+    db: Session = Depends(get_db),
+):
+    return health_score_service.explain_health_score_change(
+        db,
+        business_id=business_id,
+        since_hours=since_hours,
+        limit=limit,
+    )
