@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { fetchAssistantThread, postAssistantMessage, type AssistantThreadMessage } from "../../api/assistantThread";
 import { publishDailyBrief, type DailyBriefOut, type DailyBriefPlaybook } from "../../api/dailyBrief";
@@ -17,6 +17,7 @@ import {
   type SignalState,
 } from "../../api/signals";
 import { useAppState } from "../../app/state/appState";
+import { addPlanNote, createPlan, listPlans, markPlanStepDone, type ResolutionPlan } from "../../api/plans";
 import styles from "./AssistantPage.module.css";
 
 function formatDate(value?: string | null) {
@@ -51,6 +52,7 @@ export default function AssistantPage() {
   const navigate = useNavigate();
   const businessId = businessIdParam?.trim() || searchParams.get("businessId")?.trim() || "";
   const initialSignalId = searchParams.get("signalId")?.trim() || null;
+  const createPlanSignalId = searchParams.get("createPlanSignalId")?.trim() || null;
   const { setActiveBusinessId } = useAppState();
 
   const [signals, setSignals] = useState<SignalState[]>([]);
@@ -64,6 +66,9 @@ export default function AssistantPage() {
   const [actor, setActor] = useState("analyst");
   const [reason, setReason] = useState("");
   const [showCompletionPrompt, setShowCompletionPrompt] = useState(false);
+  const [plans, setPlans] = useState<ResolutionPlan[]>([]);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [planNoteText, setPlanNoteText] = useState("");
 
   useEffect(() => setActiveBusinessId(businessId || null), [businessId, setActiveBusinessId]);
 
@@ -87,6 +92,14 @@ export default function AssistantPage() {
     setThread(rows);
   }, [businessId]);
 
+
+  const loadPlans = useCallback(async () => {
+    if (!businessId) return;
+    const rows = await listPlans(businessId);
+    setPlans(rows);
+    setSelectedPlanId((prev) => prev ?? rows[0]?.plan_id ?? null);
+  }, [businessId]);
+
   const loadDailyBrief = useCallback(async () => {
     if (!businessId) return;
     const result = await publishDailyBrief(businessId);
@@ -97,7 +110,8 @@ export default function AssistantPage() {
     loadDailyBrief();
     loadAll();
     loadThread();
-  }, [loadAll, loadThread, loadDailyBrief]);
+    loadPlans();
+  }, [loadAll, loadThread, loadDailyBrief, loadPlans]);
 
   const topPriorities = useMemo(() => {
     const penalties = new Map((healthScore?.contributors ?? []).map((row) => [row.signal_id, row.penalty]));
@@ -241,6 +255,42 @@ export default function AssistantPage() {
     }
   }, [businessId, explain, selectedSignalId]);
 
+
+
+  const selectedPlan = useMemo(() => plans.find((plan) => plan.plan_id === selectedPlanId) ?? null, [plans, selectedPlanId]);
+
+  const planActivity = useMemo(() => {
+    if (!selectedPlanId) return [];
+    return thread.filter((message) => String(message.content_json.plan_id ?? "") === selectedPlanId);
+  }, [selectedPlanId, thread]);
+
+  const handleCreatePlan = useCallback(async (signalIds: string[], title?: string) => {
+    if (!businessId || signalIds.length === 0) return;
+    const plan = await createPlan({ business_id: businessId, title, signal_ids: signalIds });
+    await Promise.all([loadPlans(), loadThread()]);
+    setSelectedPlanId(plan.plan_id);
+  }, [businessId, loadPlans, loadThread]);
+
+  const handlePlanStepDone = useCallback(async (stepId: string) => {
+    if (!businessId || !selectedPlanId) return;
+    await markPlanStepDone(businessId, selectedPlanId, { step_id: stepId, actor });
+    await Promise.all([loadPlans(), loadThread()]);
+  }, [actor, businessId, selectedPlanId, loadPlans, loadThread]);
+
+  const handlePlanNoteSubmit = useCallback(async (event: FormEvent) => {
+    event.preventDefault();
+    if (!businessId || !selectedPlanId || !planNoteText.trim()) return;
+    await addPlanNote(businessId, selectedPlanId, { actor, text: planNoteText.trim() });
+    setPlanNoteText("");
+    await Promise.all([loadPlans(), loadThread()]);
+  }, [actor, businessId, selectedPlanId, planNoteText, loadPlans, loadThread]);
+
+
+  useEffect(() => {
+    if (!createPlanSignalId || !businessId) return;
+    handleCreatePlan([createPlanSignalId], `Plan · ${createPlanSignalId}`);
+  }, [businessId, createPlanSignalId, handleCreatePlan]);
+
   if (!businessId) {
     return (
       <div className={styles.emptyState}>
@@ -257,6 +307,15 @@ export default function AssistantPage() {
         <div className={styles.card}>
           <div className={styles.cardTitle}>Health score</div>
           <div>{healthScore ? Math.round(healthScore.score) : "—"}</div>
+        </div>
+
+        <div className={styles.card}>
+          <div className={styles.cardTitle}>Plans</div>
+          {plans.map((plan) => (
+            <button key={plan.plan_id} className={styles.alertRow} onClick={() => setSelectedPlanId(plan.plan_id)}>
+              {plan.title} · {plan.status}
+            </button>
+          ))}
         </div>
 
         <div className={styles.card}>
@@ -311,6 +370,7 @@ export default function AssistantPage() {
                 <div className={styles.muted}>{priority.clear_condition_summary}</div>
                 <div className={styles.actionChips}>
                   <button className={styles.actionChip} onClick={() => appendExplainMessage(priority.signal_id, "priority")}>Open Explain</button>
+                  <button className={styles.actionChip} onClick={() => handleCreatePlan([priority.signal_id], `Plan · ${priority.title}`)}>Create plan</button>
                   {priority.recommended_playbooks.map((playbook) => (
                     <button key={playbook.id} className={styles.actionChip} onClick={() => handleBriefStartPlaybook(priority.signal_id, playbook)}>
                       Start Playbook: {playbook.title}
@@ -361,6 +421,47 @@ export default function AssistantPage() {
           </div>
         ))}
 
+
+
+        {selectedPlan && (
+          <div className={styles.card}>
+            <div className={styles.cardTitle}>Plan</div>
+            <div><strong>{selectedPlan.title}</strong> · {selectedPlan.status}</div>
+            <div className={styles.muted}>Signals: {selectedPlan.signal_ids.join(", ")}</div>
+            <div className={styles.actionChips} style={{ marginTop: 8 }}>
+              {selectedPlan.signal_ids.map((signalId) => (
+                <button key={signalId} className={styles.actionChip} onClick={() => appendExplainMessage(signalId, "priority")}>
+                  Open {signalId}
+                </button>
+              ))}
+            </div>
+            <div className={styles.cardTitle} style={{ marginTop: 12 }}>Steps</div>
+            {selectedPlan.steps.map((step) => (
+              <label key={step.step_id} className={styles.field}>
+                <span>
+                  <input type="checkbox" checked={step.status === "done"} onChange={() => handlePlanStepDone(step.step_id)} /> {step.title}
+                </span>
+              </label>
+            ))}
+            <div className={styles.cardTitle} style={{ marginTop: 12 }}>Notes</div>
+            <ul>
+              {selectedPlan.notes.map((note) => (
+                <li key={note.id}>{note.text}</li>
+              ))}
+            </ul>
+            <form onSubmit={handlePlanNoteSubmit}>
+              <textarea className={styles.textarea} value={planNoteText} onChange={(event) => setPlanNoteText(event.target.value)} />
+              <button className={styles.actionChip} type="submit">Add note</button>
+            </form>
+            <div className={styles.cardTitle} style={{ marginTop: 12 }}>Activity</div>
+            <ul>
+              {planActivity.map((message) => (
+                <li key={message.id}>{message.kind} · {formatDate(message.created_at)}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {explain && (
           <div className={styles.card}>
             <div className={styles.cardTitle}>What resolves this</div>
@@ -375,6 +476,7 @@ export default function AssistantPage() {
             </div>
 
             <div className={styles.cardTitle} style={{ marginTop: 14 }}>Playbooks</div>
+            <div className={styles.actionChips}><button className={styles.actionChip} onClick={() => explain && handleCreatePlan([explain.signal_id], `Plan · ${explain.detector.title}`)}>Create plan from this signal</button></div>
             <div className={styles.actionChips}>
               {explain.playbooks.map((playbook) => (
                 <button key={playbook.id} className={styles.actionChip} onClick={() => handleStartPlaybook(playbook)}>

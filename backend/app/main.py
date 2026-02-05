@@ -22,6 +22,7 @@ from backend.app.api.routes.assistant_thread import router as assistant_thread_r
 from backend.app.api.routes.sim_v2 import router as sim_v2_router
 from backend.app.api.routes.businesses import router as businesses_router
 from backend.app.api.routes.daily_brief import router as daily_brief_router
+from backend.app.api.routes.assistant_plans import router as assistant_plans_router
 
 
 app = FastAPI(title="Clarity Labs API", version="0.1.0")
@@ -68,3 +69,4 @@ app.include_router(assistant_thread_router)
 app.include_router(sim_v2_router)
 app.include_router(businesses_router)
 app.include_router(daily_brief_router)
+app.include_router(assistant_plans_router)

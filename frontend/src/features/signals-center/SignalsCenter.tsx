@@ -549,6 +549,14 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
                   Open in Assistant
                 </Link>
               )}
+              {detail && (
+                <Link
+                  className={styles.secondaryButton}
+                  to={`/app/${businessId}/assistant?signalId=${detail.id}&createPlanSignalId=${detail.id}`}
+                >
+                  Create plan
+                </Link>
+              )}
             </div>
 
             <div>

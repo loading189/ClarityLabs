@@ -10,6 +10,7 @@ sys.path.append(str(Path(__file__).resolve().parents[2]))
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test_assistant_thread.db")
 
 from backend.app.db import Base, SessionLocal, engine
+from backend.app.sim import models as sim_models  # noqa: F401
 from backend.app.models import Business, Organization
 from backend.app.services.assistant_thread_service import AssistantMessageIn, append_message, list_messages
 

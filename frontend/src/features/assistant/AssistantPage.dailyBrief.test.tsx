@@ -41,6 +41,10 @@ const getSignalExplain = vi.fn().mockResolvedValue({
 });
 const updateSignalStatus = vi.fn();
 const getMonitorStatus = vi.fn();
+const listPlans = vi.fn().mockResolvedValue([]);
+const createPlan = vi.fn();
+const markPlanStepDone = vi.fn();
+const addPlanNote = vi.fn();
 
 vi.mock("../../api/signals", () => ({
   listSignalStates: (...args: unknown[]) => listSignalStates(...args),
@@ -57,6 +61,7 @@ vi.mock("../../api/assistantThread", () => ({
   postAssistantMessage: (...args: unknown[]) => postAssistantMessage(...args),
 }));
 vi.mock("../../api/dailyBrief", () => ({ publishDailyBrief: (...args: unknown[]) => publishDailyBrief(...args) }));
+vi.mock("../../api/plans", () => ({ listPlans: (...args: unknown[]) => listPlans(...args), createPlan: (...args: unknown[]) => createPlan(...args), markPlanStepDone: (...args: unknown[]) => markPlanStepDone(...args), addPlanNote: (...args: unknown[]) => addPlanNote(...args) }));
 vi.mock("../../api/monitor", () => ({ getMonitorStatus: (...args: unknown[]) => getMonitorStatus(...args) }));
 
 function renderAssistant() {
