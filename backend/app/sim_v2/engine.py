@@ -6,10 +6,10 @@ import hashlib
 import random
 from typing import Dict, List
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from backend.app.models import Business, HealthSignalState
+from backend.app.models import Business, HealthSignalState, RawEvent, TxnCategorization
 from backend.app.services import monitoring_service
 from backend.app.services.category_seed import seed_coa_and_categories_and_mappings
 from backend.app.sim_v2 import catalog
@@ -75,6 +75,62 @@ def _signals_summary(db: Session, business_id: str) -> Dict[str, object]:
     return {"total": len(states), "by_severity": by_severity, "by_domain": by_domain, "top": top}
 
 
+
+
+def _coverage_inputs(db: Session, business_id: str, anchor_date: date) -> Dict[str, int]:
+    window_start = anchor_date - timedelta(days=29)
+
+    raw_events_count = int(
+        db.execute(
+            select(func.count()).select_from(RawEvent).where(
+                RawEvent.business_id == business_id,
+                RawEvent.source == "sim_v2",
+            )
+        ).scalar_one()
+    )
+
+    normalized_txns_count = int(
+        db.execute(
+            select(func.count()).select_from(TxnCategorization).where(
+                TxnCategorization.business_id == business_id,
+                TxnCategorization.source == "sim_v2",
+            )
+        ).scalar_one()
+    )
+
+    rows = db.execute(
+        select(RawEvent.payload).where(
+            RawEvent.business_id == business_id,
+            RawEvent.source == "sim_v2",
+            RawEvent.occurred_at >= datetime.combine(window_start, time.min, tzinfo=timezone.utc),
+            RawEvent.occurred_at <= datetime.combine(anchor_date, time.max, tzinfo=timezone.utc),
+        )
+    ).all()
+
+    deposits_count_last30 = 0
+    expenses_count_last30 = 0
+    vendors = set()
+    for (payload,) in rows:
+        if not isinstance(payload, dict):
+            continue
+        direction = str(payload.get("direction") or "")
+        if direction == "inflow":
+            deposits_count_last30 += 1
+        elif direction == "outflow":
+            expenses_count_last30 += 1
+        vendor = payload.get("counterparty_hint")
+        if isinstance(vendor, str) and vendor.strip():
+            vendors.add(vendor.strip().lower())
+
+    return {
+        "raw_events_count": raw_events_count,
+        "normalized_txns_count": normalized_txns_count,
+        "deposits_count_last30": deposits_count_last30,
+        "expenses_count_last30": expenses_count_last30,
+        "distinct_vendors_last30": len(vendors),
+        "balance_series_points": normalized_txns_count,
+    }
+
 def seed(db: Session, req: SimV2SeedRequest) -> dict:
     business = db.get(Business, req.business_id)
     if not business:
@@ -103,9 +159,24 @@ def seed(db: Session, req: SimV2SeedRequest) -> dict:
     db.commit()
 
     pulse_now = datetime.combine(anchor_date, time(hour=12, tzinfo=timezone.utc))
-    monitoring_service.pulse(db, req.business_id, now=pulse_now)
+    pulse_result = monitoring_service.pulse(
+        db,
+        req.business_id,
+        now=pulse_now,
+        include_detector_results=True,
+        force_run=True,
+    )
 
     signals = _signals_summary(db, req.business_id)
+    detector_rows = sorted(
+        pulse_result.get("detector_results", []),
+        key=lambda row: (str(row.get("domain", "")), str(row.get("signal_id", "")), str(row.get("detector_id", ""))),
+    )
+    coverage = {
+        "window_observed": {"start_date": clock.start_date, "end_date": clock.anchor_date},
+        "inputs": _coverage_inputs(db, req.business_id, anchor_date),
+        "detectors": detector_rows,
+    }
     return {
         "business_id": req.business_id,
         "window": {
@@ -123,6 +194,7 @@ def seed(db: Session, req: SimV2SeedRequest) -> dict:
             "pulse_ran": True,
         },
         "signals": signals,
+        "coverage": coverage,
     }
 
 

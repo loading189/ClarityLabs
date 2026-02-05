@@ -73,9 +73,31 @@ SCENARIOS: Dict[str, ScenarioDef] = {
 
 PRESETS: Dict[str, List[dict]] = {
     "healthy": [{"id": "steady_state", "intensity": 1}],
-    "cash_strained": [{"id": "steady_state", "intensity": 1}, {"id": "cash_crunch", "intensity": 2}],
-    "revenue_decline": [{"id": "steady_state", "intensity": 1}, {"id": "revenue_drop", "intensity": 2}],
-    "messy_books": [{"id": "steady_state", "intensity": 1}, {"id": "messy_books", "intensity": 2}],
+    "cash_strained": [
+        {"id": "steady_state", "intensity": 1},
+        {"id": "cash_crunch", "intensity": 2},
+        {"id": "revenue_drop", "intensity": 1},
+        {"id": "expense_spike", "intensity": 2},
+        {"id": "vendor_concentration", "intensity": 1},
+        {"id": "timing_mismatch", "intensity": 2},
+    ],
+    "revenue_decline": [
+        {"id": "steady_state", "intensity": 1},
+        {"id": "revenue_drop", "intensity": 2},
+        {"id": "cash_crunch", "intensity": 1},
+        {"id": "expense_spike", "intensity": 2},
+        {"id": "vendor_concentration", "intensity": 1},
+        {"id": "timing_mismatch", "intensity": 1},
+        {"id": "messy_books", "intensity": 1},
+    ],
+    "messy_books": [
+        {"id": "steady_state", "intensity": 1},
+        {"id": "messy_books", "intensity": 2},
+        {"id": "cash_crunch", "intensity": 1},
+        {"id": "expense_spike", "intensity": 2},
+        {"id": "vendor_concentration", "intensity": 1},
+        {"id": "timing_mismatch", "intensity": 1},
+    ],
     "stripe_timing": [{"id": "steady_state", "intensity": 1}, {"id": "timing_mismatch", "intensity": 2}],
 }
 

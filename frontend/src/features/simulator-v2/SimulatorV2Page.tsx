@@ -1,10 +1,16 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { getSimV2Catalog, resetSimV2, seedSimV2, type SimCatalog, type SimSeedResponse } from "../../api/simV2";
 import { useAppState } from "../../app/state/appState";
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
+}
+
+
+function renderDetectorState(row: SimSeedResponse["coverage"]["detectors"][number]) {
+  if (!row.ran) return `skipped (${row.skipped_reason ?? "unknown"})`;
+  return row.fired ? `fired (${row.severity ?? "n/a"})` : "ran (no fire)";
 }
 
 export default function SimulatorV2Page() {
@@ -105,6 +111,44 @@ export default function SimulatorV2Page() {
           <div>Events inserted: {result.stats.raw_events_inserted}</div>
           <div>Pulse ran: {String(result.stats.pulse_ran)}</div>
           <div>Signals produced: {result.signals.total}</div>
+
+          <h3 style={{ marginTop: 16 }}>Coverage Report</h3>
+          <div>Observed: {result.coverage.window_observed.start_date} → {result.coverage.window_observed.end_date}</div>
+          <ul>
+            <li>Raw events: {result.coverage.inputs.raw_events_count}</li>
+            <li>Normalized txns: {result.coverage.inputs.normalized_txns_count}</li>
+            <li>Deposits (last 30d): {result.coverage.inputs.deposits_count_last30}</li>
+            <li>Expenses (last 30d): {result.coverage.inputs.expenses_count_last30}</li>
+            <li>Distinct vendors (last 30d): {result.coverage.inputs.distinct_vendors_last30}</li>
+            <li>Balance series points: {result.coverage.inputs.balance_series_points}</li>
+          </ul>
+
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th align="left">Detector</th>
+                <th align="left">Signal</th>
+                <th align="left">Domain</th>
+                <th align="left">Status</th>
+                <th align="left">Evidence</th>
+              </tr>
+            </thead>
+            <tbody>
+              {result.coverage.detectors.map((row) => (
+                <tr key={`${row.detector_id}:${row.signal_id}`}>
+                  <td>{row.detector_id}</td>
+                  <td>
+                    <Link to={`/app/${businessId}/assistant?signalId=${encodeURIComponent(row.signal_id)}`}>
+                      {row.signal_id}
+                    </Link>
+                  </td>
+                  <td>{row.domain}</td>
+                  <td>{renderDetectorState(row)}</td>
+                  <td>{row.evidence_keys.join(", ") || "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

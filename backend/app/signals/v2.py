@@ -6,7 +6,7 @@ import hashlib
 import math
 import re
 from statistics import mean, pstdev
-from typing import Dict, Iterable, List, Optional
+from typing import Callable, Dict, Iterable, List, Optional
 
 from backend.app.norma.ledger import build_cash_ledger
 from backend.app.norma.normalize import NormalizedTransaction
@@ -21,6 +21,36 @@ class DetectedSignal:
     title: str
     summary: str
     payload: Dict[str, object]
+
+
+@dataclass(frozen=True)
+class DetectorRunResult:
+    detector_id: str
+    signal_id: str
+    domain: str
+    ran: bool
+    skipped_reason: Optional[str]
+    fired: bool
+    severity: Optional[str]
+    evidence_keys: List[str]
+
+
+@dataclass(frozen=True)
+class DetectorRunSummary:
+    signals: List[DetectedSignal]
+    detectors: List[DetectorRunResult]
+
+
+@dataclass(frozen=True)
+class DetectorDefinition:
+    detector_id: str
+    signal_type: str
+    domain: str
+    runner: Callable[..., List[DetectedSignal]]
+    needs_audit_entries: bool = False
+
+
+_SEVERITY_RANK = {"info": 0, "warning": 1, "medium": 1, "high": 2, "critical": 3}
 
 
 def _fingerprint(parts: Iterable[object]) -> str:
@@ -979,27 +1009,86 @@ def detect_hygiene_signal_flapping(
     return signals
 
 
+DETECTOR_DEFINITIONS: List[DetectorDefinition] = [
+    DetectorDefinition("detect_expense_creep_by_vendor", "expense_creep_by_vendor", "expense", detect_expense_creep_by_vendor),
+    DetectorDefinition("detect_low_cash_runway", "low_cash_runway", "liquidity", detect_low_cash_runway),
+    DetectorDefinition("detect_unusual_outflow_spike", "unusual_outflow_spike", "expense", detect_unusual_outflow_spike),
+    DetectorDefinition("detect_liquidity_runway_low", "liquidity.runway_low", "liquidity", detect_liquidity_runway_low),
+    DetectorDefinition("detect_liquidity_cash_trend_down", "liquidity.cash_trend_down", "liquidity", detect_liquidity_cash_trend_down),
+    DetectorDefinition("detect_revenue_decline_vs_baseline", "revenue.decline_vs_baseline", "revenue", detect_revenue_decline_vs_baseline),
+    DetectorDefinition("detect_revenue_volatility_spike", "revenue.volatility_spike", "revenue", detect_revenue_volatility_spike),
+    DetectorDefinition("detect_expense_spike_vs_baseline", "expense.spike_vs_baseline", "expense", detect_expense_spike_vs_baseline),
+    DetectorDefinition("detect_expense_new_recurring", "expense.new_recurring", "expense", detect_expense_new_recurring),
+    DetectorDefinition("detect_timing_inflow_outflow_mismatch", "timing.inflow_outflow_mismatch", "timing", detect_timing_inflow_outflow_mismatch),
+    DetectorDefinition("detect_timing_payroll_rent_cliff", "timing.payroll_rent_cliff", "timing", detect_timing_payroll_rent_cliff),
+    DetectorDefinition("detect_concentration_revenue_top_customer", "concentration.revenue_top_customer", "concentration", detect_concentration_revenue_top_customer),
+    DetectorDefinition("detect_concentration_expense_top_vendor", "concentration.expense_top_vendor", "concentration", detect_concentration_expense_top_vendor),
+    DetectorDefinition("detect_hygiene_uncategorized_high", "hygiene.uncategorized_high", "hygiene", detect_hygiene_uncategorized_high),
+    DetectorDefinition("detect_hygiene_signal_flapping", "hygiene.signal_flapping", "hygiene", detect_hygiene_signal_flapping, needs_audit_entries=True),
+]
+
+
+def run_v2_detectors_with_summary(
+    business_id: str,
+    txns: List[NormalizedTransaction],
+    *,
+    audit_entries: Optional[List[Dict[str, object]]] = None,
+) -> DetectorRunSummary:
+    all_signals: List[DetectedSignal] = []
+    detector_results: List[DetectorRunResult] = []
+
+    for detector in DETECTOR_DEFINITIONS:
+        if detector.needs_audit_entries:
+            if not audit_entries:
+                detector_results.append(
+                    DetectorRunResult(
+                        detector_id=detector.detector_id,
+                        signal_id=detector.signal_type,
+                        domain=detector.domain,
+                        ran=False,
+                        skipped_reason="missing_audit_entries",
+                        fired=False,
+                        severity=None,
+                        evidence_keys=[],
+                    )
+                )
+                continue
+            signals = detector.runner(business_id, audit_entries)
+        else:
+            signals = detector.runner(business_id, txns)
+
+        fired = bool(signals)
+        strongest = None
+        if fired:
+            strongest = max((sig.severity for sig in signals), key=lambda sev: _SEVERITY_RANK.get(sev, -1))
+        evidence_keys = sorted({k for sig in signals for k in sig.payload.keys()})
+        detector_results.append(
+            DetectorRunResult(
+                detector_id=detector.detector_id,
+                signal_id=detector.signal_type,
+                domain=detector.domain,
+                ran=True,
+                skipped_reason=None,
+                fired=fired,
+                severity=strongest,
+                evidence_keys=evidence_keys,
+            )
+        )
+        all_signals.extend(signals)
+
+    ordered_signals = sorted(all_signals, key=lambda sig: (sig.signal_type, sig.signal_id))
+    ordered_detectors = sorted(detector_results, key=lambda d: (d.domain, d.signal_id, d.detector_id))
+    return DetectorRunSummary(signals=ordered_signals, detectors=ordered_detectors)
+
+
 def run_v2_detectors(
     business_id: str,
     txns: List[NormalizedTransaction],
     *,
     audit_entries: Optional[List[Dict[str, object]]] = None,
 ) -> List[DetectedSignal]:
-    signals: List[DetectedSignal] = []
-    signals.extend(detect_expense_creep_by_vendor(business_id, txns))
-    signals.extend(detect_low_cash_runway(business_id, txns))
-    signals.extend(detect_unusual_outflow_spike(business_id, txns))
-    signals.extend(detect_liquidity_runway_low(business_id, txns))
-    signals.extend(detect_liquidity_cash_trend_down(business_id, txns))
-    signals.extend(detect_revenue_decline_vs_baseline(business_id, txns))
-    signals.extend(detect_revenue_volatility_spike(business_id, txns))
-    signals.extend(detect_expense_spike_vs_baseline(business_id, txns))
-    signals.extend(detect_expense_new_recurring(business_id, txns))
-    signals.extend(detect_timing_inflow_outflow_mismatch(business_id, txns))
-    signals.extend(detect_timing_payroll_rent_cliff(business_id, txns))
-    signals.extend(detect_concentration_revenue_top_customer(business_id, txns))
-    signals.extend(detect_concentration_expense_top_vendor(business_id, txns))
-    signals.extend(detect_hygiene_uncategorized_high(business_id, txns))
-    if audit_entries:
-        signals.extend(detect_hygiene_signal_flapping(business_id, audit_entries))
-    return signals
+    return run_v2_detectors_with_summary(
+        business_id,
+        txns,
+        audit_entries=audit_entries,
+    ).signals

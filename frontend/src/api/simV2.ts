@@ -5,6 +5,30 @@ export type SimCatalog = {
   scenarios: { id: string; title: string; description: string; expected_signals: string[] }[];
 };
 
+
+
+export type SimCoverage = {
+  window_observed: { start_date: string; end_date: string };
+  inputs: {
+    raw_events_count: number;
+    normalized_txns_count: number;
+    deposits_count_last30: number;
+    expenses_count_last30: number;
+    distinct_vendors_last30: number;
+    balance_series_points: number;
+  };
+  detectors: {
+    detector_id: string;
+    signal_id: string;
+    domain: string;
+    ran: boolean;
+    skipped_reason?: string | null;
+    fired: boolean;
+    severity?: string | null;
+    evidence_keys: string[];
+  }[];
+};
+
 export type SimSeedRequest = {
   business_id: string;
   preset_id?: string;
@@ -34,6 +58,7 @@ export type SimSeedResponse = {
     by_domain: Record<string, number>;
     top: { signal_id: string; status: string; severity: string; domain: string; title: string }[];
   };
+  coverage: SimCoverage;
 };
 
 export function getSimV2Catalog() {
