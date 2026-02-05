@@ -17,7 +17,7 @@ import {
   type SignalState,
 } from "../../api/signals";
 import { useAppState } from "../../app/state/appState";
-import { addPlanNote, createPlan, listPlans, markPlanStepDone, updatePlanStatus, type ResolutionPlan } from "../../api/plans";
+import { addPlanNote, createPlan, listPlans, markPlanStepDone, updatePlanStatus, verifyPlan, type ResolutionPlan, type ResolutionPlanVerify } from "../../api/plans";
 import { fetchAssistantProgress, type AssistantProgress } from "../../api/progress";
 import { fetchWorkQueue, type WorkQueueItem } from "../../api/workQueue";
 import styles from "./AssistantPage.module.css";
@@ -40,6 +40,12 @@ function actionToStatus(action: SignalExplainOut["next_actions"][number]["action
   if (action === "snooze") return "ignored" as const;
   if (action === "resolve") return "resolved" as const;
   return "in_progress" as const;
+}
+
+function verificationLabel(status: "met" | "not_met" | "unknown") {
+  if (status === "met") return "Met";
+  if (status === "not_met") return "Not met";
+  return "Unknown";
 }
 
 function playbookIcon(kind: "inspect" | "adjust" | "decide") {
@@ -74,6 +80,7 @@ export default function AssistantPage() {
   const [planNoteText, setPlanNoteText] = useState("");
   const [progress, setProgress] = useState<AssistantProgress | null>(null);
   const [workQueue, setWorkQueue] = useState<WorkQueueItem[]>([]);
+  const [planVerification, setPlanVerification] = useState<ResolutionPlanVerify | null>(null);
   const resumedRef = useRef(false);
   const planStepRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -207,18 +214,6 @@ export default function AssistantPage() {
       actor,
       reason,
     });
-    await postAssistantMessage(businessId, {
-      author: "assistant",
-      kind: "action_result",
-      signal_id: selectedSignalId,
-      audit_id: result.audit_id,
-      content_json: {
-        signal_id: selectedSignalId,
-        audit_id: result.audit_id,
-        status: result.status,
-        reason,
-      },
-    });
     setReason("");
     setShowCompletionPrompt(false);
     await Promise.all([loadAll(), loadThread(), appendExplainMessage(selectedSignalId, "priority")]);
@@ -228,9 +223,9 @@ export default function AssistantPage() {
     if (!businessId || !selectedSignalId) return;
     await postAssistantMessage(businessId, {
       author: "system",
-      kind: "playbook_started",
+      kind: "receipt_playbook_started",
       signal_id: selectedSignalId,
-      content_json: { playbook_id: playbook.id, title: playbook.title },
+      content_json: { action: "playbook_started", playbook_id: playbook.id, title: playbook.title, signal_id: selectedSignalId, created_at: new Date().toISOString(), links: { signal: `/app/${businessId}/assistant?signalId=${selectedSignalId}`, plan: null, audit: null } },
     });
     await loadThread();
     setShowCompletionPrompt(true);
@@ -261,9 +256,9 @@ export default function AssistantPage() {
     const deepLink = typeof deepLinkRaw === "string" ? deepLinkRaw.replace("{businessId}", businessId) : null;
     await postAssistantMessage(businessId, {
       author: "assistant",
-      kind: "playbook_started",
+      kind: "receipt_playbook_started",
       signal_id: signalId,
-      content_json: { playbook_id: playbookId, title, source: "work_queue" },
+      content_json: { action: "playbook_started", playbook_id: playbookId, title, source: "work_queue", signal_id: signalId, created_at: new Date().toISOString(), links: { signal: `/app/${businessId}/assistant?signalId=${signalId}` } },
     });
     await loadThread();
     if (deepLink) {
@@ -277,12 +272,16 @@ export default function AssistantPage() {
     if (!businessId) return;
     await postAssistantMessage(businessId, {
       author: "assistant",
-      kind: "playbook_started",
+      kind: "receipt_playbook_started",
       signal_id: signalId,
       content_json: {
+        action: "playbook_started",
         playbook_id: playbook.id,
         title: playbook.title,
         source: "daily_brief",
+        signal_id: signalId,
+        created_at: new Date().toISOString(),
+        links: { signal: `/app/${businessId}/assistant?signalId=${signalId}` },
       },
     });
     await loadThread();
@@ -363,8 +362,15 @@ export default function AssistantPage() {
   const handlePlanStatusDone = useCallback(async () => {
     if (!businessId || !selectedPlanId) return;
     await updatePlanStatus(businessId, selectedPlanId, { actor, status: "done" });
+    setPlanVerification(null);
     await Promise.all([loadPlans(), loadThread()]);
   }, [actor, businessId, selectedPlanId, loadPlans, loadThread]);
+
+  const handleVerifyPlan = useCallback(async () => {
+    if (!businessId || !selectedPlanId) return;
+    const verification = await verifyPlan(businessId, selectedPlanId);
+    setPlanVerification(verification);
+  }, [businessId, selectedPlanId]);
 
   const handlePlanNoteSubmit = useCallback(async (event: FormEvent) => {
     event.preventDefault();
@@ -542,11 +548,13 @@ export default function AssistantPage() {
                 <div className={styles.muted}>Open explain card for deterministic evidence and actions.</div>
               </div>
             )}
-            {message.kind === "playbook_started" && (
-              <div>Started playbook: {String(message.content_json.title ?? "")}</div>
-            )}
-            {message.kind === "action_result" && (
-              <div>Updated to {String(message.content_json.status)} (audit {String(message.audit_id)}).</div>
+            {(message.kind === "receipt" || message.kind === "receipt_signal_status_updated" || message.kind === "receipt_playbook_started" || message.kind === "receipt_plan_done") && (
+              <div>
+                <div>Receipt: {String(message.content_json.action ?? message.kind)}</div>
+                {message.audit_id && <div><a href={String((message.content_json.links as Record<string, string> | undefined)?.audit ?? "#")}>Audit {String(message.audit_id)}</a></div>}
+                {(message.content_json.signal_id || message.signal_id) && <div><a href={String((message.content_json.links as Record<string, string> | undefined)?.signal ?? "#")}>Signal link</a></div>}
+                {message.content_json.plan_id && <div><a href={String((message.content_json.links as Record<string, string> | undefined)?.plan ?? "#")}>Plan link</a></div>}
+              </div>
             )}
           </div>
         ))}
@@ -565,7 +573,7 @@ export default function AssistantPage() {
                 </button>
               ))}
             </div>
-            <div className={styles.actionChips} style={{ marginTop: 8 }}><button className={styles.actionChip} onClick={handlePlanStatusDone}>Mark done</button></div>
+            <div className={styles.actionChips} style={{ marginTop: 8 }}><button className={styles.actionChip} onClick={handlePlanStatusDone}>Mark done</button><button className={styles.actionChip} onClick={handleVerifyPlan}>Verify plan</button></div>
             <div className={styles.cardTitle} style={{ marginTop: 12 }}>Steps</div>
             {selectedPlan.steps.map((step) => (
               <label key={step.step_id} className={styles.field}>
@@ -596,6 +604,15 @@ export default function AssistantPage() {
                 </ul>
               </>
             )}
+            {planVerification && (<>
+              <div className={styles.cardTitle} style={{ marginTop: 12 }}>Verification</div>
+              <div className={styles.muted}>Met {planVerification.totals.met} · Not met {planVerification.totals.not_met} · Unknown {planVerification.totals.unknown}</div>
+              <ul>
+                {planVerification.signals.map((row) => (
+                  <li key={row.signal_id}>{row.signal_id} · {verificationLabel(row.verification_status)} · {row.title} · {row.domain}</li>
+                ))}
+              </ul>
+            </>)}
             <div className={styles.cardTitle} style={{ marginTop: 12 }}>Activity</div>
             <ul>
               {planActivity.map((message) => (
@@ -608,6 +625,7 @@ export default function AssistantPage() {
         {explain && (
           <div className={styles.card}>
             <div className={styles.cardTitle}>What resolves this</div>
+            <div className={styles.muted}>Verification: {verificationLabel((explain.verification?.status ?? "unknown") as "met" | "not_met" | "unknown")}</div>
             <div>{explain.clear_condition?.summary ?? "Resolution criteria are not explicitly defined."}</div>
             <div className={styles.actionChips} style={{ marginTop: 8 }}>
               {(explain.clear_condition?.fields ?? []).map((field) => (

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.models import AssistantMessage, Business, HealthSignalState
 from backend.app.services import health_score_service, signals_service
-from backend.app.services.assistant_thread_service import AssistantMessageIn, append_message
+from backend.app.services.assistant_thread_service import AssistantMessageIn, append_message, append_receipt
 
 ALLOWED_PLAN_STATUS = {"open", "in_progress", "done"}
 ALLOWED_STEP_STATUS = {"todo", "done"}
@@ -58,6 +58,22 @@ class PlanStatusIn(BaseModel):
         if value not in ALLOWED_PLAN_STATUS:
             raise ValueError("status must be open|in_progress|done")
         return value
+
+
+
+
+class PlanVerifySignalOut(BaseModel):
+    signal_id: str
+    verification_status: str
+    title: str
+    domain: str
+
+
+class PlanVerifyOut(BaseModel):
+    plan_id: str
+    checked_at: str
+    signals: List[PlanVerifySignalOut]
+    totals: Dict[str, int]
 
 
 class PlanOut(BaseModel):
@@ -363,4 +379,47 @@ def update_plan_status(db: Session, business_id: str, plan_id: str, req: PlanSta
         AssistantMessageIn(author="system", kind="plan_status_updated", content_json={"plan_id": plan_id, "status": req.status, "actor": req.actor}),
         dedupe=False,
     )
+    if req.status == "done":
+        append_receipt(
+            db,
+            business_id,
+            {
+                "action": "plan_done",
+                "actor": req.actor,
+                "plan_id": plan_id,
+                "created_at": now_iso,
+                "links": {"plan": f"/app/{business_id}/assistant?planId={plan_id}"},
+                "outcome": content.get("outcome"),
+            },
+            dedupe=False,
+        )
     return PlanOut.model_validate(_parse_plan_row(row))
+
+
+def verify_plan(db: Session, business_id: str, plan_id: str) -> PlanVerifyOut:
+    row = _get_plan_row_by_plan_id(db, business_id, plan_id)
+    content = dict(row.content_json or {})
+    signal_ids = sorted({str(signal_id) for signal_id in (content.get("signal_ids") or []) if str(signal_id)})[:20]
+    signals: List[Dict[str, str]] = []
+    totals = {"met": 0, "not_met": 0, "unknown": 0}
+    for signal_id in signal_ids:
+        explain = signals_service.get_signal_explain(db, business_id, signal_id)
+        verification = explain.get("verification") or {}
+        status = str(verification.get("status") or "unknown")
+        if status not in totals:
+            status = "unknown"
+        totals[status] += 1
+        detector = explain.get("detector") or {}
+        signals.append({
+            "signal_id": signal_id,
+            "verification_status": status,
+            "title": str(detector.get("title") or signal_id),
+            "domain": str(detector.get("domain") or "unknown"),
+        })
+    signals.sort(key=lambda row: (row["signal_id"], row["title"], row["domain"]))
+    return PlanVerifyOut.model_validate({
+        "plan_id": plan_id,
+        "checked_at": _now_iso(),
+        "signals": signals,
+        "totals": totals,
+    })

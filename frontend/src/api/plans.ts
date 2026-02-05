@@ -64,3 +64,16 @@ export function updatePlanStatus(businessId: string, planId: string, payload: { 
   const query = new URLSearchParams({ business_id: businessId });
   return apiPost<ResolutionPlan>(`/api/assistant/plans/${encodeURIComponent(planId)}/status?${query.toString()}`, payload);
 }
+
+
+export type ResolutionPlanVerify = {
+  plan_id: string;
+  checked_at: string;
+  signals: Array<{ signal_id: string; verification_status: "met" | "not_met" | "unknown"; title: string; domain: string }>;
+  totals: { met: number; not_met: number; unknown: number };
+};
+
+export function verifyPlan(businessId: string, planId: string) {
+  const query = new URLSearchParams({ business_id: businessId });
+  return apiGet<ResolutionPlanVerify>(`/api/assistant/plans/${encodeURIComponent(planId)}/verify?${query.toString()}`);
+}

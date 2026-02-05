@@ -43,6 +43,7 @@ const getSignalExplain = vi.fn().mockResolvedValue({
   related_audits: [],
   next_actions: [{ key: "resolve_if_fixed", label: "Resolve", action: "resolve", requires_reason: true, rationale: "", suggested_snooze_minutes: null, guardrails: [] }],
   clear_condition: { summary: "Spend must normalize.", type: "threshold", fields: ["current_total"], window_days: 14, comparator: "<=", target: 500 },
+  verification: { status: "unknown", checked_at: new Date().toISOString(), facts: [] },
   playbooks: [],
   links: [],
 });
@@ -53,6 +54,8 @@ const listPlans = vi.fn().mockResolvedValue([]);
 const createPlan = vi.fn();
 const markPlanStepDone = vi.fn();
 const addPlanNote = vi.fn();
+const updatePlanStatus = vi.fn();
+const verifyPlan = vi.fn().mockResolvedValue({ plan_id: "plan-1", checked_at: new Date().toISOString(), signals: [], totals: { met: 0, not_met: 0, unknown: 0 } });
 const publishDailyBrief = vi.fn().mockResolvedValue({
   message: { id: "msg-brief", business_id: "biz-1", created_at: new Date().toISOString(), author: "system", kind: "daily_brief", signal_id: null, audit_id: null, content_json: {} },
   brief: {
@@ -86,7 +89,7 @@ vi.mock("../../api/monitor", () => ({ getMonitorStatus: (...args: unknown[]) => 
 vi.mock("../../api/dailyBrief", () => ({ publishDailyBrief: (...args: unknown[]) => publishDailyBrief(...args) }));
 vi.mock("../../api/progress", () => ({ fetchAssistantProgress: (...args: unknown[]) => fetchAssistantProgress(...args) }));
 vi.mock("../../api/workQueue", () => ({ fetchWorkQueue: (...args: unknown[]) => fetchWorkQueue(...args) }));
-vi.mock("../../api/plans", () => ({ listPlans: (...args: unknown[]) => listPlans(...args), createPlan: (...args: unknown[]) => createPlan(...args), markPlanStepDone: (...args: unknown[]) => markPlanStepDone(...args), addPlanNote: (...args: unknown[]) => addPlanNote(...args) }));
+vi.mock("../../api/plans", () => ({ listPlans: (...args: unknown[]) => listPlans(...args), createPlan: (...args: unknown[]) => createPlan(...args), markPlanStepDone: (...args: unknown[]) => markPlanStepDone(...args), addPlanNote: (...args: unknown[]) => addPlanNote(...args), updatePlanStatus: (...args: unknown[]) => updatePlanStatus(...args), verifyPlan: (...args: unknown[]) => verifyPlan(...args) }));
 
 function renderAssistant(path = "/app/biz-1/assistant") {
   return render(
@@ -130,7 +133,7 @@ describe("AssistantPage v2", () => {
     );
   });
 
-  it("performing next_action posts action_result with audit_id", async () => {
+  it("performing next_action updates signal status", async () => {
     renderAssistant();
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: /1\. Expense creep/i }));
@@ -139,10 +142,7 @@ describe("AssistantPage v2", () => {
     await user.type(screen.getByLabelText("Reason"), "Handled");
     await user.click(screen.getByRole("button", { name: /Resolve/i }));
     await waitFor(() => expect(updateSignalStatus).toHaveBeenCalled());
-    expect(postAssistantMessage).toHaveBeenCalledWith(
-      "biz-1",
-      expect.objectContaining({ kind: "action_result", audit_id: "audit-1" })
-    );
+    expect(updateSignalStatus).toHaveBeenCalledWith("biz-1", "sig-1", expect.objectContaining({ status: "resolved" }));
   });
 
   it("renders score change explanation and appends summary message on click", async () => {

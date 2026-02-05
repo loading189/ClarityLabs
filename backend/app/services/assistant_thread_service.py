@@ -4,6 +4,7 @@ import hashlib
 import json
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+from uuid import uuid4
 
 from fastapi import HTTPException
 from pydantic import BaseModel, Field, field_validator
@@ -13,7 +14,25 @@ from sqlalchemy.orm import Session
 from backend.app.models import AssistantMessage, Business
 
 ALLOWED_AUTHORS = {"system", "assistant", "user"}
-ALLOWED_KINDS = {"summary", "changes", "priority", "explain", "action_result", "note", "playbook_started", "daily_brief", "plan", "plan_created", "plan_step_done", "plan_note_added", "plan_status_updated"}
+ALLOWED_KINDS = {
+    "summary",
+    "changes",
+    "priority",
+    "explain",
+    "action_result",
+    "note",
+    "playbook_started",
+    "daily_brief",
+    "plan",
+    "plan_created",
+    "plan_step_done",
+    "plan_note_added",
+    "plan_status_updated",
+    "receipt",
+    "receipt_signal_status_updated",
+    "receipt_playbook_started",
+    "receipt_plan_done",
+}
 MAX_MESSAGE_BYTES = 16_000
 MAX_THREAD_LIMIT = 200
 
@@ -38,7 +57,7 @@ class AssistantMessageIn(BaseModel):
     def validate_kind(cls, value: str) -> str:
         normalized = value.strip()
         if normalized not in ALLOWED_KINDS:
-            raise ValueError("kind must be one of summary|changes|priority|explain|action_result|note|playbook_started|daily_brief|plan|plan_created|plan_step_done|plan_note_added|plan_status_updated")
+            raise ValueError("kind must be one of summary|changes|priority|explain|action_result|note|playbook_started|daily_brief|plan|plan_created|plan_step_done|plan_note_added|plan_status_updated|receipt|receipt_signal_status_updated|receipt_playbook_started|receipt_plan_done")
         return normalized
 
     @field_validator("content_json")
@@ -62,6 +81,24 @@ class AssistantMessageOut(BaseModel):
     signal_id: Optional[str] = None
     audit_id: Optional[str] = None
     content_json: Dict[str, Any]
+
+
+class AssistantReceiptLinks(BaseModel):
+    audit: Optional[str] = None
+    signal: Optional[str] = None
+    plan: Optional[str] = None
+
+
+class AssistantReceiptPayload(BaseModel):
+    receipt_id: str
+    action: str
+    actor: Optional[str] = None
+    reason: Optional[str] = None
+    signal_id: Optional[str] = None
+    plan_id: Optional[str] = None
+    audit_id: Optional[str] = None
+    created_at: str
+    links: AssistantReceiptLinks = Field(default_factory=AssistantReceiptLinks)
 
 
 
@@ -192,6 +229,41 @@ def append_message(
     db.commit()
     db.refresh(row)
     return _to_out(row)
+
+
+def append_receipt(
+    db: Session,
+    business_id: str,
+    receipt_payload: Dict[str, Any],
+    *,
+    dedupe: bool = False,
+) -> AssistantMessageOut:
+    payload = dict(receipt_payload or {})
+    if not payload.get("receipt_id"):
+        payload["receipt_id"] = str(uuid4())
+    if not payload.get("created_at"):
+        payload["created_at"] = datetime.now(timezone.utc).isoformat()
+
+    normalized_payload = AssistantReceiptPayload.model_validate(payload)
+    action = str(normalized_payload.action or "")
+    kind_map = {
+        "signal_status_updated": "receipt_signal_status_updated",
+        "playbook_started": "receipt_playbook_started",
+        "plan_done": "receipt_plan_done",
+    }
+    kind = kind_map.get(action, "receipt")
+    return append_message(
+        db,
+        business_id,
+        AssistantMessageIn(
+            author="system",
+            kind=kind,
+            signal_id=normalized_payload.signal_id,
+            audit_id=normalized_payload.audit_id,
+            content_json=normalized_payload.model_dump(),
+        ),
+        dedupe=dedupe,
+    )
 
 
 
