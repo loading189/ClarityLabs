@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { fetchAssistantThread, postAssistantMessage, type AssistantThreadMessage } from "../../api/assistantThread";
+import { publishDailyBrief, type DailyBriefOut, type DailyBriefPlaybook } from "../../api/dailyBrief";
 import { listChanges, type ChangeEvent } from "../../api/changes";
 import {
   fetchHealthScore,
@@ -59,6 +60,7 @@ export default function AssistantPage() {
   const [explain, setExplain] = useState<SignalExplainOut | null>(null);
   const [thread, setThread] = useState<AssistantThreadMessage[]>([]);
   const [scoreExplain, setScoreExplain] = useState<HealthScoreExplainChangeOut | null>(null);
+  const [dailyBrief, setDailyBrief] = useState<DailyBriefOut | null>(null);
   const [actor, setActor] = useState("analyst");
   const [reason, setReason] = useState("");
   const [showCompletionPrompt, setShowCompletionPrompt] = useState(false);
@@ -85,10 +87,17 @@ export default function AssistantPage() {
     setThread(rows);
   }, [businessId]);
 
+  const loadDailyBrief = useCallback(async () => {
+    if (!businessId) return;
+    const result = await publishDailyBrief(businessId);
+    setDailyBrief(result.brief);
+  }, [businessId]);
+
   useEffect(() => {
+    loadDailyBrief();
     loadAll();
     loadThread();
-  }, [loadAll, loadThread]);
+  }, [loadAll, loadThread, loadDailyBrief]);
 
   const topPriorities = useMemo(() => {
     const penalties = new Map((healthScore?.contributors ?? []).map((row) => [row.signal_id, row.penalty]));
@@ -198,6 +207,25 @@ export default function AssistantPage() {
     }
   }, [businessId, loadThread, navigate, selectedSignalId]);
 
+  const handleBriefStartPlaybook = useCallback(async (signalId: string, playbook: DailyBriefPlaybook) => {
+    if (!businessId) return;
+    await postAssistantMessage(businessId, {
+      author: "assistant",
+      kind: "playbook_started",
+      signal_id: signalId,
+      content_json: {
+        playbook_id: playbook.id,
+        title: playbook.title,
+        source: "daily_brief",
+      },
+    });
+    await loadThread();
+    const deepLink = playbook.deep_link?.replace("{businessId}", businessId);
+    if (deepLink) {
+      navigate(deepLink);
+    }
+  }, [businessId, loadThread, navigate]);
+
   const handleCompletionResponse = useCallback(async (decision: "yes" | "not_yet") => {
     if (!businessId || !selectedSignalId || !explain) return;
     if (decision === "yes") {
@@ -263,6 +291,37 @@ export default function AssistantPage() {
       </div>
 
       <div className={styles.mainPanel}>
+        {dailyBrief && (
+          <div className={styles.card}>
+            <div className={styles.cardTitle}>Daily brief</div>
+            <div>{dailyBrief.headline}</div>
+            <ul>
+              {dailyBrief.summary_bullets.map((bullet) => (
+                <li key={bullet}>{bullet}</li>
+              ))}
+            </ul>
+            <div className={styles.muted}>
+              Score {dailyBrief.metrics.health_score} · Open signals {dailyBrief.metrics.open_signals_count} · New changes {dailyBrief.metrics.new_changes_count}
+            </div>
+            <div className={styles.cardTitle} style={{ marginTop: 12 }}>Daily priorities</div>
+            {dailyBrief.priorities.map((priority) => (
+              <div key={priority.signal_id} className={styles.card}>
+                <div><strong>{priority.title}</strong> · {priority.severity} · {priority.status.replace(/_/g, " ")}</div>
+                <div className={styles.muted}>{priority.why_now}</div>
+                <div className={styles.muted}>{priority.clear_condition_summary}</div>
+                <div className={styles.actionChips}>
+                  <button className={styles.actionChip} onClick={() => appendExplainMessage(priority.signal_id, "priority")}>Open Explain</button>
+                  {priority.recommended_playbooks.map((playbook) => (
+                    <button key={playbook.id} className={styles.actionChip} onClick={() => handleBriefStartPlaybook(priority.signal_id, playbook)}>
+                      Start Playbook: {playbook.title}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {thread.map((message) => (
           <div key={message.id} className={styles.card}>
             <div className={styles.cardTitle}>{message.kind.replace("_", " ")}</div>

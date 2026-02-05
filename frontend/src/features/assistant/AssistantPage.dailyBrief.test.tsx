@@ -9,11 +9,24 @@ const listSignalStates = vi.fn().mockResolvedValue({
   signals: [{ id: "sig-1", type: "expense", domain: "expense", severity: "warning", status: "open", title: "Expense creep", summary: null, updated_at: null }],
   meta: {},
 });
-const fetchHealthScore = vi.fn().mockResolvedValue({ business_id: "biz-1", score: 78, generated_at: new Date().toISOString(), domains: [], contributors: [{ signal_id: "sig-1", domain: "expense", status: "open", severity: "warning", penalty: 12, rationale: "" }], meta: { model_version: "v1", weights: {} } });
+const fetchHealthScore = vi.fn().mockResolvedValue({ business_id: "biz-1", score: 78, generated_at: new Date().toISOString(), domains: [], contributors: [], meta: { model_version: "v1", weights: {} } });
 const fetchHealthScoreExplainChange = vi.fn().mockResolvedValue({ business_id: "biz-1", computed_at: new Date().toISOString(), window: { since_hours: 72 }, changes: [], impacts: [], summary: { headline: "No major changes", net_estimated_delta: 0, top_drivers: [] } });
 const listChanges = vi.fn().mockResolvedValue([]);
 const fetchAssistantThread = vi.fn().mockResolvedValue([]);
-const postAssistantMessage = vi.fn().mockResolvedValue({ id: "msg-1", business_id: "biz-1", created_at: new Date().toISOString(), author: "assistant", kind: "summary", signal_id: null, audit_id: null, content_json: { text: "ok" } });
+const postAssistantMessage = vi.fn().mockResolvedValue({ id: "msg-1", business_id: "biz-1", created_at: new Date().toISOString(), author: "assistant", kind: "playbook_started", signal_id: "sig-1", audit_id: null, content_json: {} });
+const publishDailyBrief = vi.fn().mockResolvedValue({
+  message: { id: "msg-brief", business_id: "biz-1", created_at: new Date().toISOString(), author: "system", kind: "daily_brief", signal_id: null, audit_id: null, content_json: {} },
+  brief: {
+    business_id: "biz-1",
+    date: "2025-01-15",
+    generated_at: new Date().toISOString(),
+    headline: "Daily brief for 2025-01-15: health score 78 with 1 active priorities.",
+    summary_bullets: ["Health score is 78."],
+    priorities: [{ signal_id: "sig-1", title: "Expense creep", severity: "warning", status: "open", why_now: "Expense creep is open with warning severity.", recommended_playbooks: [{ id: "pb-1", title: "Inspect recent outflows", deep_link: null }], clear_condition_summary: "Spend must normalize." }],
+    metrics: { health_score: 78, delta_7d: null, open_signals_count: 1, new_changes_count: 0 },
+    links: { assistant: "/", signals: "/", health_score: "/", changes: "/" },
+  },
+});
 const getSignalExplain = vi.fn().mockResolvedValue({
   business_id: "biz-1",
   signal_id: "sig-1",
@@ -21,26 +34,13 @@ const getSignalExplain = vi.fn().mockResolvedValue({
   detector: { type: "expense", title: "Expense creep", description: "", domain: "expense", default_severity: "warning", recommended_actions: [], evidence_schema: [], scoring_profile: {} },
   evidence: [],
   related_audits: [],
-  next_actions: [{ key: "resolve_if_fixed", label: "Resolve", action: "resolve", requires_reason: true, rationale: "", suggested_snooze_minutes: null, guardrails: [] }],
+  next_actions: [],
   clear_condition: { summary: "Spend must normalize.", type: "threshold", fields: ["current_total"], window_days: 14, comparator: "<=", target: 500 },
-  playbooks: [{ id: "expense_inspect_ledger", title: "Inspect recent outflows", description: "Review ledger", kind: "inspect", ui_target: "ledger", deep_link: null, requires_confirmation: false }],
+  playbooks: [],
   links: [],
 });
-const updateSignalStatus = vi.fn().mockResolvedValue({ business_id: "biz-1", signal_id: "sig-1", status: "resolved", last_seen_at: null, resolved_at: null, resolution_note: "done", reason: "done", audit_id: "audit-1" });
+const updateSignalStatus = vi.fn();
 const getMonitorStatus = vi.fn();
-const publishDailyBrief = vi.fn().mockResolvedValue({
-  message: { id: "msg-brief", business_id: "biz-1", created_at: new Date().toISOString(), author: "system", kind: "daily_brief", signal_id: null, audit_id: null, content_json: {} },
-  brief: {
-    business_id: "biz-1",
-    date: "2025-01-15",
-    generated_at: new Date().toISOString(),
-    headline: "Daily brief headline",
-    summary_bullets: ["Health score is 78."],
-    priorities: [{ signal_id: "sig-1", title: "Expense creep", severity: "warning", status: "open", why_now: "Expense creep is open with warning severity.", recommended_playbooks: [{ id: "pb-1", title: "Inspect recent outflows", deep_link: null }], clear_condition_summary: "Spend must normalize." }],
-    metrics: { health_score: 78, delta_7d: -12, open_signals_count: 1, new_changes_count: 1 },
-    links: { assistant: "/", signals: "/", health_score: "/", changes: "/" },
-  },
-});
 
 vi.mock("../../api/signals", () => ({
   listSignalStates: (...args: unknown[]) => listSignalStates(...args),
@@ -56,13 +56,13 @@ vi.mock("../../api/assistantThread", () => ({
   fetchAssistantThread: (...args: unknown[]) => fetchAssistantThread(...args),
   postAssistantMessage: (...args: unknown[]) => postAssistantMessage(...args),
 }));
-vi.mock("../../api/monitor", () => ({ getMonitorStatus: (...args: unknown[]) => getMonitorStatus(...args) }));
 vi.mock("../../api/dailyBrief", () => ({ publishDailyBrief: (...args: unknown[]) => publishDailyBrief(...args) }));
+vi.mock("../../api/monitor", () => ({ getMonitorStatus: (...args: unknown[]) => getMonitorStatus(...args) }));
 
-function renderAssistant(path = "/app/biz-1/assistant") {
+function renderAssistant() {
   return render(
     <AppStateProvider>
-      <MemoryRouter initialEntries={[path]}>
+      <MemoryRouter initialEntries={["/app/biz-1/assistant"]}>
         <Routes>
           <Route path="/app/:businessId/assistant" element={<AssistantPage />} />
         </Routes>
@@ -71,31 +71,25 @@ function renderAssistant(path = "/app/biz-1/assistant") {
   );
 }
 
-describe("AssistantPage playbooks", () => {
+describe("AssistantPage daily brief", () => {
   afterEach(() => cleanup());
   beforeEach(() => {
     vi.clearAllMocks();
     fetchAssistantThread.mockResolvedValue([]);
   });
 
-  it("renders clear condition and playbooks, and clicking playbook appends thread message", async () => {
+  it("renders daily brief and start playbook appends message without monitor calls", async () => {
     renderAssistant();
+    await screen.findByText(/Daily brief for 2025-01-15/i);
+    expect(screen.getByText(/Daily brief for 2025-01-15/i)).toBeInTheDocument();
+
     const user = userEvent.setup();
-
-    await user.click(await screen.findByRole("button", { name: /1\. Expense creep/i }));
-
-    await screen.findByText(/What resolves this/i);
-    expect(screen.getAllByText(/Spend must normalize\./i).length).toBeGreaterThan(0);
-    const playbookBtn = screen.getAllByRole("button", { name: /Inspect recent outflows/i }).find((btn) => btn.textContent?.includes("🔎"));
-    expect(playbookBtn).toBeDefined();
-    expect(playbookBtn).toBeInTheDocument();
-
-    await user.click(playbookBtn!);
+    await user.click(screen.getByRole("button", { name: /Start Playbook: Inspect recent outflows/i }));
 
     await waitFor(() =>
       expect(postAssistantMessage).toHaveBeenCalledWith(
         "biz-1",
-        expect.objectContaining({ author: "system", kind: "playbook_started", signal_id: "sig-1" })
+        expect.objectContaining({ kind: "playbook_started", signal_id: "sig-1" })
       )
     );
     expect(getMonitorStatus).not.toHaveBeenCalled();
