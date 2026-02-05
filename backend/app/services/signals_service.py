@@ -1402,6 +1402,61 @@ def _list_related_audits(
     return related
 
 
+def _next_actions(state: HealthSignalState, detector: Dict[str, Any], related_audits: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    status = state.status or "open"
+    severity = (state.severity or detector.get("default_severity") or "warning").lower()
+    recommended = detector.get("recommended_actions") or []
+    primary_recommendation = recommended[0] if recommended else "Review the supporting evidence before changing status."
+
+    persistence_days = 0
+    if state.detected_at and state.updated_at:
+        persistence_days = max(0, (state.updated_at - state.detected_at).days)
+
+    items: List[Dict[str, Any]] = []
+    if status in {"open", "ignored"}:
+        items.append({
+            "key": "acknowledge",
+            "label": "Acknowledge",
+            "action": "acknowledge",
+            "suggested_snooze_minutes": None,
+            "requires_reason": True,
+            "rationale": f"Move this signal into active triage. {primary_recommendation}",
+            "guardrails": ["Use after validating the current evidence for this period."],
+        })
+
+    if status in {"open", "in_progress"}:
+        suggested = 240 if severity == "critical" else 1440
+        items.append({
+            "key": "snooze_24h" if suggested == 1440 else "snooze_4h",
+            "label": "Snooze",
+            "action": "snooze",
+            "suggested_snooze_minutes": suggested,
+            "requires_reason": True,
+            "rationale": "Temporarily defer after review when no immediate intervention is required.",
+            "guardrails": [
+                "Snooze only if this was reviewed today.",
+                "Do not snooze unresolved critical issues for more than one workday.",
+            ],
+        })
+
+    if status != "resolved":
+        resolve_guardrails = ["Resolve only when evidence no longer indicates active risk."]
+        if persistence_days >= 2:
+            resolve_guardrails.append("Add context for why the persistent condition is now safe.")
+        items.append({
+            "key": "resolve_if_fixed",
+            "label": "Resolve",
+            "action": "resolve",
+            "suggested_snooze_minutes": None,
+            "requires_reason": True,
+            "rationale": "Close this signal when the underlying condition is fixed or accepted.",
+            "guardrails": resolve_guardrails,
+        })
+
+    order = {"acknowledge": 0, "snooze": 1, "resolve": 2}
+    return sorted(items, key=lambda item: (order.get(item.get("action"), 99), item.get("key", "")))
+
+
 def get_signal_explain(db: Session, business_id: str, signal_id: str) -> Dict[str, Any]:
     _require_business(db, business_id)
     state = db.get(HealthSignalState, (business_id, signal_id))
@@ -1411,6 +1466,7 @@ def get_signal_explain(db: Session, business_id: str, signal_id: str) -> Dict[st
     evidence = _build_evidence(state.signal_type, state.payload_json)
     detector = _detector_meta(state.signal_type, state)
     related_audits = _list_related_audits(db, business_id, signal_id)
+    next_actions = _next_actions(state, detector, related_audits)
 
     return {
         "business_id": business_id,
@@ -1427,6 +1483,7 @@ def get_signal_explain(db: Session, business_id: str, signal_id: str) -> Dict[st
         "detector": detector,
         "evidence": evidence,
         "related_audits": related_audits,
+        "next_actions": next_actions,
         "links": [
             "/signals",
             f"/app/{business_id}/signals",

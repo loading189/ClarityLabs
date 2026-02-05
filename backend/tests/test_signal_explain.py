@@ -200,3 +200,20 @@ def test_explain_includes_recent_audit_for_status_update(db_session):
     assert explain["state"]["status"] == "resolved"
     audit_ids = [entry["id"] for entry in explain["related_audits"]]
     assert update_payload["audit_id"] in audit_ids
+
+
+def test_explain_includes_deterministic_next_actions(db_session):
+    biz = _create_business(db_session)
+    _seed_expense_creep(db_session, biz.id)
+
+    signals, _ = signals_service.list_signal_states(db_session, biz.id)
+    signal_id = signals[0]["id"]
+
+    explain = signals_service.get_signal_explain(db_session, biz.id, signal_id)
+
+    assert explain["next_actions"]
+    actions = explain["next_actions"]
+    assert [item["action"] for item in actions] == sorted(
+        [item["action"] for item in actions], key=lambda action: {"acknowledge": 0, "snooze": 1, "resolve": 2}[action]
+    )
+    assert actions[0]["requires_reason"] is True

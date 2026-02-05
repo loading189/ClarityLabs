@@ -114,6 +114,17 @@ export type SignalExplainEvidence = {
   } | null;
 };
 
+
+export type SignalExplainNextAction = {
+  key: string;
+  label: string;
+  action: "acknowledge" | "snooze" | "resolve" | null;
+  suggested_snooze_minutes?: number | null;
+  requires_reason: boolean;
+  rationale: string;
+  guardrails?: string[] | null;
+};
+
 export type SignalExplainAudit = {
   id: string;
   event_type: string;
@@ -147,6 +158,7 @@ export type SignalExplainOut = {
   };
   evidence: SignalExplainEvidence[];
   related_audits: SignalExplainAudit[];
+  next_actions: SignalExplainNextAction[];
   links: string[];
 };
 
