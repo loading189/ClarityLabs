@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
+import { fetchAssistantThread, postAssistantMessage, type AssistantThreadMessage } from "../../api/assistantThread";
 import { listChanges, type ChangeEvent } from "../../api/changes";
-import { fetchHealthScore, type HealthScoreOut } from "../../api/healthScore";
+import {
+  fetchHealthScore,
+  fetchHealthScoreExplainChange,
+  type HealthScoreExplainChangeOut,
+  type HealthScoreOut,
+} from "../../api/healthScore";
 import {
   getSignalExplain,
   listSignalStates,
@@ -11,15 +17,6 @@ import {
 } from "../../api/signals";
 import { useAppState } from "../../app/state/appState";
 import styles from "./AssistantPage.module.css";
-
-type ThreadMessage = {
-  id: string;
-  type: "system" | "summary" | "explain" | "action_result";
-  created_at: string;
-  payload: Record<string, unknown>;
-};
-
-const THREAD_CAP = 200;
 
 function formatDate(value?: string | null) {
   if (!value) return "—";
@@ -41,10 +38,6 @@ function actionToStatus(action: SignalExplainOut["next_actions"][number]["action
   return "in_progress" as const;
 }
 
-function threadKey(businessId: string) {
-  return `clarity.assistant.thread.${businessId}`;
-}
-
 export default function AssistantPage() {
   const { businessId: businessIdParam } = useParams();
   const [searchParams] = useSearchParams();
@@ -57,79 +50,37 @@ export default function AssistantPage() {
   const [healthScore, setHealthScore] = useState<HealthScoreOut | null>(null);
   const [selectedSignalId, setSelectedSignalId] = useState<string | null>(initialSignalId);
   const [explain, setExplain] = useState<SignalExplainOut | null>(null);
-  const [thread, setThread] = useState<ThreadMessage[]>([]);
+  const [thread, setThread] = useState<AssistantThreadMessage[]>([]);
+  const [scoreExplain, setScoreExplain] = useState<HealthScoreExplainChangeOut | null>(null);
   const [actor, setActor] = useState("analyst");
   const [reason, setReason] = useState("");
 
   useEffect(() => setActiveBusinessId(businessId || null), [businessId, setActiveBusinessId]);
 
-  useEffect(() => {
-    if (!businessId) return;
-    const raw = localStorage.getItem(threadKey(businessId));
-    if (!raw) {
-      setThread([
-        {
-          id: "system-initial",
-          type: "system",
-          created_at: new Date().toISOString(),
-          payload: { text: "Here’s what matters right now." },
-        },
-      ]);
-      return;
-    }
-    try {
-      const parsed = JSON.parse(raw) as ThreadMessage[];
-      setThread(parsed.slice(-THREAD_CAP));
-    } catch {
-      setThread([]);
-    }
-  }, [businessId]);
-
-  useEffect(() => {
-    if (!businessId) return;
-    localStorage.setItem(threadKey(businessId), JSON.stringify(thread.slice(-THREAD_CAP)));
-  }, [businessId, thread]);
-
-  const appendMessage = useCallback((message: Omit<ThreadMessage, "id" | "created_at">) => {
-    setThread((prev) => {
-      const next = [
-        ...prev,
-        {
-          ...message,
-          id: `${message.type}-${Date.now()}-${prev.length}`,
-          created_at: new Date().toISOString(),
-        },
-      ];
-      return next.slice(-THREAD_CAP);
-    });
-  }, []);
-
   const loadAll = useCallback(async () => {
     if (!businessId) return;
-    const [signalsData, scoreData, changesData] = await Promise.all([
+    const [signalsData, scoreData, changesData, scoreChangeData] = await Promise.all([
       listSignalStates(businessId),
       fetchHealthScore(businessId),
       listChanges(businessId, 10),
+      fetchHealthScoreExplainChange(businessId, 72, 20),
     ]);
     setSignals(signalsData.signals ?? []);
     setHealthScore(scoreData);
     setChanges(changesData ?? []);
+    setScoreExplain(scoreChangeData);
+  }, [businessId]);
+
+  const loadThread = useCallback(async () => {
+    if (!businessId) return;
+    const rows = await fetchAssistantThread(businessId, 200);
+    setThread(rows);
   }, [businessId]);
 
   useEffect(() => {
     loadAll();
-  }, [loadAll]);
-
-  const loadExplain = useCallback(
-    async (signalId: string, source: "priority" | "change") => {
-      if (!businessId) return;
-      const data = await getSignalExplain(businessId, signalId);
-      setExplain(data);
-      setSelectedSignalId(signalId);
-      appendMessage({ type: "explain", payload: { signal_id: signalId, source, explain: data } });
-    },
-    [appendMessage, businessId]
-  );
+    loadThread();
+  }, [loadAll, loadThread]);
 
   const topPriorities = useMemo(() => {
     const penalties = new Map((healthScore?.contributors ?? []).map((row) => [row.signal_id, row.penalty]));
@@ -141,13 +92,61 @@ export default function AssistantPage() {
       }))
       .sort((a, b) => {
         if (b.priority !== a.priority) return b.priority - a.priority;
-        if ((b.severity ?? "").localeCompare(a.severity ?? "") !== 0) {
-          return (b.severity ?? "").localeCompare(a.severity ?? "");
-        }
+        if ((b.severity ?? "").localeCompare(a.severity ?? "") !== 0) return (b.severity ?? "").localeCompare(a.severity ?? "");
         return a.id.localeCompare(b.id);
       })
       .slice(0, 5);
   }, [healthScore?.contributors, signals]);
+
+  const seedThreadIfEmpty = useCallback(async () => {
+    if (!businessId || thread.length !== 0 || !healthScore) return;
+    await postAssistantMessage(businessId, {
+      author: "system",
+      kind: "summary",
+      content_json: { text: "Here’s what matters right now.", score: healthScore.score },
+    });
+    await postAssistantMessage(businessId, {
+      author: "assistant",
+      kind: "priority",
+      content_json: { top_signal_ids: topPriorities.map((row) => row.id) },
+    });
+    await loadThread();
+  }, [businessId, healthScore, loadThread, thread.length, topPriorities]);
+
+  useEffect(() => {
+    seedThreadIfEmpty();
+  }, [seedThreadIfEmpty]);
+
+  const appendExplainMessage = useCallback(
+    async (signalId: string, source: "priority" | "change" | "score_change") => {
+      if (!businessId) return;
+      const data = await getSignalExplain(businessId, signalId);
+      setExplain(data);
+      setSelectedSignalId(signalId);
+      await postAssistantMessage(businessId, {
+        author: "assistant",
+        kind: "explain",
+        signal_id: signalId,
+        content_json: { signal_id: signalId, source },
+      });
+      await loadThread();
+    },
+    [businessId, loadThread]
+  );
+
+  const appendScoreChangeSummary = useCallback(async () => {
+    if (!businessId || !scoreExplain) return;
+    await postAssistantMessage(businessId, {
+      author: "assistant",
+      kind: "changes",
+      content_json: {
+        headline: scoreExplain.summary.headline,
+        top_drivers: scoreExplain.summary.top_drivers,
+        impacts: scoreExplain.impacts,
+      },
+    });
+    await loadThread();
+  }, [businessId, scoreExplain, loadThread]);
 
   const handleAction = async (action: SignalExplainOut["next_actions"][number]) => {
     if (!businessId || !selectedSignalId || !actor.trim() || !reason.trim()) return;
@@ -156,9 +155,12 @@ export default function AssistantPage() {
       actor,
       reason,
     });
-    appendMessage({
-      type: "action_result",
-      payload: {
+    await postAssistantMessage(businessId, {
+      author: "assistant",
+      kind: "action_result",
+      signal_id: selectedSignalId,
+      audit_id: result.audit_id,
+      content_json: {
         signal_id: selectedSignalId,
         audit_id: result.audit_id,
         status: result.status,
@@ -166,8 +168,7 @@ export default function AssistantPage() {
       },
     });
     setReason("");
-    await loadAll();
-    await loadExplain(selectedSignalId, "priority");
+    await Promise.all([loadAll(), loadThread(), appendExplainMessage(selectedSignalId, "priority")]);
   };
 
   if (!businessId) {
@@ -191,7 +192,7 @@ export default function AssistantPage() {
         <div className={styles.card}>
           <div className={styles.cardTitle}>Top priorities</div>
           {topPriorities.map((signal, index) => (
-            <button key={signal.id} className={styles.alertRow} onClick={() => loadExplain(signal.id, "priority")}>
+            <button key={signal.id} className={styles.alertRow} onClick={() => appendExplainMessage(signal.id, "priority")}>
               {index + 1}. {signal.title ?? signal.id}
             </button>
           ))}
@@ -200,27 +201,58 @@ export default function AssistantPage() {
         <div className={styles.card}>
           <div className={styles.cardTitle}>Recent changes</div>
           {changes.slice(0, 10).map((change) => (
-            <button key={change.id} className={styles.alertRow} onClick={() => loadExplain(change.signal_id, "change")}>
-              <div>{change.type.replace(/_/g, " ")} · {change.title ?? change.signal_id}</div>
-              <div className={styles.muted}>{formatDate(change.occurred_at)} {change.actor ? `· ${change.actor}` : ""}</div>
+            <button key={change.id} className={styles.alertRow} onClick={() => appendExplainMessage(change.signal_id, "change")}>
+              <div>
+                {change.type.replace(/_/g, " ")} · {change.title ?? change.signal_id}
+              </div>
+              <div className={styles.muted}>
+                {formatDate(change.occurred_at)} {change.actor ? `· ${change.actor}` : ""}
+              </div>
             </button>
           ))}
+        </div>
+
+        <div className={styles.card}>
+          <div className={styles.cardTitle}>Score changed because…</div>
+          <button className={styles.alertRow} onClick={appendScoreChangeSummary}>
+            {scoreExplain?.summary.headline ?? "No recent score-impacting changes."}
+          </button>
         </div>
       </div>
 
       <div className={styles.mainPanel}>
         {thread.map((message) => (
           <div key={message.id} className={styles.card}>
-            <div className={styles.cardTitle}>{message.type.replace("_", " ")}</div>
-            {message.type === "system" && <p>{String(message.payload.text ?? "")}</p>}
-            {message.type === "explain" && (
+            <div className={styles.cardTitle}>{message.kind.replace("_", " ")}</div>
+            {message.kind === "summary" && <p>{String(message.content_json.text ?? "")}</p>}
+            {message.kind === "priority" && <p>Current priorities are loaded from deterministic signal ranking.</p>}
+            {message.kind === "changes" && (
               <div>
-                <div>{(message.payload.explain as SignalExplainOut)?.detector?.title}</div>
-                <div className={styles.muted}>Signal {(message.payload.signal_id as string) ?? ""}</div>
+                <div>{String(message.content_json.headline ?? "")}</div>
+                <ul>
+                  {((message.content_json.top_drivers as string[] | undefined) ?? []).map((driver) => (
+                    <li key={driver}>{driver}</li>
+                  ))}
+                </ul>
+                <ul>
+                  {((message.content_json.impacts as HealthScoreExplainChangeOut["impacts"] | undefined) ?? []).map((impact) => (
+                    <li key={`${impact.signal_id}-${impact.change_type}`}>
+                      <button className={styles.alertRow} onClick={() => appendExplainMessage(impact.signal_id, "score_change")}>
+                        {impact.signal_id} · {impact.change_type.replace(/_/g, " ")} · {impact.estimated_penalty_delta}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
-            {message.type === "action_result" && (
-              <div>Updated to {String(message.payload.status)} (audit {String(message.payload.audit_id)}).</div>
+            {message.kind === "explain" && (
+              <div>
+                <div>{message.signal_id ? `Signal ${message.signal_id}` : "Signal"}</div>
+                <div className={styles.muted}>Open explain card for deterministic evidence and actions.</div>
+              </div>
+            )}
+            {message.kind === "action_result" && (
+              <div>Updated to {String(message.content_json.status)} (audit {String(message.audit_id)}).</div>
             )}
           </div>
         ))}

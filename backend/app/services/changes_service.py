@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import HTTPException
@@ -108,5 +109,64 @@ def list_changes(db: Session, business_id: str, limit: int = 50) -> List[Dict[st
             }
         )
         if len(changes) >= limit:
+            break
+    return changes
+
+
+def list_changes_window(db: Session, business_id: str, *, since_hours: int = 72, limit: int = 50) -> List[Dict[str, Any]]:
+    _require_business(db, business_id)
+    bounded_limit = max(1, min(limit, 200))
+    since = datetime.now(timezone.utc) - timedelta(hours=max(1, since_hours))
+    rows = (
+        db.execute(
+            select(AuditLog)
+            .where(
+                AuditLog.business_id == business_id,
+                AuditLog.created_at >= since,
+            )
+            .order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
+            .limit(bounded_limit * 3)
+        )
+        .scalars()
+        .all()
+    )
+
+    changes: List[Dict[str, Any]] = []
+    for row in rows:
+        event_type = _event_type(row)
+        if not event_type:
+            continue
+        signal_id = _signal_id_from_audit(row)
+        if not signal_id:
+            continue
+
+        state = _state_from_audit(row)
+        signal_type = state.get("signal_type")
+        catalog = SIGNAL_CATALOG.get(signal_type or "", {})
+        title = state.get("title") or catalog.get("title")
+        severity = state.get("severity")
+        domain = catalog.get("domain")
+        status = state.get("status")
+
+        changes.append(
+            {
+                "id": row.id,
+                "occurred_at": row.created_at.isoformat() if row.created_at else None,
+                "type": event_type,
+                "business_id": business_id,
+                "signal_id": signal_id,
+                "severity": severity,
+                "domain": domain,
+                "title": title,
+                "actor": row.actor,
+                "reason": row.reason,
+                "summary": _summary(event_type, title or signal_id, status),
+                "links": {
+                    "assistant": f"/app/{business_id}/assistant?signalId={signal_id}",
+                    "signals": f"/app/{business_id}/signals?signalId={signal_id}",
+                },
+            }
+        )
+        if len(changes) >= bounded_limit:
             break
     return changes
