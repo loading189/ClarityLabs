@@ -284,9 +284,9 @@ def _count_states(states: List[HealthSignalState]) -> Dict[str, Dict[str, int]]:
     return {"by_status": by_status, "by_severity": by_severity}
 
 
-def pulse(db: Session, business_id: str) -> Dict[str, Any]:
+def pulse(db: Session, business_id: str, now: Optional[datetime] = None) -> Dict[str, Any]:
     require_business(db, business_id)
-    now = _now()
+    now = _normalize_dt(now) or _now()
 
     newest_event_at = db.execute(
         select(func.max(RawEvent.occurred_at)).where(RawEvent.business_id == business_id)
