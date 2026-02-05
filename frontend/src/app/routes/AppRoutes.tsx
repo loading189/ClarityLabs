@@ -1,11 +1,9 @@
 // frontend/src/app/routes/AppRoutes.tsx
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useSearchParams } from "react-router-dom";
 import AppLayout from "../layout/AppLayout";
 import AdminSimulatorPage from "./AdminSimulatorPage";
 import CategorizePage from "./CategorizePage";
 import DashboardPage from "./DashboardPage";
-import HealthPage from "./HealthPage";
-import HomePage from "./HomePage";
 import IntegrationsPage from "./IntegrationsPage";
 import LedgerPage from "../../features/ledger/LedgerPage";
 import RulesPage from "./RulesPage";
@@ -19,6 +17,20 @@ import OnboardingWizardPage from "./OnboardingWizardPage";
 import ErrorBoundary from "../../components/common/ErrorBoundary";
 import AssistantPage from "./AssistantPage";
 
+
+function AssistantCompatRedirect() {
+  const [searchParams] = useSearchParams();
+  const businessId = searchParams.get("businessId")?.trim();
+  const signalId = searchParams.get("signalId")?.trim();
+
+  if (!businessId) {
+    return <Navigate to="/app" replace />;
+  }
+
+  const nextSearch = signalId ? `?signalId=${encodeURIComponent(signalId)}` : "";
+  return <Navigate to={`/app/${businessId}/assistant${nextSearch}`} replace />;
+}
+
 export default function AppRoutes() {
   return (
     <ErrorBoundary>
@@ -29,12 +41,13 @@ export default function AppRoutes() {
         <Route path="/app" element={<AppIndexRedirect />} />
         <Route path="/app/select" element={<BusinessSelectPage />} />
         <Route path="/onboarding" element={<OnboardingWizardPage />} />
-        <Route path="/assistant" element={<AssistantPage />} />
+        <Route path="/assistant" element={<AssistantCompatRedirect />} />
 
         {/* workspace */}
         <Route path="/app/:businessId" element={<AppLayout />}>
-          <Route path="home" element={<HomePage />} />
-          <Route path="health" element={<HealthPage />} />
+          <Route path="home" element={<Navigate to="../assistant" replace />} />
+          <Route path="health" element={<Navigate to="../assistant" replace />} />
+          <Route path="assistant" element={<AssistantPage />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="signals" element={<SignalsCenterPage />} />
           <Route path="ledger" element={<LedgerPage />} />
@@ -45,7 +58,7 @@ export default function AppRoutes() {
           <Route path="integrations" element={<IntegrationsPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="admin/simulator" element={<AdminSimulatorPage />} />
-          <Route path="*" element={<Navigate to="dashboard" replace />} />
+          <Route path="*" element={<Navigate to="assistant" replace />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/app" replace />} />

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
   getSignalExplain,
   listSignalStates,
@@ -64,8 +64,10 @@ function buildLedgerFilters(
 }
 
 export default function AssistantPage() {
+  const { businessId: businessIdParam } = useParams();
   const [searchParams] = useSearchParams();
-  const businessId = searchParams.get("businessId")?.trim() ?? "";
+  const businessId =
+    businessIdParam?.trim() || searchParams.get("businessId")?.trim() || "";
   const initialSignalId = searchParams.get("signalId")?.trim() || null;
   const { setActiveBusinessId } = useAppState();
 

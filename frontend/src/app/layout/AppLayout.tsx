@@ -9,17 +9,19 @@ import ErrorBoundary from "../../components/common/ErrorBoundary";
 type NavItem = { label: string; path: string };
 
 const primaryNav: NavItem[] = [
-  { label: "Home", path: "home" },
-  { label: "Health", path: "health" },
+  { label: "Assistant", path: "assistant" },
   { label: "Signals", path: "signals" },
-  { label: "Dashboard", path: "dashboard" },
   { label: "Ledger", path: "ledger" },
-  { label: "Trends", path: "trends" },
-  { label: "Vendors", path: "vendors" },
+];
+
+const secondaryNav: NavItem[] = [
   { label: "Categorize", path: "categorize" },
   { label: "Rules", path: "rules" },
+  { label: "Vendors", path: "vendors" },
   { label: "Integrations", path: "integrations" },
   { label: "Settings", path: "settings" },
+  { label: "Trends", path: "trends" },
+  { label: "Dashboard", path: "dashboard" },
 ];
 
 const adminNav: NavItem[] = [{ label: "Simulator", path: "admin/simulator" }];
@@ -90,7 +92,8 @@ export default function AppLayout() {
           </div>
         </div>
 
-        <NavSection items={primaryNav} businessId={businessId} />
+        <NavSection title="Workspace" items={primaryNav} businessId={businessId} />
+        <NavSection title="Tools" items={secondaryNav} businessId={businessId} />
         <NavSection title="Admin" items={adminNav} businessId={businessId} />
       </aside>
 

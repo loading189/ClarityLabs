@@ -155,7 +155,7 @@ describe("SignalsCenter", () => {
     const assistantLink = await screen.findByRole("link", { name: /Send to Assistant/i });
     expect(assistantLink).toHaveAttribute(
       "href",
-      "/assistant?businessId=biz-1&signalId=sig-1"
+      "/app/biz-1/assistant?signalId=sig-1"
     );
   });
 });

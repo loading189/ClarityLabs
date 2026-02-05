@@ -535,7 +535,7 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
               {detail && (
                 <Link
                   className={styles.secondaryButton}
-                  to={`/assistant?businessId=${businessId}&signalId=${detail.id}`}
+                  to={`/app/${businessId}/assistant?signalId=${detail.id}`}
                 >
                   Send to Assistant
                 </Link>
