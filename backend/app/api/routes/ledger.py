@@ -12,6 +12,7 @@ from backend.app.db import get_db
 from backend.app.services import ledger_service
 
 router = APIRouter(prefix="/ledger", tags=["ledger"])
+api_router = APIRouter(prefix="/api/ledger", tags=["ledger"])
 
 Direction = Literal["inflow", "outflow"]
 
@@ -84,6 +85,44 @@ class LedgerTraceTxnOut(BaseModel):
     category_name: Optional[str] = None
     account_name: Optional[str] = None
     counterparty_hint: Optional[str] = None
+
+
+class LedgerQueryRowOut(BaseModel):
+    occurred_at: datetime
+    date: date
+    description: str
+    vendor: str
+    amount: float
+    category: str
+    account: str
+    balance: float
+    source_event_id: str
+
+
+class LedgerSummaryOut(BaseModel):
+    start_balance: float
+    end_balance: float
+    total_in: float
+    total_out: float
+    row_count: int
+
+
+class LedgerQueryOut(BaseModel):
+    rows: List[LedgerQueryRowOut]
+    summary: LedgerSummaryOut
+
+
+class LedgerDimensionAccountOut(BaseModel):
+    account: str
+    label: str
+    count: int
+    total: float
+
+
+class LedgerDimensionVendorOut(BaseModel):
+    vendor: str
+    count: int
+    total: float
 
 
 # -------------------------
@@ -162,3 +201,61 @@ def balance_sheet_v1(
     db: Session = Depends(get_db),
 ):
     return ledger_service.balance_sheet_v1(db, business_id, as_of, starting_cash)
+
+
+@api_router.get("", response_model=LedgerQueryOut)
+def ledger_query(
+    business_id: str = Query(...),
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
+    account: Optional[List[str]] = Query(None),
+    vendor: Optional[List[str]] = Query(None),
+    search: Optional[str] = Query(None),
+    limit: int = Query(200, ge=1, le=2000),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
+    payload = ledger_service.ledger_query(
+        db,
+        business_id,
+        start_date=start_date,
+        end_date=end_date,
+        accounts=account,
+        vendors=vendor,
+        search=search,
+        limit=limit,
+        offset=offset,
+    )
+    return {"rows": payload["rows"], "summary": payload["summary"]}
+
+
+@api_router.get("/dimensions/accounts", response_model=List[LedgerDimensionAccountOut])
+def ledger_dimensions_accounts(
+    business_id: str = Query(...),
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
+    db: Session = Depends(get_db),
+):
+    return ledger_service.ledger_dimensions(
+        db,
+        business_id,
+        start_date=start_date,
+        end_date=end_date,
+        dimension="accounts",
+    )
+
+
+@api_router.get("/dimensions/vendors", response_model=List[LedgerDimensionVendorOut])
+def ledger_dimensions_vendors(
+    business_id: str = Query(...),
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
+    db: Session = Depends(get_db),
+):
+    return ledger_service.ledger_dimensions(
+        db,
+        business_id,
+        start_date=start_date,
+        end_date=end_date,
+        dimension="vendors",
+    )

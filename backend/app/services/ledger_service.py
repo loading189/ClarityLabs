@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 import logging
 from typing import List, Optional, Literal, Dict, Iterable, Any
 
@@ -53,6 +53,157 @@ def _build_cash_series(
         bal += signed_amount(txn.amount or 0.0, txn.direction)
         out.append({"occurred_at": txn.occurred_at, "balance": round(bal, 2)})
     return out
+
+
+def default_ledger_window() -> tuple[date, date]:
+    end = datetime.now(timezone.utc).date()
+    start = end - timedelta(days=90)
+    return start, end
+
+
+def _ledger_join_rows(db: Session, business_id: str):
+    stmt = (
+        select(TxnCategorization, RawEvent, Category, Account)
+        .join(RawEvent, and_(
+            RawEvent.business_id == TxnCategorization.business_id,
+            RawEvent.source_event_id == TxnCategorization.source_event_id,
+        ))
+        .join(Category, Category.id == TxnCategorization.category_id)
+        .join(Account, Account.id == Category.account_id)
+        .where(TxnCategorization.business_id == business_id)
+        .order_by(RawEvent.occurred_at.asc(), RawEvent.source_event_id.asc())
+    )
+    return db.execute(stmt).all()
+
+
+def _vendor_label(txn) -> str:
+    return (txn.counterparty_hint or txn.description or "Unknown").strip() or "Unknown"
+
+
+def _matches_any(value: str, candidates: Optional[List[str]]) -> bool:
+    if not candidates:
+        return True
+    normalized = value.strip().lower()
+    return any(normalized == item.strip().lower() for item in candidates if item and item.strip())
+
+
+def ledger_query(
+    db: Session,
+    business_id: str,
+    *,
+    start_date: Optional[date],
+    end_date: Optional[date],
+    accounts: Optional[List[str]] = None,
+    vendors: Optional[List[str]] = None,
+    search: Optional[str] = None,
+    limit: int = 200,
+    offset: int = 0,
+) -> Dict[str, Any]:
+    require_business(db, business_id)
+    if not start_date or not end_date:
+        start_date, end_date = default_ledger_window()
+
+    base_rows = _ledger_join_rows(db, business_id)
+    q = (search or "").strip().lower()
+    filtered: List[Dict[str, Any]] = []
+    start_balance = 0.0
+
+    for _, ev, cat, acct in base_rows:
+        txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
+        amount = signed_amount(txn.amount or 0.0, txn.direction)
+        vendor = _vendor_label(txn)
+        account = (acct.name or "").strip() or "Unknown"
+        account_id = acct.id
+        category = (cat.name or "").strip() or "Uncategorized"
+
+        if ev.occurred_at.date() < start_date:
+            start_balance += amount
+            continue
+        if ev.occurred_at.date() > end_date:
+            continue
+        if not (_matches_any(account, accounts) or _matches_any(account_id, accounts)):
+            continue
+        if not _matches_any(vendor, vendors):
+            continue
+        if q:
+            haystack = f"{txn.description} {vendor} {account} {category}".lower()
+            if q not in haystack:
+                continue
+
+        filtered.append(
+            {
+                "occurred_at": ev.occurred_at,
+                "date": ev.occurred_at.date(),
+                "description": txn.description,
+                "vendor": vendor,
+                "amount": round(amount, 2),
+                "category": category,
+                "account": account,
+                "balance": 0.0,
+                "source_event_id": ev.source_event_id,
+            }
+        )
+
+    balance = start_balance
+    total_in = 0.0
+    total_out = 0.0
+    for row in filtered:
+        amount = float(row["amount"])
+        balance += amount
+        row["balance"] = round(balance, 2)
+        if amount >= 0:
+            total_in += amount
+        else:
+            total_out += abs(amount)
+
+    page = filtered[offset: offset + limit]
+    return {
+        "rows": page,
+        "summary": {
+            "start_balance": round(start_balance, 2),
+            "end_balance": round(balance, 2),
+            "total_in": round(total_in, 2),
+            "total_out": round(total_out, 2),
+            "row_count": len(filtered),
+        },
+        "window": {"start_date": start_date, "end_date": end_date},
+    }
+
+
+def ledger_dimensions(
+    db: Session,
+    business_id: str,
+    *,
+    start_date: Optional[date],
+    end_date: Optional[date],
+    dimension: Literal["accounts", "vendors"],
+) -> List[Dict[str, Any]]:
+    payload = ledger_query(
+        db,
+        business_id,
+        start_date=start_date,
+        end_date=end_date,
+        limit=100000,
+        offset=0,
+    )
+    groups: Dict[str, Dict[str, Any]] = {}
+    for row in payload["rows"]:
+        if dimension == "accounts":
+            key = str(row["account"])
+            label = key
+            item = groups.setdefault(key, {"account": key, "label": label, "count": 0, "total": 0.0})
+        else:
+            key = str(row["vendor"])
+            label = key
+            item = groups.setdefault(key, {"vendor": key, "label": label, "count": 0, "total": 0.0})
+        item["count"] += 1
+        item["total"] += float(row["amount"])
+
+    values = list(groups.values())
+    for item in values:
+        item["total"] = round(float(item["total"]), 2)
+    values.sort(key=lambda item: (-int(item["count"]), str(item["label"]).lower()))
+    return values
 
 
 def ledger_lines(

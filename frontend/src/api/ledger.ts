@@ -49,6 +49,44 @@ export type LedgerTraceTxn = {
   counterparty_hint?: string | null;
 };
 
+export type LedgerQueryRow = {
+  occurred_at: string;
+  date: string;
+  description: string;
+  vendor: string;
+  amount: number;
+  category: string;
+  account: string;
+  balance: number;
+  source_event_id: string;
+};
+
+export type LedgerQuerySummary = {
+  start_balance: number;
+  end_balance: number;
+  total_in: number;
+  total_out: number;
+  row_count: number;
+};
+
+export type LedgerQueryResponse = {
+  rows: LedgerQueryRow[];
+  summary: LedgerQuerySummary;
+};
+
+export type LedgerDimensionAccount = {
+  account: string;
+  label: string;
+  count: number;
+  total: number;
+};
+
+export type LedgerDimensionVendor = {
+  vendor: string;
+  count: number;
+  total: number;
+};
+
 function toNumber(value: unknown, fallback = 0): number {
   const n = typeof value === "number" ? value : Number(value);
   return Number.isFinite(n) ? n : fallback;
@@ -156,4 +194,61 @@ export async function fetchLedgerTransactions(
   }
   const payload = await res.json();
   return Array.isArray(payload) ? payload : [];
+}
+
+export async function fetchLedgerQuery(
+  businessId: string,
+  query: {
+    start_date?: string;
+    end_date?: string;
+    account?: string[];
+    vendor?: string[];
+    search?: string;
+    limit?: number;
+    offset?: number;
+  },
+  signal?: AbortSignal
+): Promise<LedgerQueryResponse> {
+  const params = new URLSearchParams();
+  params.set("business_id", businessId);
+  if (query.start_date) params.set("start_date", query.start_date);
+  if (query.end_date) params.set("end_date", query.end_date);
+  (query.account ?? []).forEach((value) => params.append("account", value));
+  (query.vendor ?? []).forEach((value) => params.append("vendor", value));
+  if (query.search) params.set("search", query.search);
+  if (query.limit != null) params.set("limit", String(query.limit));
+  if (query.offset != null) params.set("offset", String(query.offset));
+
+  const res = await fetch(`${API_BASE}/api/ledger?${params.toString()}`, { signal });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(body || `Ledger query failed (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function fetchLedgerAccountDimensions(
+  businessId: string,
+  query: { start_date?: string; end_date?: string },
+  signal?: AbortSignal
+): Promise<LedgerDimensionAccount[]> {
+  const params = new URLSearchParams({ business_id: businessId });
+  if (query.start_date) params.set("start_date", query.start_date);
+  if (query.end_date) params.set("end_date", query.end_date);
+  const res = await fetch(`${API_BASE}/api/ledger/dimensions/accounts?${params.toString()}`, { signal });
+  if (!res.ok) throw new Error(`Ledger account dimensions failed (${res.status})`);
+  return res.json();
+}
+
+export async function fetchLedgerVendorDimensions(
+  businessId: string,
+  query: { start_date?: string; end_date?: string },
+  signal?: AbortSignal
+): Promise<LedgerDimensionVendor[]> {
+  const params = new URLSearchParams({ business_id: businessId });
+  if (query.start_date) params.set("start_date", query.start_date);
+  if (query.end_date) params.set("end_date", query.end_date);
+  const res = await fetch(`${API_BASE}/api/ledger/dimensions/vendors?${params.toString()}`, { signal });
+  if (!res.ok) throw new Error(`Ledger vendor dimensions failed (${res.status})`);
+  return res.json();
 }

@@ -1,4 +1,4 @@
-export type DateWindow = "7" | "30" | "90";
+export type DateWindow = "7" | "30" | "90" | "365" | "custom";
 
 export type FilterState = {
   start?: string;
@@ -6,6 +6,7 @@ export type FilterState = {
   window?: DateWindow;
   account?: string;
   category?: string;
+  vendor?: string;
   q?: string;
   direction?: "inflow" | "outflow";
 };
@@ -20,7 +21,7 @@ export const DEFAULT_WINDOW: DateWindow = "30";
 export function parseFilters(params: URLSearchParams): FilterState {
   const windowParam = params.get("window");
   const windowValue =
-    windowParam === "7" || windowParam === "30" || windowParam === "90"
+    windowParam === "7" || windowParam === "30" || windowParam === "90" || windowParam === "365" || windowParam === "custom"
       ? windowParam
       : undefined;
 
@@ -34,6 +35,7 @@ export function parseFilters(params: URLSearchParams): FilterState {
     window: windowValue,
     account: params.get("account") ?? undefined,
     category: params.get("category") ?? undefined,
+    vendor: params.get("vendor") ?? undefined,
     q: params.get("q") ?? undefined,
     direction,
   };
@@ -46,6 +48,7 @@ export function buildSearchParams(filters: FilterState) {
   if (filters.window) params.set("window", filters.window);
   if (filters.account) params.set("account", filters.account);
   if (filters.category) params.set("category", filters.category);
+  if (filters.vendor) params.set("vendor", filters.vendor);
   if (filters.q) params.set("q", filters.q);
   if (filters.direction) params.set("direction", filters.direction);
   return params;
@@ -60,6 +63,12 @@ function formatDate(date: Date) {
 
 export function getDateRangeForWindow(window: DateWindow) {
   const days = Number(window);
+  if (window === "custom") {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - 90);
+    return { start: formatDate(start), end: formatDate(end) };
+  }
   const end = new Date();
   const start = new Date();
   start.setDate(end.getDate() - days);
