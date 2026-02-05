@@ -1,6 +1,15 @@
 import { apiGet, apiPost } from "./client";
 
-export type SignalSeverity = "green" | "yellow" | "red";
+export type SignalSeverity =
+  | "green"
+  | "yellow"
+  | "red"
+  | "info"
+  | "warning"
+  | "critical"
+  | "low"
+  | "medium"
+  | "high";
 
 export interface Signal {
   id: string;

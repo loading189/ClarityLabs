@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.models import (
     Account,
+    AuditLog,
     Business,
     Category,
     HealthSignalState,
@@ -26,6 +27,25 @@ MONITOR_SIGNAL_TYPES = {
     "expense_creep_by_vendor",
     "low_cash_runway",
     "unusual_outflow_spike",
+    "liquidity.runway_low",
+    "liquidity.cash_trend_down",
+    "revenue.decline_vs_baseline",
+    "revenue.volatility_spike",
+    "expense.spike_vs_baseline",
+    "expense.new_recurring",
+    "timing.inflow_outflow_mismatch",
+    "timing.payroll_rent_cliff",
+    "concentration.revenue_top_customer",
+    "concentration.expense_top_vendor",
+    "hygiene.uncategorized_high",
+    "hygiene.signal_flapping",
+}
+
+FLAPPING_EVENT_TYPES = {
+    "signal_detected",
+    "signal_updated",
+    "signal_resolved",
+    "signal_status_changed",
 }
 
 
@@ -101,6 +121,35 @@ def _fetch_posted_transactions(db: Session, business_id: str) -> List[Normalized
             )
         )
     return txns
+
+
+def _fetch_signal_audit_entries(
+    db: Session,
+    business_id: str,
+    since: datetime,
+) -> List[Dict[str, object]]:
+    rows = (
+        db.execute(
+            select(AuditLog)
+            .where(
+                AuditLog.business_id == business_id,
+                AuditLog.event_type.in_(FLAPPING_EVENT_TYPES),
+                AuditLog.created_at >= since,
+            )
+            .order_by(AuditLog.created_at.asc(), AuditLog.id.asc())
+        )
+        .scalars()
+        .all()
+    )
+    return [
+        {
+            "id": row.id,
+            "event_type": row.event_type,
+            "created_at": row.created_at,
+            "after_state": row.after_state,
+        }
+        for row in rows
+    ]
 
 
 def _get_or_create_runtime(db: Session, business_id: str) -> MonitorRuntime:
@@ -266,7 +315,8 @@ def pulse(db: Session, business_id: str) -> Dict[str, Any]:
         }
 
     txns = _fetch_posted_transactions(db, business_id)
-    detected = run_v2_detectors(business_id, txns)
+    audit_entries = _fetch_signal_audit_entries(db, business_id, now - timedelta(days=14))
+    detected = run_v2_detectors(business_id, txns, audit_entries=audit_entries)
     touched = _upsert_signal_states(db, business_id, detected, now)
 
     runtime.last_pulse_at = now

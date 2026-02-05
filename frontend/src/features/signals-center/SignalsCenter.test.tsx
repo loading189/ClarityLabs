@@ -46,6 +46,26 @@ const getSignalDetail = vi.fn().mockResolvedValue({
 const updateSignalStatus = vi.fn();
 const getAuditLog = vi.fn().mockResolvedValue({ items: [], next_cursor: null });
 const fetchSignals = vi.fn();
+const fetchHealthScore = vi.fn().mockResolvedValue({
+  business_id: "biz-1",
+  score: 82,
+  generated_at: new Date("2024-05-02T10:00:00Z").toISOString(),
+  domains: [
+    { domain: "liquidity", score: 74, penalty: 26, contributors: [] },
+    { domain: "expense", score: 88, penalty: 12, contributors: [] },
+  ],
+  contributors: [
+    {
+      signal_id: "sig-1",
+      domain: "expense",
+      status: "open",
+      severity: "warning",
+      penalty: 12.5,
+      rationale: "warning expense signal open",
+    },
+  ],
+  meta: { model_version: "health_score_v1", weights: {} },
+});
 
 vi.mock("../../api/signals", () => ({
   listSignalStates: (...args: unknown[]) => listSignalStates(...args),
@@ -56,6 +76,10 @@ vi.mock("../../api/signals", () => ({
 
 vi.mock("../../api/audit", () => ({
   getAuditLog: (...args: unknown[]) => getAuditLog(...args),
+}));
+
+vi.mock("../../api/healthScore", () => ({
+  fetchHealthScore: (...args: unknown[]) => fetchHealthScore(...args),
 }));
 
 describe("SignalsCenter", () => {
@@ -71,6 +95,7 @@ describe("SignalsCenter", () => {
     );
 
     await waitFor(() => expect(listSignalStates).toHaveBeenCalled());
+    await waitFor(() => expect(fetchHealthScore).toHaveBeenCalledWith("biz-1"));
     expect(screen.getByText("Expense creep detected")).toBeInTheDocument();
     expect(screen.getByText("Runway declining")).toBeInTheDocument();
 
@@ -97,6 +122,22 @@ describe("SignalsCenter", () => {
     await waitFor(() => expect(getSignalDetail).toHaveBeenCalledWith("biz-1", "sig-1"));
     expect(screen.getByText(/"vendor": "Acme"/i)).toBeInTheDocument();
     expect(screen.getByText(/"total": 1200/i)).toBeInTheDocument();
+  });
+
+  it("renders health score widget and opens breakdown", async () => {
+    render(
+      <MemoryRouter>
+        <SignalsCenter businessId="biz-1" />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => expect(fetchHealthScore).toHaveBeenCalled());
+    expect(screen.getByText(/Health score/i)).toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /View breakdown/i }));
+
+    expect(screen.getByText(/Contributors/i)).toBeInTheDocument();
   });
 
   it("provides a send to assistant deep link", async () => {

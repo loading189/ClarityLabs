@@ -37,6 +37,18 @@ export type LedgerLinesQuery = {
   limit?: number;
 };
 
+export type LedgerTraceTxn = {
+  occurred_at: string;
+  source_event_id: string;
+  description: string;
+  direction: "inflow" | "outflow";
+  signed_amount: number;
+  display_amount: number;
+  category_name?: string | null;
+  account_name?: string | null;
+  counterparty_hint?: string | null;
+};
+
 function toNumber(value: unknown, fallback = 0): number {
   const n = typeof value === "number" ? value : Number(value);
   return Number.isFinite(n) ? n : fallback;
@@ -122,4 +134,26 @@ export async function fetchLedgerLines(
       ? payload.rows
       : [];
   return rows.map(normalizeLedgerLine);
+}
+
+export async function fetchLedgerTransactions(
+  businessId: string,
+  params: { txn_ids?: string[]; date_start?: string; date_end?: string; limit?: number },
+  signal?: AbortSignal
+): Promise<LedgerTraceTxn[]> {
+  const search = new URLSearchParams();
+  if (params.txn_ids?.length) search.set("txn_ids", params.txn_ids.join(","));
+  if (params.date_start) search.set("date_start", params.date_start);
+  if (params.date_end) search.set("date_end", params.date_end);
+  if (params.limit) search.set("limit", String(params.limit));
+
+  const url = `/ledger/business/${businessId}/transactions?${search.toString()}`;
+  const fullUrl = `${API_BASE}${url}`;
+  const res = await fetch(fullUrl, { signal });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(body || `Ledger transactions request failed (${res.status})`);
+  }
+  const payload = await res.json();
+  return Array.isArray(payload) ? payload : [];
 }

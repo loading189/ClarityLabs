@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import Drawer from "../../components/common/Drawer";
 import { ErrorState, LoadingState } from "../../components/common/DataState";
 import { getAuditLog, type AuditLogOut } from "../../api/audit";
+import { fetchHealthScore, type HealthScoreOut } from "../../api/healthScore";
 import {
   fetchSignals,
   getSignalDetail,
@@ -14,6 +15,7 @@ import {
   type SignalStatus,
 } from "../../api/signals";
 import styles from "./SignalsCenter.module.css";
+import HealthScoreBreakdownDrawer from "../../components/health-score/HealthScoreBreakdownDrawer";
 
 const STATUS_LABELS: Record<string, string> = {
   open: "Open",
@@ -191,6 +193,10 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
     open: false,
     nextStatus: null,
   });
+  const [healthScore, setHealthScore] = useState<HealthScoreOut | null>(null);
+  const [healthScoreLoading, setHealthScoreLoading] = useState(false);
+  const [healthScoreErr, setHealthScoreErr] = useState<string | null>(null);
+  const [breakdownOpen, setBreakdownOpen] = useState(false);
   const [actor, setActor] = useState("");
   const [reason, setReason] = useState("");
   const [savingStatus, setSavingStatus] = useState(false);
@@ -220,9 +226,24 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
     }
   }, [businessId, legacyDateRange.end, legacyDateRange.start, useLegacyV1]);
 
+  const loadHealthScore = useCallback(async () => {
+    if (!businessId) return;
+    setHealthScoreLoading(true);
+    setHealthScoreErr(null);
+    try {
+      const data = await fetchHealthScore(businessId);
+      setHealthScore(data);
+    } catch (e: any) {
+      setHealthScoreErr(e?.message ?? "Failed to load health score");
+    } finally {
+      setHealthScoreLoading(false);
+    }
+  }, [businessId]);
+
   useEffect(() => {
     loadSignals();
-  }, [loadSignals]);
+    loadHealthScore();
+  }, [loadHealthScore, loadSignals]);
 
   useEffect(() => {
     if (useLegacyV1) {
@@ -271,6 +292,10 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
     return { types, severities };
   }, [signals]);
 
+  const signalTitleById = useMemo(() => {
+    return new Map(signals.map((signal) => [signal.id, signal.title ?? signal.id]));
+  }, [signals]);
+
   const filteredSignals = useMemo(() => {
     return signals.filter((signal) => {
       if (statusFilter && signal.status !== statusFilter) return false;
@@ -307,6 +332,7 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
       setToastMsg(`Status updated to ${STATUS_LABELS[result.status] ?? result.status}.`);
       closeStatusModal();
       await loadSignals();
+      await loadHealthScore();
       const detailData = await getSignalDetail(businessId, selected.id);
       setDetail(detailData);
       setSelected((prev) => (prev ? { ...prev, status: result.status } : prev));
@@ -334,6 +360,33 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
 
   return (
     <div className={styles.container}>
+      <div className={styles.scoreHeader}>
+        <div>
+          <div className={styles.scoreTitle}>Health score</div>
+          {healthScoreLoading && <div className={styles.scoreMuted}>Loading…</div>}
+          {healthScoreErr && <div className={styles.scoreError}>{healthScoreErr}</div>}
+          {!healthScoreLoading && !healthScoreErr && healthScore && (
+            <div className={styles.scoreValue}>{Math.round(healthScore.score)}</div>
+          )}
+        </div>
+        {healthScore && (
+          <div className={styles.scoreDomains}>
+            {healthScore.domains.map((domain) => (
+              <span key={domain.domain} className={styles.scorePill}>
+                {domain.domain}: {Math.round(domain.score)}
+              </span>
+            ))}
+          </div>
+        )}
+        <button
+          type="button"
+          className={styles.primaryButton}
+          onClick={() => setBreakdownOpen(true)}
+          disabled={!healthScore}
+        >
+          View breakdown
+        </button>
+      </div>
       <div className={styles.filters}>
         <label className={styles.filterField}>
           Status
@@ -557,6 +610,20 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
           </div>
         </div>
       )}
+
+      <HealthScoreBreakdownDrawer
+        open={breakdownOpen}
+        onClose={() => setBreakdownOpen(false)}
+        score={healthScore}
+        getSignalLabel={(signalId) => signalTitleById.get(signalId) ?? null}
+        onSelectSignal={(signalId) => {
+          const match = signals.find((signal) => signal.id === signalId);
+          if (match && !useLegacyV1) {
+            setSelected(match);
+          }
+          setBreakdownOpen(false);
+        }}
+      />
     </div>
   );
 }
