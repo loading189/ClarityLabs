@@ -12,11 +12,13 @@ from backend.app.services.assistant_plan_service import (
     PlanOut,
     PlanStatusIn,
     PlanStepDoneIn,
+    PlanVerifyOut,
     add_plan_note,
     create_plan,
     list_plans,
     mark_plan_step_done,
     update_plan_status,
+    verify_plan,
 )
 
 router = APIRouter(prefix="/api/assistant/plans", tags=["assistant"])
@@ -66,3 +68,12 @@ def post_plan_status(
     db: Session = Depends(get_db),
 ):
     return update_plan_status(db, business_id, plan_id, req)
+
+
+@router.get("/{plan_id}/verify", response_model=PlanVerifyOut)
+def get_plan_verify(
+    plan_id: str,
+    business_id: str = Query(...),
+    db: Session = Depends(get_db),
+):
+    return verify_plan(db, business_id, plan_id)

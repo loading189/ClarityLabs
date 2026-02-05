@@ -13,7 +13,7 @@ const fetchHealthScore = vi.fn().mockResolvedValue({ business_id: "biz-1", score
 const fetchHealthScoreExplainChange = vi.fn().mockResolvedValue({ business_id: "biz-1", computed_at: new Date().toISOString(), window: { since_hours: 72 }, changes: [], impacts: [], summary: { headline: "No major changes", net_estimated_delta: 0, top_drivers: [] } });
 const listChanges = vi.fn().mockResolvedValue([]);
 const fetchAssistantThread = vi.fn().mockResolvedValue([]);
-const postAssistantMessage = vi.fn().mockResolvedValue({ id: "msg-1", business_id: "biz-1", created_at: new Date().toISOString(), author: "assistant", kind: "playbook_started", signal_id: "sig-1", audit_id: null, content_json: {} });
+const postAssistantMessage = vi.fn().mockResolvedValue({ id: "msg-1", business_id: "biz-1", created_at: new Date().toISOString(), author: "assistant", kind: "receipt_playbook_started", signal_id: "sig-1", audit_id: null, content_json: {} });
 const publishDailyBrief = vi.fn().mockResolvedValue({
   message: { id: "msg-brief", business_id: "biz-1", created_at: new Date().toISOString(), author: "system", kind: "daily_brief", signal_id: null, audit_id: null, content_json: {} },
   brief: {
@@ -36,6 +36,7 @@ const getSignalExplain = vi.fn().mockResolvedValue({
   related_audits: [],
   next_actions: [],
   clear_condition: { summary: "Spend must normalize.", type: "threshold", fields: ["current_total"], window_days: 14, comparator: "<=", target: 500 },
+  verification: { status: "unknown", checked_at: new Date().toISOString(), facts: [] },
   playbooks: [],
   links: [],
 });
@@ -46,6 +47,8 @@ const listPlans = vi.fn().mockResolvedValue([]);
 const createPlan = vi.fn();
 const markPlanStepDone = vi.fn();
 const addPlanNote = vi.fn();
+const updatePlanStatus = vi.fn();
+const verifyPlan = vi.fn().mockResolvedValue({ plan_id: "plan-1", checked_at: new Date().toISOString(), signals: [], totals: { met: 0, not_met: 0, unknown: 0 } });
 
 const fetchWorkQueue = vi.fn().mockResolvedValue({ business_id: "biz-1", generated_at: new Date().toISOString(), items: [] });
 vi.mock("../../api/signals", () => ({
@@ -65,7 +68,7 @@ vi.mock("../../api/assistantThread", () => ({
 vi.mock("../../api/dailyBrief", () => ({ publishDailyBrief: (...args: unknown[]) => publishDailyBrief(...args) }));
 vi.mock("../../api/progress", () => ({ fetchAssistantProgress: (...args: unknown[]) => fetchAssistantProgress(...args) }));
 vi.mock("../../api/workQueue", () => ({ fetchWorkQueue: (...args: unknown[]) => fetchWorkQueue(...args) }));
-vi.mock("../../api/plans", () => ({ listPlans: (...args: unknown[]) => listPlans(...args), createPlan: (...args: unknown[]) => createPlan(...args), markPlanStepDone: (...args: unknown[]) => markPlanStepDone(...args), addPlanNote: (...args: unknown[]) => addPlanNote(...args) }));
+vi.mock("../../api/plans", () => ({ listPlans: (...args: unknown[]) => listPlans(...args), createPlan: (...args: unknown[]) => createPlan(...args), markPlanStepDone: (...args: unknown[]) => markPlanStepDone(...args), addPlanNote: (...args: unknown[]) => addPlanNote(...args), updatePlanStatus: (...args: unknown[]) => updatePlanStatus(...args), verifyPlan: (...args: unknown[]) => verifyPlan(...args) }));
 vi.mock("../../api/monitor", () => ({ getMonitorStatus: (...args: unknown[]) => getMonitorStatus(...args) }));
 
 function renderAssistant() {
@@ -98,7 +101,7 @@ describe("AssistantPage daily brief", () => {
     await waitFor(() =>
       expect(postAssistantMessage).toHaveBeenCalledWith(
         "biz-1",
-        expect.objectContaining({ kind: "playbook_started", signal_id: "sig-1" })
+        expect.objectContaining({ kind: "receipt_playbook_started", signal_id: "sig-1" })
       )
     );
     expect(getMonitorStatus).not.toHaveBeenCalled();

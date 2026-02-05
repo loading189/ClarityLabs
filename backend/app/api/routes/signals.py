@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.db import get_db
 from backend.app.services import signals_service
+from backend.app.services.assistant_thread_service import append_receipt
 
 router = APIRouter(prefix="/api/signals", tags=["signals"])
 
@@ -97,6 +98,21 @@ class SignalExplainEvidenceOut(BaseModel):
 
 
 
+
+
+class SignalExplainVerificationFactOut(BaseModel):
+    key: str
+    label: str
+    value: Any
+    source: Literal["ledger", "state", "derived", "detector"]
+
+
+class SignalExplainVerificationOut(BaseModel):
+    status: Literal["met", "not_met", "unknown"]
+    checked_at: str
+    facts: List[SignalExplainVerificationFactOut] = Field(default_factory=list)
+
+
 class SignalExplainNextActionOut(BaseModel):
     key: str
     label: str
@@ -124,6 +140,7 @@ class SignalExplainOut(BaseModel):
     related_audits: List[SignalExplainAuditOut]
     next_actions: List[SignalExplainNextActionOut]
     clear_condition: Optional[SignalExplainClearConditionOut] = None
+    verification: SignalExplainVerificationOut
     playbooks: List[SignalExplainPlaybookOut] = Field(default_factory=list)
     links: List[str]
 
@@ -165,7 +182,7 @@ def update_signal_status(
     req: SignalStatusUpdateIn,
     db: Session = Depends(get_db),
 ):
-    return signals_service.update_signal_status(
+    result = signals_service.update_signal_status(
         db,
         business_id,
         signal_id,
@@ -173,6 +190,23 @@ def update_signal_status(
         reason=req.reason,
         actor=req.actor,
     )
+    append_receipt(
+        db,
+        business_id,
+        {
+            "action": "signal_status_updated",
+            "actor": req.actor,
+            "reason": req.reason,
+            "signal_id": signal_id,
+            "audit_id": result.get("audit_id"),
+            "links": {
+                "audit": f"/app/{business_id}/audit/{result.get('audit_id')}",
+                "signal": f"/app/{business_id}/assistant?signalId={signal_id}",
+            },
+        },
+        dedupe=False,
+    )
+    return result
 
 
 @router.get("/{business_id}/{signal_id}")

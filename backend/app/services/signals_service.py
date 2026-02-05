@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from datetime import date
+from datetime import date, datetime, timezone
 import logging
 import os
 from typing import Any, Dict, List, Literal, Optional, Tuple
@@ -1548,6 +1548,38 @@ def _next_actions(state: HealthSignalState, detector: Dict[str, Any], related_au
     return sorted(items, key=lambda item: (order.get(item.get("action"), 99), item.get("key", "")))
 
 
+
+
+def _build_verification(detector: Dict[str, Any], state: HealthSignalState, evidence: List[Dict[str, Any]]) -> Dict[str, Any]:
+    clear_condition = detector.get("clear_condition")
+    if not isinstance(clear_condition, dict):
+        return {"status": "unknown", "checked_at": datetime.now(timezone.utc).isoformat(), "facts": []}
+
+    required_keys = [str(key) for key in (clear_condition.get("fields") or []) if str(key)]
+    evidence_keys = {str(item.get("key") or "") for item in evidence}
+    missing_required = [key for key in required_keys if key not in evidence_keys]
+
+    status: str
+    if missing_required:
+        status = "unknown"
+    else:
+        status = "met" if is_signal_resolved_condition_met(state) else "not_met"
+
+    facts = sorted(evidence, key=lambda item: str(item.get("key") or ""))[:6]
+    return {
+        "status": status,
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "facts": [
+            {
+                "key": str(item.get("key") or ""),
+                "label": str(item.get("label") or ""),
+                "value": item.get("value"),
+                "source": str(item.get("source") or "derived"),
+            }
+            for item in facts
+        ],
+    }
+
 def get_signal_explain(db: Session, business_id: str, signal_id: str) -> Dict[str, Any]:
     _require_business(db, business_id)
     state = db.get(HealthSignalState, (business_id, signal_id))
@@ -1558,6 +1590,7 @@ def get_signal_explain(db: Session, business_id: str, signal_id: str) -> Dict[st
     detector = _detector_meta(state.signal_type, state)
     related_audits = _list_related_audits(db, business_id, signal_id)
     next_actions = _next_actions(state, detector, related_audits)
+    verification = _build_verification(detector, state, evidence)
 
     return {
         "business_id": business_id,
@@ -1577,6 +1610,7 @@ def get_signal_explain(db: Session, business_id: str, signal_id: str) -> Dict[st
         "related_audits": related_audits,
         "next_actions": next_actions,
         "clear_condition": detector.get("clear_condition"),
+        "verification": verification,
         "playbooks": sorted(detector.get("playbooks") or [], key=lambda item: str(item.get("id", ""))),
         "links": [
             "/signals",

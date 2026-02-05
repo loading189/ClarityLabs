@@ -1,7 +1,7 @@
 import { apiGet, apiPost } from "./client";
 
 export type AssistantAuthor = "system" | "assistant" | "user";
-export type AssistantKind = "summary" | "changes" | "priority" | "explain" | "action_result" | "note" | "playbook_started" | "daily_brief" | "plan" | "plan_created" | "plan_step_done" | "plan_note_added" | "plan_status_updated";
+export type AssistantKind = "summary" | "changes" | "priority" | "explain" | "action_result" | "note" | "playbook_started" | "daily_brief" | "plan" | "plan_created" | "plan_step_done" | "plan_note_added" | "plan_status_updated" | "receipt" | "receipt_signal_status_updated" | "receipt_playbook_started" | "receipt_plan_done";
 
 export type AssistantThreadMessage = {
   id: string;

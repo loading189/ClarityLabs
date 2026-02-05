@@ -145,6 +145,14 @@ export type SignalExplainPlaybook = {
   requires_confirmation?: boolean | null;
 };
 
+export type SignalVerificationStatus = "met" | "not_met" | "unknown";
+
+export type SignalExplainVerification = {
+  status: SignalVerificationStatus;
+  checked_at: string;
+  facts: Array<{ key: string; label: string; value: string | number | boolean | null; source: "ledger" | "state" | "derived" | "detector" }>;
+};
+
 export type SignalExplainAudit = {
   id: string;
   event_type: string;
@@ -181,6 +189,7 @@ export type SignalExplainOut = {
   related_audits: SignalExplainAudit[];
   next_actions: SignalExplainNextAction[];
   clear_condition: SignalExplainClearCondition | null;
+  verification: SignalExplainVerification;
   playbooks: SignalExplainPlaybook[];
   links: string[];
 };
