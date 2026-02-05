@@ -48,6 +48,19 @@ const getSignalExplain = vi.fn().mockResolvedValue({
 });
 const updateSignalStatus = vi.fn().mockResolvedValue({ business_id: "biz-1", signal_id: "sig-1", status: "resolved", last_seen_at: null, resolved_at: null, resolution_note: "done", reason: "done", audit_id: "audit-1" });
 const getMonitorStatus = vi.fn();
+const publishDailyBrief = vi.fn().mockResolvedValue({
+  message: { id: "msg-brief", business_id: "biz-1", created_at: new Date().toISOString(), author: "system", kind: "daily_brief", signal_id: null, audit_id: null, content_json: {} },
+  brief: {
+    business_id: "biz-1",
+    date: "2025-01-15",
+    generated_at: new Date().toISOString(),
+    headline: "Daily brief headline",
+    summary_bullets: ["Health score is 78."],
+    priorities: [{ signal_id: "sig-1", title: "Expense creep", severity: "warning", status: "open", why_now: "Expense creep is open with warning severity.", recommended_playbooks: [{ id: "pb-1", title: "Inspect recent outflows", deep_link: null }], clear_condition_summary: "Spend must normalize." }],
+    metrics: { health_score: 78, delta_7d: -12, open_signals_count: 1, new_changes_count: 1 },
+    links: { assistant: "/", signals: "/", health_score: "/", changes: "/" },
+  },
+});
 
 vi.mock("../../api/signals", () => ({
   listSignalStates: (...args: unknown[]) => listSignalStates(...args),
@@ -64,6 +77,7 @@ vi.mock("../../api/assistantThread", () => ({
   postAssistantMessage: (...args: unknown[]) => postAssistantMessage(...args),
 }));
 vi.mock("../../api/monitor", () => ({ getMonitorStatus: (...args: unknown[]) => getMonitorStatus(...args) }));
+vi.mock("../../api/dailyBrief", () => ({ publishDailyBrief: (...args: unknown[]) => publishDailyBrief(...args) }));
 
 function renderAssistant(path = "/app/biz-1/assistant") {
   return render(
