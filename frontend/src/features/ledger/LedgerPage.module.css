@@ -1,13 +1,335 @@
-.page { display: grid; gap: 12px; }
-.topFilters { display: flex; gap: 8px; align-items: center; }
-.layout { display: grid; grid-template-columns: 280px 1fr; gap: 12px; }
-.sidebar { border: 1px solid #ddd; border-radius: 8px; padding: 8px; }
-.sidebarTabs { display: flex; gap: 6px; margin-bottom: 8px; }
-.sidebarList { display: grid; gap: 6px; max-height: 560px; overflow: auto; }
-.sidebarItem { display: flex; justify-content: space-between; font-size: 12px; }
-.main { border: 1px solid #ddd; border-radius: 8px; overflow: auto; }
-.table { width: 100%; border-collapse: collapse; }
-.table th, .table td { border-bottom: 1px solid #eee; padding: 8px; text-align: left; }
-.table tbody tr { cursor: pointer; }
-.chips { display: flex; gap: 6px; flex-wrap: wrap; }
-.chip { border: 1px solid #bbb; border-radius: 999px; padding: 2px 8px; }
+.page {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+}
+
+.headerMeta {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.topFilters {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-muted);
+  padding: 12px;
+}
+
+.filterGroup {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.label {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.input,
+.select {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card-bg);
+  min-width: 140px;
+}
+
+.input:focus-visible,
+.select:focus-visible,
+.button:focus-visible,
+.chip:focus-visible,
+.buttonGhost:focus-visible,
+.primaryLink:focus-visible,
+.segmented button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px var(--focus);
+}
+
+.button,
+.buttonGhost {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card-bg);
+  padding: 8px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.buttonActive {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+}
+
+.buttonGhost {
+  background: transparent;
+}
+
+.chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: var(--card-bg);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(230px, 280px) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.sidebar,
+.main {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card-bg);
+}
+
+.sidebar {
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px;
+}
+
+.segmented button {
+  border: none;
+  background: transparent;
+  border-radius: 999px;
+  padding: 6px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.segmentedActive {
+  background: var(--card-bg) !important;
+  color: var(--text) !important;
+  box-shadow: var(--shadow-sm);
+}
+
+.sidebarSearchRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+}
+
+.sidebarList {
+  display: grid;
+  gap: 6px;
+  max-height: 560px;
+  overflow: auto;
+}
+
+.sidebarItem {
+  display: flex;
+  justify-content: space-between;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card-bg);
+  cursor: pointer;
+  padding: 8px;
+  font-size: 12px;
+}
+
+.sidebarItem:hover,
+.table tbody tr:hover {
+  background: #f9fafb;
+}
+
+.sidebarItemActive {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.badge {
+  background: var(--surface-muted);
+  border-radius: 999px;
+  min-width: 24px;
+  text-align: center;
+  padding: 2px 6px;
+}
+
+.main {
+  overflow: auto;
+}
+
+.tableWrap {
+  overflow: auto;
+  max-height: 72vh;
+}
+
+.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.table th,
+.table td {
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.tableCompact th,
+.tableCompact td {
+  padding: 7px 10px;
+}
+
+.table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--surface-muted);
+  text-align: left;
+}
+
+.stickyLeft,
+.stickySecond {
+  position: sticky;
+  background: var(--card-bg);
+  z-index: 1;
+}
+
+thead .stickyLeft,
+thead .stickySecond {
+  background: var(--surface-muted);
+  z-index: 3;
+}
+
+.stickyLeft {
+  left: 0;
+}
+
+.stickySecond {
+  left: 120px;
+}
+
+.numeric {
+  text-align: right !important;
+}
+
+.negative {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.rowSelected {
+  background: var(--primary-soft);
+}
+
+.columnMenu summary {
+  list-style: none;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 12px;
+  background: var(--card-bg);
+}
+
+.columnList {
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card-bg);
+  font-size: 12px;
+}
+
+.skeletonItem,
+.skeletonRow {
+  background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 37%, #f3f4f6 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.2s ease infinite;
+  border-radius: var(--radius-sm);
+}
+
+.skeletonItem {
+  height: 32px;
+}
+
+.skeletonRow {
+  height: 20px;
+}
+
+.drawerContent {
+  display: grid;
+  gap: 8px;
+}
+
+.drawerTitle {
+  font-weight: 700;
+}
+
+.signalContext {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+  padding: 10px;
+}
+
+.signalContextTitle {
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.primaryLink {
+  display: inline-flex;
+  width: fit-content;
+  text-decoration: none;
+  background: var(--primary);
+  color: white;
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+@keyframes shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: 0 0; }
+}
+
+@media (max-width: 1100px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebarList {
+    max-height: 260px;
+  }
+
+  .stickyLeft,
+  .stickySecond {
+    position: static;
+  }
+}

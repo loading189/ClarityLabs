@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import Drawer from "../../components/common/Drawer";
 import PageHeader from "../../components/common/PageHeader";
-import { ErrorState, LoadingState } from "../../components/common/DataState";
+import { ErrorState } from "../../components/common/DataState";
 import { assertBusinessId } from "../../utils/businessId";
 import { useFilters } from "../../app/filters/useFilters";
-import { resolveDateRange } from "../../app/filters/filters";
+import { resolveDateRange, type DateWindow } from "../../app/filters/filters";
 import { useAppState } from "../../app/state/appState";
 import {
   fetchLedgerAccountDimensions,
@@ -17,6 +17,22 @@ import {
   type LedgerQueryRow,
 } from "../../api/ledger";
 import styles from "./LedgerPage.module.css";
+
+const SIDEBAR_TOP_N = 12;
+const COLUMN_STORAGE_KEY = "ledger-column-visibility";
+const ALL_COLUMNS = ["date", "description", "account", "vendor", "category", "amount", "balance"] as const;
+type ColumnKey = (typeof ALL_COLUMNS)[number];
+
+type ColumnVisibility = Record<ColumnKey, boolean>;
+const DEFAULT_VISIBILITY: ColumnVisibility = {
+  date: true,
+  description: true,
+  account: true,
+  vendor: true,
+  category: true,
+  amount: true,
+  balance: true,
+};
 
 function money(value: number) {
   const sign = value < 0 ? "-" : "";
@@ -39,12 +55,53 @@ function setListParam(values: string[]) {
   return values.slice().sort((a, b) => a.localeCompare(b)).join(",");
 }
 
+function readColumnVisibility(): ColumnVisibility {
+  try {
+    const raw = localStorage.getItem(COLUMN_STORAGE_KEY);
+    if (!raw) return DEFAULT_VISIBILITY;
+    const parsed = JSON.parse(raw) as Partial<ColumnVisibility>;
+    return {
+      date: parsed.date ?? true,
+      description: parsed.description ?? true,
+      account: parsed.account ?? true,
+      vendor: parsed.vendor ?? true,
+      category: parsed.category ?? true,
+      amount: parsed.amount ?? true,
+      balance: parsed.balance ?? true,
+    };
+  } catch {
+    return DEFAULT_VISIBILITY;
+  }
+}
+
+const DATE_PRESETS: Array<{ value: DateWindow | "this_month" | "last_month"; label: string }> = [
+  { value: "7", label: "Last 7" },
+  { value: "30", label: "Last 30" },
+  { value: "90", label: "Last 90" },
+  { value: "this_month", label: "This month" },
+  { value: "last_month", label: "Last month" },
+  { value: "custom", label: "Custom" },
+];
+
+function monthStartEnd(offsetMonths = 0) {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth() + offsetMonths, 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + offsetMonths + 1, 0);
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  return { start: iso(start), end: iso(end) };
+}
+
 export default function LedgerPage() {
   const { businessId: businessIdParam } = useParams();
   const businessId = assertBusinessId(businessIdParam, "LedgerPage");
   const [filters, setFilters] = useFilters();
   const { setDateRange, activeBusinessId, setActiveBusinessId } = useAppState();
   const [sidebarTab, setSidebarTab] = useState<"accounts" | "vendors">("accounts");
+  const [sidebarSearch, setSidebarSearch] = useState({ accounts: "", vendors: "" });
+  const [expandedList, setExpandedList] = useState({ accounts: false, vendors: false });
+  const [searchDraft, setSearchDraft] = useState(filters.q ?? "");
+  const [density, setDensity] = useState<"comfortable" | "compact">("comfortable");
+  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(() => readColumnVisibility());
 
   const range = useMemo(() => resolveDateRange(filters), [filters]);
   useEffect(() => {
@@ -63,6 +120,38 @@ export default function LedgerPage() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [selected, setSelected] = useState<LedgerQueryRow | null>(null);
+
+  useEffect(() => {
+    setSearchDraft(filters.q ?? "");
+  }, [filters.q]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const normalized = searchDraft.trim();
+      const next = normalized || undefined;
+      if (next !== (filters.q ?? undefined)) {
+        setFilters((f) => ({ ...f, q: next }));
+      }
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [filters.q, searchDraft, setFilters]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify(columnVisibility));
+    } catch {
+      // noop
+    }
+  }, [columnVisibility]);
+
+  useEffect(() => {
+    if (!selected) return;
+    const onEsc = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSelected(null);
+    };
+    window.addEventListener("keydown", onEsc);
+    return () => window.removeEventListener("keydown", onEsc);
+  }, [selected]);
 
   useEffect(() => {
     const c = new AbortController();
@@ -106,6 +195,26 @@ export default function LedgerPage() {
     };
   }, [businessId, filters.q, range.end, range.start, selectedAccounts.join("|"), selectedVendors.join("|")]);
 
+  const visibleRows = useMemo(() => {
+    const rows = ledger?.rows ?? [];
+    if (filters.category === "uncategorized") {
+      return rows.filter((row) => !row.category || row.category.toLowerCase() === "uncategorized");
+    }
+    return rows;
+  }, [filters.category, ledger?.rows]);
+
+  const filteredAccounts = useMemo(() => {
+    const q = sidebarSearch.accounts.trim().toLowerCase();
+    if (!q) return accounts;
+    return accounts.filter((item) => `${item.label} ${item.account}`.toLowerCase().includes(q));
+  }, [accounts, sidebarSearch.accounts]);
+
+  const filteredVendors = useMemo(() => {
+    const q = sidebarSearch.vendors.trim().toLowerCase();
+    if (!q) return vendors;
+    return vendors.filter((item) => item.vendor.toLowerCase().includes(q));
+  }, [sidebarSearch.vendors, vendors]);
+
   function toggleAccount(label: string) {
     const next = selectedAccounts.includes(label)
       ? selectedAccounts.filter((v) => v !== label)
@@ -120,102 +229,255 @@ export default function LedgerPage() {
     setFilters((f) => ({ ...f, vendor: setListParam(next) } as any));
   }
 
+  function updateDatePreset(value: string) {
+    if (value === "this_month") {
+      const next = monthStartEnd(0);
+      setFilters((f) => ({ ...f, window: "custom", start: next.start, end: next.end }));
+      return;
+    }
+    if (value === "last_month") {
+      const next = monthStartEnd(-1);
+      setFilters((f) => ({ ...f, window: "custom", start: next.start, end: next.end }));
+      return;
+    }
+    setFilters((f) => ({ ...f, window: value as DateWindow }));
+  }
+
+  function removeChip(key: "account" | "vendor" | "q" | "category", value?: string) {
+    if (key === "account" && value) toggleAccount(value);
+    if (key === "vendor" && value) toggleVendor(value);
+    if (key === "q") setFilters((f) => ({ ...f, q: undefined }));
+    if (key === "category") setFilters((f) => ({ ...f, category: undefined }));
+  }
+
+  const activeFilterCount = selectedAccounts.length + selectedVendors.length + (filters.q ? 1 : 0) + (filters.category ? 1 : 0);
+
+  const currentPresetValue =
+    filters.window === "7" || filters.window === "30" || filters.window === "90" || filters.window === "custom"
+      ? filters.window
+      : "90";
+
   return (
     <div className={styles.page}>
       <PageHeader
         title="Ledger"
         subtitle="Deterministic proof layer for transactions, balances, and categorization."
-        actions={<div>{ledger?.summary.row_count ?? 0} rows</div>}
+        actions={<div className={styles.headerMeta}>{visibleRows.length} rows</div>}
       />
 
       <div className={styles.topFilters}>
-        <select
-          aria-label="Date preset"
-          value={filters.window ?? "90"}
-          onChange={(e) => setFilters({ window: e.target.value as any })}
-        >
-          <option value="30">Last 30d</option>
-          <option value="90">Last 90d</option>
-          <option value="365">Last 365d</option>
-          <option value="custom">Custom</option>
-        </select>
-        <input
-          aria-label="Search"
-          placeholder="Search description/vendor/account"
-          value={filters.q ?? ""}
-          onChange={(e) => setFilters({ q: e.target.value || undefined })}
-        />
+        <div className={styles.filterGroup}>
+          <label className={styles.label} htmlFor="ledger-date-preset">Date</label>
+          <select
+            id="ledger-date-preset"
+            className={styles.select}
+            aria-label="Date preset"
+            value={currentPresetValue}
+            onChange={(e) => updateDatePreset(e.target.value)}
+          >
+            {DATE_PRESETS.map((preset) => (
+              <option key={preset.value} value={preset.value}>{preset.label}</option>
+            ))}
+          </select>
+          {currentPresetValue === "custom" && (
+            <>
+              <input
+                className={styles.input}
+                type="date"
+                aria-label="Start date"
+                value={filters.start ?? ""}
+                onChange={(e) => setFilters((f) => ({ ...f, start: e.target.value || undefined, window: "custom" }))}
+              />
+              <input
+                className={styles.input}
+                type="date"
+                aria-label="End date"
+                value={filters.end ?? ""}
+                onChange={(e) => setFilters((f) => ({ ...f, end: e.target.value || undefined, window: "custom" }))}
+              />
+            </>
+          )}
+        </div>
+
+        <div className={styles.filterGroup}>
+          <input
+            className={styles.input}
+            aria-label="Search"
+            placeholder="Search description/vendor/account"
+            value={searchDraft}
+            onChange={(e) => setSearchDraft(e.target.value)}
+          />
+          <button
+            className={`${styles.button} ${filters.category === "uncategorized" ? styles.buttonActive : ""}`}
+            type="button"
+            onClick={() => setFilters((f) => ({ ...f, category: f.category === "uncategorized" ? undefined : "uncategorized" }))}
+          >
+            Uncategorized only
+          </button>
+          <select
+            className={styles.select}
+            aria-label="Row density"
+            value={density}
+            onChange={(e) => setDensity(e.target.value as "comfortable" | "compact")}
+          >
+            <option value="comfortable">Comfortable rows</option>
+            <option value="compact">Compact rows</option>
+          </select>
+          <details className={styles.columnMenu}>
+            <summary>Columns</summary>
+            <div className={styles.columnList}>
+              {ALL_COLUMNS.map((column) => (
+                <label key={column}>
+                  <input
+                    type="checkbox"
+                    checked={columnVisibility[column]}
+                    onChange={() => setColumnVisibility((prev) => ({ ...prev, [column]: !prev[column] }))}
+                  />
+                  {column}
+                </label>
+              ))}
+            </div>
+          </details>
+          <button
+            className={styles.button}
+            onClick={() => setFilters({ window: "90", account: undefined, vendor: undefined, q: undefined, category: undefined })}
+            disabled={activeFilterCount === 0}
+            type="button"
+          >
+            Reset all
+          </button>
+        </div>
+
         <div className={styles.chips}>
           {selectedAccounts.map((a) => (
-            <button key={`a-${a}`} className={styles.chip} onClick={() => toggleAccount(a)}>{a} ✕</button>
+            <button key={`a-${a}`} className={styles.chip} onClick={() => removeChip("account", a)}>{a} ✕</button>
           ))}
           {selectedVendors.map((v) => (
-            <button key={`v-${v}`} className={styles.chip} onClick={() => toggleVendor(v)}>{v} ✕</button>
+            <button key={`v-${v}`} className={styles.chip} onClick={() => removeChip("vendor", v)}>{v} ✕</button>
           ))}
+          {filters.q && <button className={styles.chip} onClick={() => removeChip("q")}>Search: {filters.q} ✕</button>}
+          {filters.category === "uncategorized" && <button className={styles.chip} onClick={() => removeChip("category")}>Uncategorized ✕</button>}
         </div>
       </div>
 
       <div className={styles.layout}>
         <aside className={styles.sidebar}>
-          <div className={styles.sidebarTabs}>
-            <button onClick={() => setSidebarTab("accounts")}>Accounts</button>
-            <button onClick={() => setSidebarTab("vendors")}>Vendors</button>
+          <div className={styles.segmented} role="tablist" aria-label="Ledger dimensions">
+            <button className={sidebarTab === "accounts" ? styles.segmentedActive : ""} onClick={() => setSidebarTab("accounts")}>Accounts</button>
+            <button className={sidebarTab === "vendors" ? styles.segmentedActive : ""} onClick={() => setSidebarTab("vendors")}>Vendors</button>
           </div>
+
+          <div className={styles.sidebarSearchRow}>
+            <input
+              className={styles.input}
+              aria-label="Sidebar search"
+              placeholder={`Search ${sidebarTab}`}
+              value={sidebarSearch[sidebarTab]}
+              onChange={(e) => setSidebarSearch((prev) => ({ ...prev, [sidebarTab]: e.target.value }))}
+            />
+            <button
+              className={styles.buttonGhost}
+              type="button"
+              onClick={() => sidebarTab === "accounts" ? setFilters((f) => ({ ...f, account: undefined })) : setFilters((f) => ({ ...f, vendor: undefined } as any))}
+            >
+              Clear
+            </button>
+          </div>
+
           <div className={styles.sidebarList}>
-            {sidebarTab === "accounts" &&
-              accounts.map((item) => (
-                <button key={item.account} className={styles.sidebarItem} onClick={() => toggleAccount(item.account)}>
-                  <span>{item.label}</span>
-                  <span>{item.count} · {money(item.total)}</span>
-                </button>
-              ))}
-            {sidebarTab === "vendors" &&
-              vendors.map((item) => (
-                <button key={item.vendor} className={styles.sidebarItem} onClick={() => toggleVendor(item.vendor)}>
-                  <span>{item.vendor}</span>
-                  <span>{item.count} · {money(item.total)}</span>
-                </button>
-              ))}
+            {loading && Array.from({ length: 8 }).map((_, idx) => <div key={idx} className={styles.skeletonItem} />)}
+            {!loading && sidebarTab === "accounts" && (expandedList.accounts ? filteredAccounts : filteredAccounts.slice(0, SIDEBAR_TOP_N)).map((item) => (
+              <button
+                key={item.account}
+                className={`${styles.sidebarItem} ${selectedAccounts.includes(item.account) ? styles.sidebarItemActive : ""}`}
+                onClick={() => toggleAccount(item.account)}
+              >
+                <span>{item.label}</span>
+                <span className={styles.badge}>{item.count}</span>
+              </button>
+            ))}
+            {!loading && sidebarTab === "vendors" && (expandedList.vendors ? filteredVendors : filteredVendors.slice(0, SIDEBAR_TOP_N)).map((item) => (
+              <button
+                key={item.vendor}
+                className={`${styles.sidebarItem} ${selectedVendors.includes(item.vendor) ? styles.sidebarItemActive : ""}`}
+                onClick={() => toggleVendor(item.vendor)}
+              >
+                <span>{item.vendor}</span>
+                <span className={styles.badge}>{item.count}</span>
+              </button>
+            ))}
           </div>
+          {!loading && sidebarTab === "accounts" && filteredAccounts.length > SIDEBAR_TOP_N && (
+            <button className={styles.buttonGhost} onClick={() => setExpandedList((s) => ({ ...s, accounts: !s.accounts }))}>
+              {expandedList.accounts ? "Show less" : "Show more"}
+            </button>
+          )}
+          {!loading && sidebarTab === "vendors" && filteredVendors.length > SIDEBAR_TOP_N && (
+            <button className={styles.buttonGhost} onClick={() => setExpandedList((s) => ({ ...s, vendors: !s.vendors }))}>
+              {expandedList.vendors ? "Show less" : "Show more"}
+            </button>
+          )}
         </aside>
 
         <section className={styles.main}>
-          {loading && <LoadingState label="Loading ledger…" />}
           {err && <ErrorState label={err} />}
-          {!loading && !err && (
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>Date</th><th>Description</th><th>Vendor</th><th>Account</th><th>Amount</th><th>Balance</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(ledger?.rows ?? []).map((row) => (
-                  <tr key={row.source_event_id} onClick={() => setSelected(row)}>
-                    <td>{fmtDate(row.occurred_at)}</td>
-                    <td>{row.description}</td>
-                    <td>{row.vendor}</td>
-                    <td>{row.account}</td>
-                    <td>{money(row.amount)}</td>
-                    <td>{money(row.balance)}</td>
+          {!err && (
+            <div className={styles.tableWrap}>
+              <table className={`${styles.table} ${density === "compact" ? styles.tableCompact : ""}`}>
+                <thead>
+                  <tr>
+                    {columnVisibility.date && <th className={styles.stickyLeft}>Date</th>}
+                    {columnVisibility.description && <th className={styles.stickySecond}>Description</th>}
+                    {columnVisibility.account && <th>Account</th>}
+                    {columnVisibility.vendor && <th>Vendor</th>}
+                    {columnVisibility.category && <th>Category</th>}
+                    {columnVisibility.amount && <th className={styles.numeric}>Amount</th>}
+                    {columnVisibility.balance && <th className={styles.numeric}>Balance</th>}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {loading && Array.from({ length: 12 }).map((_, idx) => (
+                    <tr key={`s-${idx}`}><td colSpan={7}><div className={styles.skeletonRow} /></td></tr>
+                  ))}
+                  {!loading && visibleRows.map((row) => (
+                    <tr
+                      key={row.source_event_id}
+                      className={selected?.source_event_id === row.source_event_id ? styles.rowSelected : ""}
+                      onClick={() => setSelected(row)}
+                    >
+                      {columnVisibility.date && <td className={styles.stickyLeft}>{fmtDate(row.occurred_at)}</td>}
+                      {columnVisibility.description && <td className={styles.stickySecond}>{row.description}</td>}
+                      {columnVisibility.account && <td>{row.account}</td>}
+                      {columnVisibility.vendor && <td>{row.vendor || "—"}</td>}
+                      {columnVisibility.category && <td>{row.category || "Uncategorized"}</td>}
+                      {columnVisibility.amount && <td className={`${styles.numeric} ${row.amount < 0 ? styles.negative : ""}`}>{money(row.amount)}</td>}
+                      {columnVisibility.balance && <td className={styles.numeric}>{money(row.balance)}</td>}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </section>
       </div>
 
       <Drawer open={Boolean(selected)} title="Transaction detail" onClose={() => setSelected(null)}>
         {selected && (
-          <div>
-            <div>{selected.description}</div>
-            <div>{selected.vendor} · {selected.account}</div>
+          <div className={styles.drawerContent}>
+            <div className={styles.drawerTitle}>{selected.description}</div>
+            <div>{selected.vendor || "No vendor"} · {selected.account}</div>
             <div>Amount: {money(selected.amount)}</div>
             <div>Balance: {money(selected.balance)}</div>
-            <div>Categorization reason: {(selected as any).categorization_reason ?? "—"}</div>
-            <Link to={`/app/${businessId}/signals?search=${encodeURIComponent(selected.source_event_id)}&has_ledger_anchors=true`}>
-              Open related signals
+            <div>Category: {selected.category || "Uncategorized"}</div>
+            <div className={styles.signalContext}>
+              <div className={styles.signalContextTitle}>Signal context</div>
+              <div>Ledger anchor: <code>{selected.source_event_id}</code></div>
+            </div>
+            <button className={styles.buttonGhost} onClick={() => navigator.clipboard?.writeText(selected.source_event_id)} type="button">
+              Copy ledger anchor
+            </button>
+            <Link className={styles.primaryLink} to={`/app/${businessId}/signals?search=${encodeURIComponent(selected.source_event_id)}&has_ledger_anchors=true`}>
+              Open Signals Center with ledger anchor
             </Link>
           </div>
         )}
