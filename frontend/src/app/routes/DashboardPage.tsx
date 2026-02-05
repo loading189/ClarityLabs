@@ -46,6 +46,10 @@ export default function DashboardPage() {
 
       <FilterBar filters={filters} onChange={setFilters} />
 
+      <div className={styles.tableCard} style={{ marginBottom: 12 }}>
+        Assistant is now the primary workspace view. <Link to={`/app/${businessId}/assistant`}>Open Assistant</Link> for live signal triage and explain workflows.
+      </div>
+
       {loading && <LoadingState label="Loading dashboard metrics…" />}
       {err && <ErrorState label={`Failed to load dashboard: ${err}`} />}
 

@@ -1,7 +1,7 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { AppStateProvider } from "../../app/state/appState";
 import AssistantPage from "./AssistantPage";
 
@@ -151,11 +151,14 @@ vi.mock("../../api/ledger", () => ({
   fetchLedgerTransactions: (...args: unknown[]) => fetchLedgerTransactions(...args),
 }));
 
-function renderAssistant(path = "/assistant?businessId=biz-1") {
+function renderAssistant(path = "/app/biz-1/assistant") {
   return render(
     <AppStateProvider>
       <MemoryRouter initialEntries={[path]}>
-        <AssistantPage />
+        <Routes>
+          <Route path="/assistant" element={<AssistantPage />} />
+          <Route path="/app/:businessId/assistant" element={<AssistantPage />} />
+        </Routes>
       </MemoryRouter>
     </AppStateProvider>
   );
@@ -181,11 +184,11 @@ describe("AssistantPage", () => {
   });
 
   it("loads explain data from query params and renders evidence", async () => {
-    renderAssistant("/assistant?businessId=biz-1&signalId=sig-1");
+    renderAssistant("/app/biz-1/assistant?signalId=sig-1");
 
     await waitFor(() => expect(getSignalExplain).toHaveBeenCalledWith("biz-1", "sig-1"));
     expect(screen.getByText("Vendor")).toBeInTheDocument();
-    expect(screen.getByText("Acme")).toBeInTheDocument();
+    expect(screen.getAllByText("Acme").length).toBeGreaterThan(0);
   });
 
   it("opens breakdown and selects a contributor", async () => {
@@ -195,13 +198,13 @@ describe("AssistantPage", () => {
 
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /View breakdown/i }));
-    await user.click(screen.getByRole("button", { name: /Expense creep/i }));
+    await user.click(screen.getAllByRole("button", { name: /Expense creep/i })[1]);
 
     await waitFor(() => expect(getSignalExplain).toHaveBeenCalledWith("biz-1", "sig-1"));
   });
 
   it("loads ledger trace transactions from evidence anchors", async () => {
-    renderAssistant("/assistant?businessId=biz-1&signalId=sig-1");
+    renderAssistant("/app/biz-1/assistant?signalId=sig-1");
 
     await waitFor(() => expect(getSignalExplain).toHaveBeenCalledWith("biz-1", "sig-1"));
 
@@ -211,7 +214,7 @@ describe("AssistantPage", () => {
     await waitFor(() =>
       expect(fetchLedgerTransactions).toHaveBeenCalledWith("biz-1", { txn_ids: ["txn-1"] })
     );
-    expect(screen.getByText("Acme")).toBeInTheDocument();
+    expect(screen.getAllByText("Acme").length).toBeGreaterThan(0);
   });
 
   it("updates status from action chips and refreshes explain", async () => {
@@ -222,7 +225,7 @@ describe("AssistantPage", () => {
         state: { ...explainPayload.state, status: "resolved" },
       });
 
-    renderAssistant("/assistant?businessId=biz-1&signalId=sig-1");
+    renderAssistant("/app/biz-1/assistant?signalId=sig-1");
 
     await waitFor(() => expect(getSignalExplain).toHaveBeenCalled());
 

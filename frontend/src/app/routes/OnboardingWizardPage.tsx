@@ -108,8 +108,8 @@ export default function OnboardingWizardPage() {
       });
       window.dispatchEvent(new Event("clarity:data-updated"));
       bumpDataVersion();
-      setDone("History generated. Redirecting to dashboard...");
-      navigate(`/app/${biz.id}/dashboard`, { replace: true });
+      setDone("History generated. Redirecting to assistant...");
+      navigate(`/app/${biz.id}/assistant`, { replace: true });
     } catch (e: any) {
       setErr(e?.message ?? "Failed to generate history");
     } finally {

@@ -41,7 +41,7 @@ export default function BusinessSelectPage() {
     const id = assertBusinessId(rawId, "BusinessSelectPage");
     if (!id) return;
     setActiveBusinessId(id);
-    navigate(`/app/${id}/dashboard`);
+    navigate(`/app/${id}/assistant`);
   };
 
   return (

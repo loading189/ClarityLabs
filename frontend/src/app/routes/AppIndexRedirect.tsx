@@ -30,7 +30,7 @@ export default function AppIndexRedirect() {
           return;
         }
 
-        navigate(`/app/${resolved}/dashboard`, { replace: true });
+        navigate(`/app/${resolved}/assistant`, { replace: true });
       } catch (e: any) {
         if (e instanceof DOMException && e.name === "AbortError") return;
         console.error("[AppIndexRedirect] failed", e);
