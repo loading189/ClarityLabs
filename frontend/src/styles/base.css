@@ -34,12 +34,16 @@ a {
   text-decoration: none;
 }
 
+select {
+  background:#252b38!important;
+}
+
 button,
 input,
 select,
 textarea {
   font: inherit;
-  color: var(--text);
+  color: inherit;
 }
 
 button {
@@ -50,10 +54,4 @@ button {
 
 button:disabled {
   cursor: not-allowed;
-}
-
-
-:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
 }
