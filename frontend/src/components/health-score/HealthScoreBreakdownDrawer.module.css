@@ -1,106 +1,17 @@
-.container {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.summary {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  padding: 12px 14px;
-  background: #0f172a;
-  border-radius: 10px;
-  color: #e2e8f0;
-}
-
-.scoreLabel {
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #94a3b8;
-}
-
-.scoreValue {
-  font-size: 36px;
-  font-weight: 600;
-}
-
-.meta {
-  font-size: 12px;
-  color: #94a3b8;
-}
-
-.section {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.sectionTitle {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.domainList {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 8px;
-}
-
-.domainRow {
-  display: flex;
-  justify-content: space-between;
-  padding: 8px 10px;
-  background: #f1f5f9;
-  border-radius: 8px;
-  font-size: 13px;
-}
-
-.contributorList {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.contributorRow {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 10px 12px;
-  background: #f8fafc;
-  border-radius: 10px;
-  border: 1px solid #e2e8f0;
-  cursor: pointer;
-  text-align: left;
-}
-
-.contributorRow:hover {
-  background: #eef2ff;
-}
-
-.contributorTitle {
-  font-weight: 600;
-  font-size: 13px;
-}
-
-.contributorMeta {
-  font-size: 12px;
-  color: #64748b;
-}
-
-.contributorRationale {
-  font-size: 12px;
-  color: #475569;
-}
-
-.contributorPenalty {
-  font-weight: 600;
-  color: #b91c1c;
-}
-
-.muted {
-  color: #64748b;
-  font-size: 13px;
-}
+.container { display: flex; flex-direction: column; gap: 16px; }
+.summary { display: flex; align-items: flex-end; justify-content: space-between; padding: 12px 14px; background: var(--surface-muted); border-radius: var(--radius-md); color: var(--text); border: 1px solid var(--border); }
+.scoreLabel { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-soft); }
+.scoreValue { font-size: 36px; font-weight: 600; }
+.meta { font-size: 12px; color: var(--text-muted); }
+.section { display: flex; flex-direction: column; gap: 8px; }
+.sectionTitle { font-size: 13px; font-weight: 600; color: var(--text-soft); text-transform: uppercase; letter-spacing: .06em; }
+.domainList { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; }
+.domainRow { display: flex; justify-content: space-between; padding: 8px 10px; background: var(--surface-muted); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; }
+.contributorList { display: flex; flex-direction: column; gap: 8px; }
+.contributorRow { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 10px 12px; background: var(--card-bg); border-radius: var(--radius-md); border: 1px solid var(--border); cursor: pointer; text-align: left; }
+.contributorRow:hover { background: var(--surface-2); }
+.contributorTitle { font-weight: 600; font-size: 13px; }
+.contributorMeta { font-size: 12px; color: var(--text-muted); }
+.contributorRationale { font-size: 12px; color: var(--text-muted); }
+.contributorPenalty { font-weight: 600; color: var(--danger); }
+.muted { color: var(--text-muted); font-size: 13px; }

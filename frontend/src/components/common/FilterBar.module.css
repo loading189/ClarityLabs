@@ -3,63 +3,37 @@
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 16px;
   padding: 16px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-lg);
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
 }
 
-.group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  font-size: 0.8rem;
-}
-
-.label {
-  color: rgba(255, 255, 255, 0.6);
-}
-
-.pills {
-  display: flex;
-  gap: 6px;
-}
+.group { display: flex; flex-direction: column; gap: 8px; font-size: 0.8rem; }
+.label { color: var(--text-muted); }
+.pills { display: flex; gap: 6px; }
 
 .pill {
-  background: rgba(255, 255, 255, 0.08);
-  color: inherit;
-  border: 1px solid transparent;
-  border-radius: 999px;
+  background: var(--pill-bg);
+  color: var(--pill-text);
+  border: 1px solid var(--pill-border);
+  border-radius: var(--radius-pill);
   padding: 4px 10px;
   font-size: 0.75rem;
   cursor: pointer;
 }
 
-.pillActive {
-  border-color: rgba(124, 145, 255, 0.6);
-  background: rgba(124, 145, 255, 0.2);
-}
-
-.dateInputs {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.toLabel {
-  font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.5);
-}
+.pillActive { border-color: var(--btn-primary-border); background: var(--primary-soft); color: var(--text); }
+.dateInputs { display: flex; align-items: center; gap: 8px; }
+.toLabel { font-size: 0.7rem; color: var(--text-soft); }
 
 .bar input,
 .bar select {
-  background: rgba(255, 255, 255, 0.06);
-  color: inherit;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 10px;
+  background: var(--input-bg);
+  color: var(--text);
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm);
   padding: 8px 10px;
   font-size: 0.85rem;
 }
 
-.bar input::placeholder {
-  color: rgba(255, 255, 255, 0.35);
-}
+.bar input::placeholder { color: var(--input-placeholder); }

@@ -1,41 +1,28 @@
 .tableCard {
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--card-bg);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
   overflow: hidden;
 }
 
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.85rem;
-}
+.table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
 
 .headCell {
   text-align: left;
   padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--table-head-bg);
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-muted);
 }
 
 .cell {
   padding: 12px 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.85);
+  border-top: 1px solid var(--divider);
+  color: var(--text);
 }
 
-.alignRight {
-  text-align: right;
-}
+.alignRight { text-align: right; }
 
-.clickableRow:hover {
-  background: rgba(255, 255, 255, 0.04);
-  cursor: pointer;
-}
+.clickableRow:hover { background: var(--row-hover); cursor: pointer; }
 
-.empty {
-  padding: 18px;
-  text-align: center;
-  color: rgba(255, 255, 255, 0.5);
-}
+.empty { padding: 18px; text-align: center; color: var(--text-soft); }
