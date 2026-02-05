@@ -75,6 +75,17 @@ class SignalExplainEvidenceOut(BaseModel):
     anchors: Optional[SignalExplainEvidenceAnchorOut] = None
 
 
+
+
+class SignalExplainNextActionOut(BaseModel):
+    key: str
+    label: str
+    action: Optional[Literal["acknowledge", "snooze", "resolve"]]
+    suggested_snooze_minutes: Optional[int] = None
+    requires_reason: bool
+    rationale: str
+    guardrails: Optional[List[str]] = None
+
 class SignalExplainAuditOut(BaseModel):
     id: str
     event_type: str
@@ -91,6 +102,7 @@ class SignalExplainOut(BaseModel):
     detector: SignalExplainDetectorOut
     evidence: List[SignalExplainEvidenceOut]
     related_audits: List[SignalExplainAuditOut]
+    next_actions: List[SignalExplainNextActionOut]
     links: List[str]
 
 

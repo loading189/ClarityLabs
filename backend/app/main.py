@@ -17,6 +17,7 @@ from backend.app.api.routes.health_score import router as health_score_router
 from backend.app.api.routes.audit import router as audit_router
 from backend.app.api.routes.diagnostics import router as diagnostics_router
 from backend.app.api.routes.monitor import router as monitor_router
+from backend.app.api.routes.changes import router as changes_router
 
 
 
@@ -60,3 +61,4 @@ app.include_router(health_score_router)
 app.include_router(audit_router)
 app.include_router(diagnostics_router)
 app.include_router(monitor_router)
+app.include_router(changes_router)
