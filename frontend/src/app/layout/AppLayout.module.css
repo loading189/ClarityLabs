@@ -86,3 +86,15 @@
   .sidebar { position: sticky; top: 0; z-index: 5; flex-direction: row; flex-wrap: wrap; }
   .navItems { flex-direction: row; flex-wrap: wrap; }
 }
+
+.toolsDropdown { display: flex; flex-direction: column; gap: 8px; }
+.toolsSummary {
+  list-style: none;
+  cursor: pointer;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-soft);
+  padding: 0 8px;
+}
+.toolsSummary::-webkit-details-marker { display: none; }

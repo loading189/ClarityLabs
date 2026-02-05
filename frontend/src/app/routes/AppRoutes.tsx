@@ -45,6 +45,7 @@ export default function AppRoutes() {
 
         {/* workspace */}
         <Route path="/app/:businessId" element={<AppLayout />}>
+          <Route index element={<Navigate to="assistant" replace />} />
           <Route path="home" element={<Navigate to="../assistant" replace />} />
           <Route path="health" element={<Navigate to="../assistant" replace />} />
           <Route path="assistant" element={<AssistantPage />} />

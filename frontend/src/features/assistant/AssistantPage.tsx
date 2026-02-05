@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { fetchAssistantThread, postAssistantMessage, type AssistantThreadMessage } from "../../api/assistantThread";
 import { publishDailyBrief, type DailyBriefOut, type DailyBriefPlaybook } from "../../api/dailyBrief";
@@ -19,6 +19,7 @@ import {
 import { useAppState } from "../../app/state/appState";
 import { addPlanNote, createPlan, listPlans, markPlanStepDone, updatePlanStatus, type ResolutionPlan } from "../../api/plans";
 import { fetchAssistantProgress, type AssistantProgress } from "../../api/progress";
+import { fetchWorkQueue, type WorkQueueItem } from "../../api/workQueue";
 import styles from "./AssistantPage.module.css";
 
 function formatDate(value?: string | null) {
@@ -54,6 +55,7 @@ export default function AssistantPage() {
   const businessId = businessIdParam?.trim() || searchParams.get("businessId")?.trim() || "";
   const initialSignalId = searchParams.get("signalId")?.trim() || null;
   const createPlanSignalId = searchParams.get("createPlanSignalId")?.trim() || null;
+  const initialPlanId = searchParams.get("planId")?.trim() || null;
   const { setActiveBusinessId } = useAppState();
 
   const [signals, setSignals] = useState<SignalState[]>([]);
@@ -68,11 +70,18 @@ export default function AssistantPage() {
   const [reason, setReason] = useState("");
   const [showCompletionPrompt, setShowCompletionPrompt] = useState(false);
   const [plans, setPlans] = useState<ResolutionPlan[]>([]);
-  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(initialPlanId);
   const [planNoteText, setPlanNoteText] = useState("");
   const [progress, setProgress] = useState<AssistantProgress | null>(null);
+  const [workQueue, setWorkQueue] = useState<WorkQueueItem[]>([]);
+  const resumedRef = useRef(false);
+  const planStepRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   useEffect(() => setActiveBusinessId(businessId || null), [businessId, setActiveBusinessId]);
+
+  useEffect(() => {
+    resumedRef.current = false;
+  }, [businessId]);
 
   const loadAll = useCallback(async () => {
     if (!businessId) return;
@@ -99,7 +108,13 @@ export default function AssistantPage() {
     if (!businessId) return;
     const rows = await listPlans(businessId);
     setPlans(rows);
-    setSelectedPlanId((prev) => prev ?? rows[0]?.plan_id ?? null);
+    setSelectedPlanId((prev) => prev ?? initialPlanId ?? rows[0]?.plan_id ?? null);
+  }, [businessId, initialPlanId]);
+
+  const loadWorkQueue = useCallback(async () => {
+    if (!businessId) return;
+    const queue = await fetchWorkQueue(businessId, 50);
+    setWorkQueue(queue.items ?? []);
   }, [businessId]);
 
   const loadDailyBrief = useCallback(async () => {
@@ -115,7 +130,8 @@ export default function AssistantPage() {
     loadAll();
     loadThread();
     loadPlans();
-  }, [loadAll, loadThread, loadDailyBrief, loadPlans]);
+    loadWorkQueue();
+  }, [loadAll, loadThread, loadDailyBrief, loadPlans, loadWorkQueue]);
 
   const topPriorities = useMemo(() => {
     const penalties = new Map((healthScore?.contributors ?? []).map((row) => [row.signal_id, row.penalty]));
@@ -225,6 +241,38 @@ export default function AssistantPage() {
     }
   }, [businessId, loadThread, navigate, selectedSignalId]);
 
+  const handleWorkQueueAction = useCallback(async (item: WorkQueueItem) => {
+    if (!businessId) return;
+    const payload = item.primary_action.payload || {};
+    if (item.primary_action.type === "open_plan") {
+      const planId = String(payload.plan_id ?? item.id);
+      setSelectedPlanId(planId);
+      return;
+    }
+    if (item.primary_action.type === "open_explain") {
+      const signalId = String(payload.signal_id ?? item.id);
+      await appendExplainMessage(signalId, "priority");
+      return;
+    }
+    const signalId = String(payload.signal_id ?? item.id);
+    const playbookId = String(payload.playbook_id ?? "");
+    const title = String(payload.title ?? item.title);
+    const deepLinkRaw = payload.deep_link;
+    const deepLink = typeof deepLinkRaw === "string" ? deepLinkRaw.replace("{businessId}", businessId) : null;
+    await postAssistantMessage(businessId, {
+      author: "assistant",
+      kind: "playbook_started",
+      signal_id: signalId,
+      content_json: { playbook_id: playbookId, title, source: "work_queue" },
+    });
+    await loadThread();
+    if (deepLink) {
+      navigate(deepLink);
+      return;
+    }
+    await appendExplainMessage(signalId, "priority");
+  }, [appendExplainMessage, businessId, loadThread, navigate]);
+
   const handleBriefStartPlaybook = useCallback(async (signalId: string, playbook: DailyBriefPlaybook) => {
     if (!businessId) return;
     await postAssistantMessage(businessId, {
@@ -261,7 +309,38 @@ export default function AssistantPage() {
 
 
 
+  const doNextItems = useMemo(() => workQueue.slice(0, 3), [workQueue]);
+  const backlogItems = useMemo(() => workQueue.slice(3), [workQueue]);
   const selectedPlan = useMemo(() => plans.find((plan) => plan.plan_id === selectedPlanId) ?? null, [plans, selectedPlanId]);
+  useEffect(() => {
+    if (!selectedPlan) return;
+    const firstUnfinished = selectedPlan.steps.find((step) => step.status !== "done");
+    if (!firstUnfinished) return;
+    const node = planStepRefs.current[firstUnfinished.step_id];
+    if (node && typeof node.scrollIntoView === "function") {
+      node.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [selectedPlan]);
+
+  useEffect(() => {
+    if (!businessId || resumedRef.current) return;
+    if (plans.length === 0 && workQueue.length === 0) return;
+
+    const activePlan = plans.find((plan) => plan.status === "open" || plan.status === "in_progress");
+    if (activePlan) {
+      setSelectedPlanId(activePlan.plan_id);
+      resumedRef.current = true;
+      return;
+    }
+
+    const topSignal = workQueue.find((item) => item.kind === "signal");
+    if (topSignal) {
+      resumedRef.current = true;
+      void handleWorkQueueAction(topSignal);
+      return;
+    }
+    resumedRef.current = true;
+  }, [businessId, handleWorkQueueAction, plans, workQueue]);
 
   const planActivity = useMemo(() => {
     if (!selectedPlanId) return [];
@@ -375,6 +454,32 @@ export default function AssistantPage() {
           </div>
         )}
 
+        <div className={styles.card}>
+          <div className={styles.cardTitle}>Today's Work Queue</div>
+          <div className={styles.cardTitle} style={{ marginTop: 8 }}>Do next</div>
+          {doNextItems.map((item) => (
+            <div key={`${item.kind}-${item.id}`} className={styles.card}>
+              <div><strong>{item.title}</strong></div>
+              <div className={styles.actionChips}>
+                {item.domain ? <span className={styles.actionChip}>{item.domain}</span> : null}
+                {item.severity ? <span className={styles.actionChip}>{item.severity}</span> : null}
+                <span className={styles.actionChip}>{item.status}</span>
+              </div>
+              <div className={styles.muted}>{item.why_now}</div>
+              <div className={styles.actionChips}>
+                <button className={styles.actionChip} onClick={() => handleWorkQueueAction(item)}>{item.primary_action.label}</button>
+              </div>
+            </div>
+          ))}
+          {backlogItems.length > 0 ? <div className={styles.cardTitle} style={{ marginTop: 8 }}>Backlog</div> : null}
+          {backlogItems.map((item) => (
+            <button key={`${item.kind}-${item.id}`} className={styles.alertRow} onClick={() => handleWorkQueueAction(item)}>
+              <div>{item.title}</div>
+              <div className={styles.muted}>{item.why_now}</div>
+            </button>
+          ))}
+        </div>
+
         {dailyBrief && (
           <div className={styles.card}>
             <div className={styles.cardTitle}>Daily brief</div>
@@ -465,7 +570,7 @@ export default function AssistantPage() {
             {selectedPlan.steps.map((step) => (
               <label key={step.step_id} className={styles.field}>
                 <span>
-                  <input type="checkbox" checked={step.status === "done"} onChange={() => handlePlanStepDone(step.step_id)} /> {step.title}
+                  <input ref={(node) => { planStepRefs.current[step.step_id] = node; }} type="checkbox" checked={step.status === "done"} onChange={() => handlePlanStepDone(step.step_id)} /> {step.title}
                 </span>
               </label>
             ))}

@@ -73,4 +73,9 @@ describe("AppRoutes redirects", () => {
     await waitFor(() => expect(fetchDashboard).toHaveBeenCalled());
     await waitFor(() => expect(screen.getAllByText("assistant-page").length).toBeGreaterThan(0));
   });
+
+  it("redirects /app/:businessId to assistant", async () => {
+    renderRoutes("/app/11111111-1111-4111-8111-111111111111");
+    await waitFor(() => expect(screen.getAllByText("assistant-page").length).toBeGreaterThan(0));
+  });
 });

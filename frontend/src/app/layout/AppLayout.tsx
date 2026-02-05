@@ -14,17 +14,17 @@ const primaryNav: NavItem[] = [
   { label: "Ledger", path: "ledger" },
 ];
 
-const secondaryNav: NavItem[] = [
+const toolsNav: NavItem[] = [
   { label: "Categorize", path: "categorize" },
   { label: "Rules", path: "rules" },
   { label: "Vendors", path: "vendors" },
   { label: "Integrations", path: "integrations" },
-  { label: "Settings", path: "settings" },
   { label: "Trends", path: "trends" },
+  { label: "Settings", path: "settings" },
+  { label: "Simulator", path: "admin/simulator" },
   { label: "Dashboard", path: "dashboard" },
 ];
 
-const adminNav: NavItem[] = [{ label: "Simulator", path: "admin/simulator" }];
 
 function NavSection({
   title,
@@ -93,8 +93,20 @@ export default function AppLayout() {
         </div>
 
         <NavSection title="Workspace" items={primaryNav} businessId={businessId} />
-        <NavSection title="Tools" items={secondaryNav} businessId={businessId} />
-        <NavSection title="Admin" items={adminNav} businessId={businessId} />
+        <details className={styles.toolsDropdown} open>
+          <summary className={styles.toolsSummary}>Tools</summary>
+          <div className={styles.navItems}>
+            {toolsNav.map((item) => (
+              <NavLink
+                key={item.path}
+                to={`/app/${businessId}/${item.path}`}
+                className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navItemActive : ""}`}
+              >
+                <span className={styles.navLabel}>{item.label}</span>
+              </NavLink>
+            ))}
+          </div>
+        </details>
       </aside>
 
       <div className={styles.main}>
