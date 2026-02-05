@@ -17,7 +17,8 @@ import {
   type SignalState,
 } from "../../api/signals";
 import { useAppState } from "../../app/state/appState";
-import { addPlanNote, createPlan, listPlans, markPlanStepDone, type ResolutionPlan } from "../../api/plans";
+import { addPlanNote, createPlan, listPlans, markPlanStepDone, updatePlanStatus, type ResolutionPlan } from "../../api/plans";
+import { fetchAssistantProgress, type AssistantProgress } from "../../api/progress";
 import styles from "./AssistantPage.module.css";
 
 function formatDate(value?: string | null) {
@@ -69,6 +70,7 @@ export default function AssistantPage() {
   const [plans, setPlans] = useState<ResolutionPlan[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [planNoteText, setPlanNoteText] = useState("");
+  const [progress, setProgress] = useState<AssistantProgress | null>(null);
 
   useEffect(() => setActiveBusinessId(businessId || null), [businessId, setActiveBusinessId]);
 
@@ -104,6 +106,8 @@ export default function AssistantPage() {
     if (!businessId) return;
     const result = await publishDailyBrief(businessId);
     setDailyBrief(result.brief);
+    const progressData = await fetchAssistantProgress(businessId, 7);
+    setProgress(progressData);
   }, [businessId]);
 
   useEffect(() => {
@@ -277,6 +281,12 @@ export default function AssistantPage() {
     await Promise.all([loadPlans(), loadThread()]);
   }, [actor, businessId, selectedPlanId, loadPlans, loadThread]);
 
+  const handlePlanStatusDone = useCallback(async () => {
+    if (!businessId || !selectedPlanId) return;
+    await updatePlanStatus(businessId, selectedPlanId, { actor, status: "done" });
+    await Promise.all([loadPlans(), loadThread()]);
+  }, [actor, businessId, selectedPlanId, loadPlans, loadThread]);
+
   const handlePlanNoteSubmit = useCallback(async (event: FormEvent) => {
     event.preventDefault();
     if (!businessId || !selectedPlanId || !planNoteText.trim()) return;
@@ -350,6 +360,21 @@ export default function AssistantPage() {
       </div>
 
       <div className={styles.mainPanel}>
+        {progress && (
+          <div className={styles.card}>
+            <div className={styles.cardTitle}>Progress</div>
+            <div>Health score {progress.health_score.current} ({progress.health_score.delta_window >= 0 ? "+" : ""}{progress.health_score.delta_window})</div>
+            <div>Open signals {progress.open_signals.current} ({progress.open_signals.delta_window >= 0 ? "+" : ""}{progress.open_signals.delta_window})</div>
+            <div>Plans this week {progress.plans.completed_count_window} · Active {progress.plans.active_count}</div>
+            <div>Streak {progress.streak_days} day{progress.streak_days === 1 ? "" : "s"}</div>
+            <div className={styles.actionChips} style={{ marginTop: 8 }}>
+              {progress.top_domains_open.map((row) => (
+                <span key={row.domain} className={styles.actionChip}>{row.domain} ({row.count})</span>
+              ))}
+            </div>
+          </div>
+        )}
+
         {dailyBrief && (
           <div className={styles.card}>
             <div className={styles.cardTitle}>Daily brief</div>
@@ -435,6 +460,7 @@ export default function AssistantPage() {
                 </button>
               ))}
             </div>
+            <div className={styles.actionChips} style={{ marginTop: 8 }}><button className={styles.actionChip} onClick={handlePlanStatusDone}>Mark done</button></div>
             <div className={styles.cardTitle} style={{ marginTop: 12 }}>Steps</div>
             {selectedPlan.steps.map((step) => (
               <label key={step.step_id} className={styles.field}>
@@ -453,6 +479,18 @@ export default function AssistantPage() {
               <textarea className={styles.textarea} value={planNoteText} onChange={(event) => setPlanNoteText(event.target.value)} />
               <button className={styles.actionChip} type="submit">Add note</button>
             </form>
+            {selectedPlan.status === "done" && selectedPlan.outcome && (
+              <>
+                <div className={styles.cardTitle} style={{ marginTop: 12 }}>Outcome</div>
+                <div className={styles.muted}>Health {selectedPlan.outcome.health_score_at_start} → {selectedPlan.outcome.health_score_at_done} ({selectedPlan.outcome.health_score_delta})</div>
+                <div className={styles.muted}>Signals resolved {selectedPlan.outcome.signals_resolved_count}/{selectedPlan.outcome.signals_total}; still open {selectedPlan.outcome.signals_still_open_count}</div>
+                <ul>
+                  {selectedPlan.outcome.summary_bullets.map((bullet) => (
+                    <li key={bullet}>{bullet}</li>
+                  ))}
+                </ul>
+              </>
+            )}
             <div className={styles.cardTitle} style={{ marginTop: 12 }}>Activity</div>
             <ul>
               {planActivity.map((message) => (

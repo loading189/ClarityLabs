@@ -41,6 +41,7 @@ const getSignalExplain = vi.fn().mockResolvedValue({
 });
 const updateSignalStatus = vi.fn();
 const getMonitorStatus = vi.fn();
+const fetchAssistantProgress = vi.fn().mockResolvedValue({ business_id: "biz-1", window_days: 7, generated_at: new Date().toISOString(), health_score: { current: 78, delta_window: 0 }, open_signals: { current: 1, delta_window: 0 }, plans: { active_count: 1, completed_count_window: 0 }, streak_days: 1, top_domains_open: [{ domain: "expense", count: 1 }] });
 const listPlans = vi.fn().mockResolvedValue([]);
 const createPlan = vi.fn();
 const markPlanStepDone = vi.fn();
@@ -61,6 +62,7 @@ vi.mock("../../api/assistantThread", () => ({
   postAssistantMessage: (...args: unknown[]) => postAssistantMessage(...args),
 }));
 vi.mock("../../api/dailyBrief", () => ({ publishDailyBrief: (...args: unknown[]) => publishDailyBrief(...args) }));
+vi.mock("../../api/progress", () => ({ fetchAssistantProgress: (...args: unknown[]) => fetchAssistantProgress(...args) }));
 vi.mock("../../api/plans", () => ({ listPlans: (...args: unknown[]) => listPlans(...args), createPlan: (...args: unknown[]) => createPlan(...args), markPlanStepDone: (...args: unknown[]) => markPlanStepDone(...args), addPlanNote: (...args: unknown[]) => addPlanNote(...args) }));
 vi.mock("../../api/monitor", () => ({ getMonitorStatus: (...args: unknown[]) => getMonitorStatus(...args) }));
 

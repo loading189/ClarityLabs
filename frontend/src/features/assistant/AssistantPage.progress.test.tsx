@@ -27,20 +27,29 @@ const publishDailyBrief = vi.fn().mockResolvedValue({
     links: { assistant: "/", signals: "/", health_score: "/", changes: "/" },
   },
 });
+const fetchAssistantProgress = vi.fn().mockResolvedValue({
+  business_id: "biz-1",
+  window_days: 7,
+  generated_at: new Date().toISOString(),
+  health_score: { current: 78, delta_window: 2 },
+  open_signals: { current: 3, delta_window: -1 },
+  plans: { active_count: 2, completed_count_window: 1 },
+  streak_days: 4,
+  top_domains_open: [{ domain: "expense", count: 2 }, { domain: "liquidity", count: 1 }],
+});
 const getSignalExplain = vi.fn().mockResolvedValue({
   business_id: "biz-1", signal_id: "sig-1",
   state: { status: "open", severity: "warning", created_at: null, updated_at: null, last_seen_at: null, resolved_at: null, metadata: {}, resolved_condition_met: false },
   detector: { type: "expense", title: "Expense creep", description: "", domain: "expense", default_severity: "warning", recommended_actions: [], evidence_schema: [], scoring_profile: {} },
-  evidence: [], related_audits: [], next_actions: [], clear_condition: null,
-  playbooks: [{ id: "pb-1", title: "Inspect", description: "", kind: "inspect", ui_target: "assistant", deep_link: null }], links: [],
+  evidence: [], related_audits: [], next_actions: [], clear_condition: null, playbooks: [], links: [],
 });
 const updateSignalStatus = vi.fn();
-const listPlans = vi.fn().mockResolvedValue([{ plan_id: "plan-1", business_id: "biz-1", title: "Plan 1", status: "open", created_at: new Date().toISOString(), updated_at: new Date().toISOString(), signal_ids: ["sig-1"], steps: [{ step_id: "step-1", title: "Inspect", status: "todo", playbook_id: "pb-1" }], notes: [] }]);
-const createPlan = vi.fn().mockResolvedValue({ plan_id: "plan-2", business_id: "biz-1", title: "Plan 2", status: "open", created_at: new Date().toISOString(), updated_at: new Date().toISOString(), signal_ids: ["sig-1"], steps: [], notes: [] });
-const markPlanStepDone = vi.fn().mockResolvedValue({});
-const addPlanNote = vi.fn().mockResolvedValue({});
+const listPlans = vi.fn().mockResolvedValue([{ plan_id: "plan-1", business_id: "biz-1", title: "Plan 1", status: "done", created_at: new Date().toISOString(), updated_at: new Date().toISOString(), signal_ids: ["sig-1"], steps: [], notes: [], outcome: { health_score_at_start: 75, health_score_at_done: 78, health_score_delta: 3, signals_total: 1, signals_resolved_count: 1, signals_still_open_count: 0, summary_bullets: ["Signals resolved: 1/1.", "Signals still open: 0.", "Health score changed by +3.00.", "Clear-condition checks met: 0/1."] } }]);
+const createPlan = vi.fn();
+const markPlanStepDone = vi.fn();
+const addPlanNote = vi.fn();
+const updatePlanStatus = vi.fn().mockResolvedValue({});
 const getMonitorStatus = vi.fn();
-const fetchAssistantProgress = vi.fn().mockResolvedValue({ business_id: "biz-1", window_days: 7, generated_at: new Date().toISOString(), health_score: { current: 78, delta_window: 0 }, open_signals: { current: 1, delta_window: 0 }, plans: { active_count: 1, completed_count_window: 0 }, streak_days: 1, top_domains_open: [{ domain: "expense", count: 1 }] });
 
 vi.mock("../../api/signals", () => ({ listSignalStates: (...args: unknown[]) => listSignalStates(...args), getSignalExplain: (...args: unknown[]) => getSignalExplain(...args), updateSignalStatus: (...args: unknown[]) => updateSignalStatus(...args) }));
 vi.mock("../../api/healthScore", () => ({ fetchHealthScore: (...args: unknown[]) => fetchHealthScore(...args), fetchHealthScoreExplainChange: (...args: unknown[]) => fetchHealthScoreExplainChange(...args) }));
@@ -48,39 +57,35 @@ vi.mock("../../api/changes", () => ({ listChanges: (...args: unknown[]) => listC
 vi.mock("../../api/assistantThread", () => ({ fetchAssistantThread: (...args: unknown[]) => fetchAssistantThread(...args), postAssistantMessage: (...args: unknown[]) => postAssistantMessage(...args) }));
 vi.mock("../../api/dailyBrief", () => ({ publishDailyBrief: (...args: unknown[]) => publishDailyBrief(...args) }));
 vi.mock("../../api/progress", () => ({ fetchAssistantProgress: (...args: unknown[]) => fetchAssistantProgress(...args) }));
-vi.mock("../../api/plans", () => ({ listPlans: (...args: unknown[]) => listPlans(...args), createPlan: (...args: unknown[]) => createPlan(...args), markPlanStepDone: (...args: unknown[]) => markPlanStepDone(...args), addPlanNote: (...args: unknown[]) => addPlanNote(...args) }));
+vi.mock("../../api/plans", () => ({ listPlans: (...args: unknown[]) => listPlans(...args), createPlan: (...args: unknown[]) => createPlan(...args), markPlanStepDone: (...args: unknown[]) => markPlanStepDone(...args), addPlanNote: (...args: unknown[]) => addPlanNote(...args), updatePlanStatus: (...args: unknown[]) => updatePlanStatus(...args) }));
 vi.mock("../../api/monitor", () => ({ getMonitorStatus: (...args: unknown[]) => getMonitorStatus(...args) }));
 
 function renderAssistant() {
   return render(<AppStateProvider><MemoryRouter initialEntries={["/app/biz-1/assistant"]}><Routes><Route path="/app/:businessId/assistant" element={<AssistantPage />} /></Routes></MemoryRouter></AppStateProvider>);
 }
 
-describe("AssistantPage plans", () => {
+describe("AssistantPage progress", () => {
   afterEach(() => cleanup());
   beforeEach(() => vi.clearAllMocks());
 
-  it("renders plans list", async () => {
+  it("renders progress panel", async () => {
     renderAssistant();
-    await screen.findByRole("button", { name: /Plan 1 · open/i });
-    expect(listPlans).toHaveBeenCalled();
+    await screen.findByText(/Progress/i);
+    expect(screen.getByText(/Health score 78/)).toBeInTheDocument();
+    expect(fetchAssistantProgress).toHaveBeenCalled();
   });
 
-  it("creates plan from daily brief priority click", async () => {
+  it("renders plan outcome when done", async () => {
     renderAssistant();
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: /Create plan/i }));
-    await waitFor(() => expect(createPlan).toHaveBeenCalled());
-  });
-
-  it("marks step done and adds note", async () => {
-    renderAssistant();
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole("checkbox"));
-    await waitFor(() => expect(markPlanStepDone).toHaveBeenCalled());
-    const textareas = screen.getAllByRole("textbox");
-    await user.type(textareas[textareas.length - 1], "note text");
-    await user.click(screen.getByRole("button", { name: /Add note/i }));
-    await waitFor(() => expect(addPlanNote).toHaveBeenCalled());
+    await screen.findByText(/Outcome/i);
+    expect(screen.getByText(/Signals resolved 1\/1/)).toBeInTheDocument();
     expect(getMonitorStatus).not.toHaveBeenCalled();
+  });
+
+  it("marks plan done", async () => {
+    renderAssistant();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /Mark done/i }));
+    await waitFor(() => expect(updatePlanStatus).toHaveBeenCalled());
   });
 });

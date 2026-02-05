@@ -10,6 +10,16 @@ export type ResolutionPlanStep = {
   status: PlanStepStatus;
 };
 
+export type ResolutionPlanOutcome = {
+  health_score_at_start?: number;
+  health_score_at_done?: number;
+  health_score_delta?: number;
+  signals_total: number;
+  signals_resolved_count: number;
+  signals_still_open_count: number;
+  summary_bullets: string[];
+};
+
 export type ResolutionPlanNote = {
   id: string;
   created_at: string;
@@ -27,6 +37,8 @@ export type ResolutionPlan = {
   signal_ids: string[];
   steps: ResolutionPlanStep[];
   notes: ResolutionPlanNote[];
+  completed_at?: string | null;
+  outcome?: ResolutionPlanOutcome | null;
 };
 
 export function listPlans(businessId: string, signal?: AbortSignal) {

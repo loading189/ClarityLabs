@@ -9,8 +9,8 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from backend.app.models import AssistantMessage, Business
-from backend.app.services import signals_service
+from backend.app.models import AssistantMessage, Business, HealthSignalState
+from backend.app.services import health_score_service, signals_service
 from backend.app.services.assistant_thread_service import AssistantMessageIn, append_message
 
 ALLOWED_PLAN_STATUS = {"open", "in_progress", "done"}
@@ -70,6 +70,8 @@ class PlanOut(BaseModel):
     signal_ids: List[str]
     steps: List[Dict[str, Any]]
     notes: List[Dict[str, Any]]
+    completed_at: Optional[str] = None
+    outcome: Optional[Dict[str, Any]] = None
 
 
 def _now_iso() -> str:
@@ -103,6 +105,96 @@ def _parse_plan_row(row: AssistantMessage) -> Optional[Dict[str, Any]]:
         "signal_ids": [str(signal_id) for signal_id in (content.get("signal_ids") or [])],
         "steps": list(content.get("steps") or []),
         "notes": list(content.get("notes") or []),
+        "completed_at": content.get("completed_at"),
+        "outcome": content.get("outcome"),
+    }
+
+
+def _get_daily_brief_metrics_by_date(db: Session, business_id: str, target_date: str) -> Dict[str, Any]:
+    rows = (
+        db.execute(
+            select(AssistantMessage)
+            .where(
+                AssistantMessage.business_id == business_id,
+                AssistantMessage.kind == "daily_brief",
+            )
+            .order_by(AssistantMessage.created_at.desc(), AssistantMessage.id.desc())
+        )
+        .scalars()
+        .all()
+    )
+    for row in rows:
+        payload = row.content_json if isinstance(row.content_json, dict) else {}
+        if str(payload.get("date") or "") != target_date:
+            continue
+        metrics = payload.get("metrics")
+        if isinstance(metrics, dict):
+            return metrics
+    return {}
+
+
+def _is_resolved_status(status: str) -> bool:
+    return status in {"resolved", "closed"}
+
+
+def _compute_plan_outcome(db: Session, business_id: str, content: Dict[str, Any], completed_at_iso: str) -> Dict[str, Any]:
+    signal_ids = sorted({str(signal_id) for signal_id in (content.get("signal_ids") or []) if str(signal_id)})
+    states = {
+        state.signal_id: state
+        for state in (
+            db.execute(
+                select(HealthSignalState).where(
+                    HealthSignalState.business_id == business_id,
+                    HealthSignalState.signal_id.in_(signal_ids),
+                )
+            )
+            .scalars()
+            .all()
+        )
+    }
+
+    resolved_count = 0
+    resolved_condition_met_count = 0
+    for signal_id in signal_ids:
+        state = states.get(signal_id)
+        if not state:
+            continue
+        if _is_resolved_status(str(state.status or "")):
+            resolved_count += 1
+        explain = signals_service.get_signal_explain(db, business_id, signal_id)
+        if bool((explain.get("state") or {}).get("resolved_condition_met")):
+            resolved_condition_met_count += 1
+
+    health_done = float(health_score_service.compute_health_score(db, business_id).get("score") or 0.0)
+    created_at_iso = str(content.get("created_at") or "")
+    start_date = ""
+    if created_at_iso:
+        try:
+            start_date = datetime.fromisoformat(created_at_iso).astimezone(timezone.utc).date().isoformat()
+        except ValueError:
+            start_date = ""
+    start_metrics = _get_daily_brief_metrics_by_date(db, business_id, start_date) if start_date else {}
+    health_start_raw = start_metrics.get("health_score")
+    health_start = float(health_start_raw) if isinstance(health_start_raw, (float, int)) else health_done
+    health_delta = round(health_done - health_start, 2)
+    still_open_count = max(0, len(signal_ids) - resolved_count)
+
+    summary_bullets = [
+        f"Signals resolved: {resolved_count}/{len(signal_ids)}.",
+        f"Signals still open: {still_open_count}.",
+        f"Health score changed by {health_delta:+.2f}.",
+        f"Clear-condition checks met: {resolved_condition_met_count}/{len(signal_ids)}.",
+    ][:4]
+
+    return {
+        "health_score_at_start": round(health_start, 2),
+        "health_score_at_done": round(health_done, 2),
+        "health_score_delta": health_delta,
+        "signals_total": len(signal_ids),
+        "signals_resolved_count": resolved_count,
+        "signals_still_open_count": still_open_count,
+        "summary_bullets": summary_bullets,
+        "completed_at": completed_at_iso,
     }
 
 
@@ -247,7 +339,20 @@ def update_plan_status(db: Session, business_id: str, plan_id: str, req: PlanSta
     row = _get_plan_row_by_plan_id(db, business_id, plan_id)
     content = dict(row.content_json or {})
     content["status"] = req.status
-    content["updated_at"] = _now_iso()
+    now_iso = _now_iso()
+    content["updated_at"] = now_iso
+    if req.status == "done":
+        content["completed_at"] = now_iso
+        outcome = _compute_plan_outcome(db, business_id, content, now_iso)
+        content["outcome"] = {
+            "health_score_at_start": outcome["health_score_at_start"],
+            "health_score_at_done": outcome["health_score_at_done"],
+            "health_score_delta": outcome["health_score_delta"],
+            "signals_total": outcome["signals_total"],
+            "signals_resolved_count": outcome["signals_resolved_count"],
+            "signals_still_open_count": outcome["signals_still_open_count"],
+            "summary_bullets": outcome["summary_bullets"],
+        }
     row.content_json = content
     db.add(row)
     db.commit()
