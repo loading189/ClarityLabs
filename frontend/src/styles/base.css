@@ -40,7 +40,7 @@ select,
 textarea {
   font: inherit;
   color: var(--text);
-  background: var(--card-bg);
+  background: #161c2a!important;
   border: none; 
 }
 
