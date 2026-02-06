@@ -1206,7 +1206,14 @@ def pulse(db: Session, business_id: str, n: int, *, run_monitoring: bool = True)
     if run_monitoring:
         monitor_result = monitoring_service.pulse(db, business_id)
 
-    return {
-        "generated": {"requested": n, "inserted": inserted},
-        "monitoring": monitor_result,
+    response: Dict[str, Any] = monitor_result or {
+        "ran": False,
+        "last_pulse_at": None,
+        "newest_event_at": None,
+        "newest_event_source_event_id": None,
+        "counts": {"by_status": {}, "by_severity": {}},
+        "touched_signal_ids": [],
     }
+    response["generated"] = {"requested": n, "inserted": inserted}
+    response["inserted"] = inserted
+    return response
