@@ -60,6 +60,11 @@ function mapDrilldownToFilters(
     const window = days <= 7 ? "7" : days <= 30 ? "30" : "90";
     Object.assign(next, { window, ...getDateRangeForWindow(window) });
   }
+  const presetValue = getString(payload, "date_preset");
+  if (presetValue === "7d" || presetValue === "30d" || presetValue === "90d") {
+    const window = presetValue.replace("d", "") as "7" | "30" | "90";
+    Object.assign(next, { window, ...getDateRangeForWindow(window) });
+  }
   return next;
 }
 

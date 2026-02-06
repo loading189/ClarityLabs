@@ -1,5 +1,6 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import LedgerPage from "./LedgerPage";
@@ -23,11 +24,24 @@ function renderPage(path = `/app/${BIZ_ID}/ledger?anchor_source_event_id=evt-2`)
     <AppStateProvider>
       <MemoryRouter initialEntries={[path]}>
         <Routes>
-          <Route path="/app/:businessId/ledger" element={<LedgerPage />} />
+          <Route
+            path="/app/:businessId/ledger"
+            element={
+              <>
+                <LedgerPage />
+                <LocationDisplay />
+              </>
+            }
+          />
         </Routes>
       </MemoryRouter>
     </AppStateProvider>
   );
+}
+
+function LocationDisplay() {
+  const location = useLocation();
+  return <div data-testid="location">{location.search}</div>;
 }
 
 afterEach(() => {
@@ -73,5 +87,34 @@ describe("LedgerPage anchor behavior", () => {
     const rentRow = rentCells[0]?.closest("tr");
     expect(rentRow).not.toBeNull();
     await waitFor(() => expect(rentRow).toHaveClass(styles.rowSelected));
+  });
+
+  it("updates anchor query param when clicking a row", async () => {
+    fetchLedgerQuery.mockResolvedValue({
+      rows: [
+        {
+          occurred_at: "2024-01-01",
+          date: "2024-01-01",
+          description: "Coffee",
+          vendor: "Cafe",
+          amount: -12,
+          category: "Meals",
+          account: "Operating",
+          balance: 100,
+          source_event_id: "evt-1",
+        },
+      ],
+      summary: { row_count: 1, start_balance: 0, end_balance: 0, total_in: 0, total_out: 0 },
+    });
+    fetchLedgerAccountDimensions.mockResolvedValue([]);
+    fetchLedgerVendorDimensions.mockResolvedValue([]);
+
+    renderPage(`/app/${BIZ_ID}/ledger`);
+    const user = userEvent.setup();
+    const row = await screen.findByText("Coffee");
+    await user.click(row);
+
+    const location = screen.getByTestId("location");
+    await waitFor(() => expect(location.textContent).toContain("anchor_source_event_id=evt-1"));
   });
 });
