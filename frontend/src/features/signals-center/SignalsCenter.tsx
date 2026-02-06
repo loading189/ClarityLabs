@@ -16,6 +16,7 @@ import {
   type SignalStateDetail,
   type SignalStatus,
 } from "../../api/signals";
+import { getMonitorStatus, type MonitorStatus } from "../../api/monitor";
 import styles from "./SignalsCenter.module.css";
 import HealthScoreBreakdownDrawer from "../../components/health-score/HealthScoreBreakdownDrawer";
 import { Button, Chip, Panel } from "../../components/ui";
@@ -77,11 +78,6 @@ function mapLegacySignal(signal: Signal): SignalState {
     updated_at: null,
   };
 }
-
-type StatusModalState = {
-  open: boolean;
-  nextStatus: SignalStatus | null;
-};
 
 function RelatedChanges({
   businessId,
@@ -230,20 +226,19 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailErr, setDetailErr] = useState<string | null>(null);
   const [detailExplain, setDetailExplain] = useState<any | null>(null);
-  const [statusModal, setStatusModal] = useState<StatusModalState>({
-    open: false,
-    nextStatus: null,
-  });
+  const [statusSelections, setStatusSelections] = useState<Record<string, SignalStatus>>({});
+  const [statusSaving, setStatusSaving] = useState<Record<string, boolean>>({});
+  const [statusErrors, setStatusErrors] = useState<Record<string, string>>({});
   const [detailSourceEventId, setDetailSourceEventId] = useState<string | null>(null);
   const [healthScore, setHealthScore] = useState<HealthScoreOut | null>(null);
   const [healthScoreLoading, setHealthScoreLoading] = useState(false);
   const [healthScoreErr, setHealthScoreErr] = useState<string | null>(null);
   const [breakdownOpen, setBreakdownOpen] = useState(false);
-  const [actor, setActor] = useState("");
-  const [reason, setReason] = useState("");
-  const [savingStatus, setSavingStatus] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [toastAuditId, setToastAuditId] = useState<string | null>(null);
+  const [monitorStatus, setMonitorStatus] = useState<MonitorStatus | null>(null);
+  const [monitorLoading, setMonitorLoading] = useState(false);
+  const [monitorErr, setMonitorErr] = useState<string | null>(null);
   const legacyDateRange = useMemo(() => buildLegacyDateRange(), []);
 
   const loadSignals = useCallback(async () => {
@@ -282,18 +277,30 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
     }
   }, [businessId]);
 
+  const loadMonitorStatus = useCallback(async () => {
+    if (!businessId) return;
+    setMonitorLoading(true);
+    setMonitorErr(null);
+    try {
+      const data = await getMonitorStatus(businessId);
+      setMonitorStatus(data);
+    } catch (e: any) {
+      setMonitorErr(e?.message ?? "Failed to load monitoring status");
+    } finally {
+      setMonitorLoading(false);
+    }
+  }, [businessId]);
+
   useEffect(() => {
     loadSignals();
     loadHealthScore();
-  }, [loadHealthScore, loadSignals]);
+    loadMonitorStatus();
+  }, [loadHealthScore, loadMonitorStatus, loadSignals]);
 
   useEffect(() => {
     if (useLegacyV1) {
       setSelected(null);
       setDetail(null);
-      setStatusModal({ open: false, nextStatus: null });
-      setActor("");
-      setReason("");
       setStatusFilter("");
       return;
     }
@@ -386,41 +393,40 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
     });
   }, [detail?.payload_json, domainFilter, hasLedgerAnchors, selected?.id, signals, severityFilter, statusFilter, textFilter]);
 
-  const openStatusModal = (nextStatus: SignalStatus) => {
-    setStatusModal({ open: true, nextStatus });
-  };
-
-  const closeStatusModal = () => {
-    setStatusModal({ open: false, nextStatus: null });
-    setActor("");
-    setReason("");
-  };
-
-  const handleStatusSubmit = async () => {
+  const handleStatusUpdate = async (signalId: string) => {
     if (useLegacyV1) return;
-    if (!selected || !statusModal.nextStatus) return;
-    if (!actor.trim() || !reason.trim()) return;
-    setSavingStatus(true);
+    const selectedSignal =
+      signals.find((signal) => signal.id === signalId) ||
+      (detail && detail.id === signalId ? detail : null);
+    const nextStatus =
+      statusSelections[signalId] ??
+      (selectedSignal?.status as SignalStatus) ??
+      "open";
+    setStatusSaving((prev) => ({ ...prev, [signalId]: true }));
+    setStatusErrors((prev) => ({ ...prev, [signalId]: "" }));
     setToastMsg(null);
     setToastAuditId(null);
     try {
-      const result = await updateSignalStatus(businessId, selected.id, {
-        status: statusModal.nextStatus,
-        actor: actor.trim(),
-        reason: reason.trim(),
+      const result = await updateSignalStatus(businessId, signalId, {
+        status: nextStatus,
       });
       setToastAuditId(result.audit_id ?? null);
       setToastMsg(`Status updated to ${STATUS_LABELS[result.status] ?? result.status}.`);
-      closeStatusModal();
       await loadSignals();
       await loadHealthScore();
-      const detailData = await getSignalDetail(businessId, selected.id);
-      setDetail(detailData);
-      setSelected((prev) => (prev ? { ...prev, status: result.status } : prev));
+      await loadMonitorStatus();
+      if (detail && detail.id === signalId) {
+        const detailData = await getSignalDetail(businessId, signalId);
+        setDetail(detailData);
+      }
+      setSelected((prev) => (prev && prev.id === signalId ? { ...prev, status: result.status } : prev));
     } catch (e: any) {
-      setDetailErr(e?.message ?? "Failed to update status");
+      setStatusErrors((prev) => ({
+        ...prev,
+        [signalId]: e?.message ?? "Failed to update status",
+      }));
     } finally {
-      setSavingStatus(false);
+      setStatusSaving((prev) => ({ ...prev, [signalId]: false }));
     }
   };
 
@@ -428,16 +434,8 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
     navigate(`/app/${businessId}/categorize?auditId=${auditId}#recent-changes`);
   };
 
-  const statusButtons = useMemo<Array<{ label: string; status: SignalStatus }>>(() => {
-    if (!detail) return [] as Array<{ label: string; status: SignalStatus }>;
-    if (detail.status === "resolved" || detail.status === "ignored") {
-      return [{ label: "Reopen", status: "open" }];
-    }
-    return [
-      { label: "Resolve", status: "resolved" },
-      { label: "Ignore", status: "ignored" },
-    ];
-  }, [detail]);
+  const buildStatusValue = (signalId: string, fallback: SignalStatus) =>
+    statusSelections[signalId] ?? fallback;
 
   const evidenceTxns = useMemo(() => {
     const entries = new Map<string, { id: string; label?: string; source?: string }>();
@@ -455,8 +453,16 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
     const payload = detail?.payload_json ?? null;
     if (payload && typeof payload === "object") {
       const txnIds = (payload as any).txn_ids;
+      const evidenceIds = (payload as any).evidence_source_event_ids;
+      const evidenceTxnIds = (payload as any).evidence_txn_ids;
       if (Array.isArray(txnIds)) {
         txnIds.forEach((id) => add(id, "Detector evidence", "payload"));
+      }
+      if (Array.isArray(evidenceIds)) {
+        evidenceIds.forEach((id: unknown) => add(id, "Detector evidence", "payload"));
+      }
+      if (Array.isArray(evidenceTxnIds)) {
+        evidenceTxnIds.forEach((id: unknown) => add(id, "Detector evidence", "payload"));
       }
       add((payload as any).ledger_anchor, "Ledger anchor", "payload");
       add((payload as any).txn_id, "Detector evidence", "payload");
@@ -506,6 +512,49 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
         >
           View breakdown
         </Button>
+        <div className={styles.monitoringPanel}>
+          <div className={styles.monitoringTitle}>Monitoring</div>
+          {monitorLoading && <div className={styles.scoreMuted}>Loading status…</div>}
+          {monitorErr && <div className={styles.scoreError}>{monitorErr}</div>}
+          {!monitorLoading && !monitorErr && monitorStatus && (
+            <div className={styles.monitoringBody}>
+              <div className={styles.monitoringRow}>
+                <span>Last pulse</span>
+                <span>{formatDate(monitorStatus.last_pulse_at)}</span>
+              </div>
+              <div className={styles.monitoringRow}>
+                <span>Newest cursor</span>
+                <span>
+                  {formatDate(monitorStatus.newest_event_at)} ·{" "}
+                  {(monitorStatus.newest_event_source_event_id ?? "—").slice(-6)}
+                </span>
+              </div>
+              <div className={styles.monitoringRow}>
+                <span>Open signals</span>
+                <span>{monitorStatus.open_count}</span>
+              </div>
+              <div className={styles.monitoringRow}>
+                <span>Status counts</span>
+                <span>
+                  {Object.entries(monitorStatus.counts.by_status)
+                    .map(([key, value]) => `${key}: ${value}`)
+                    .join(" · ") || "—"}
+                </span>
+              </div>
+              <div className={styles.monitoringRow}>
+                <span>Severity counts</span>
+                <span>
+                  {Object.entries(monitorStatus.counts.by_severity)
+                    .map(([key, value]) => `${key}: ${value}`)
+                    .join(" · ") || "—"}
+                </span>
+              </div>
+              {monitorStatus.gated && (
+                <div className={styles.monitoringGate}>{monitorStatus.gating_reason}</div>
+              )}
+            </div>
+          )}
+        </div>
       </Panel>
       <div className={styles.filters}>
         <label className={styles.filterField}>
@@ -585,9 +634,10 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
             <div className={styles.empty}>No signals match the selected filters.</div>
           )}
           {filteredSignals.map((signal) => (
-            <button
+            <div
               key={signal.id}
-              type="button"
+              role="button"
+              tabIndex={useLegacyV1 ? -1 : 0}
               className={`${styles.row} ${selected?.id === signal.id ? styles.rowActive : ""} ${
                 useLegacyV1 ? styles.rowDisabled : ""
               }`}
@@ -595,7 +645,14 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
                 if (useLegacyV1) return;
                 setSelected(signal);
               }}
-              disabled={useLegacyV1}
+              onKeyDown={(event) => {
+                if (useLegacyV1) return;
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  setSelected(signal);
+                }
+              }}
+              aria-disabled={useLegacyV1}
             >
               <span className={`${styles.severityBadge} ${severityClass(signal.severity)}`}>
                 {signal.severity ?? "—"}
@@ -604,12 +661,42 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
                 <div className={styles.rowTitle}>{signal.title ?? signal.type ?? "Signal"}</div>
                 <div className={styles.rowDomain}>{formatDomainLabel(signal.domain)}</div>
                 <div className={styles.rowSummary}>{signal.summary ?? "—"}</div>
+                {!useLegacyV1 && (
+                  <div className={styles.rowActions} onClick={(event) => event.stopPropagation()}>
+                    <select
+                      className={styles.rowSelect}
+                      value={buildStatusValue(signal.id, signal.status)}
+                      onChange={(event) =>
+                        setStatusSelections((prev) => ({
+                          ...prev,
+                          [signal.id]: event.target.value as SignalStatus,
+                        }))
+                      }
+                    >
+                      <option value="open">Open</option>
+                      <option value="in_progress">In progress</option>
+                      <option value="resolved">Resolved</option>
+                      <option value="ignored">Ignored</option>
+                    </select>
+                    <button
+                      className={styles.secondaryButton}
+                      type="button"
+                      onClick={() => handleStatusUpdate(signal.id)}
+                      disabled={statusSaving[signal.id]}
+                    >
+                      {statusSaving[signal.id] ? "Saving…" : "Update"}
+                    </button>
+                    {statusErrors[signal.id] && (
+                      <span className={styles.inlineError}>{statusErrors[signal.id]}</span>
+                    )}
+                  </div>
+                )}
               </div>
               <div className={styles.rowMeta}>
                 <div>{formatDate(signal.updated_at)}</div>
                 <div className={styles.statusPill}>{STATUS_LABELS[signal.status] ?? signal.status}</div>
               </div>
-            </button>
+            </div>
           ))}
         </div>
       )}
@@ -650,16 +737,29 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
             </div>
 
             <div className={styles.statusActions}>
-              {statusButtons.map((btn) => (
-                <button
-                  key={btn.status}
-                  className={styles.primaryButton}
-                  type="button"
-                  onClick={() => openStatusModal(btn.status)}
-                >
-                  {btn.label}
-                </button>
-              ))}
+              <select
+                className={styles.select}
+                value={buildStatusValue(detail.id, detail.status)}
+                onChange={(event) =>
+                  setStatusSelections((prev) => ({
+                    ...prev,
+                    [detail.id]: event.target.value as SignalStatus,
+                  }))
+                }
+              >
+                <option value="open">Open</option>
+                <option value="in_progress">In progress</option>
+                <option value="resolved">Resolved</option>
+                <option value="ignored">Ignored</option>
+              </select>
+              <button
+                className={styles.primaryButton}
+                type="button"
+                onClick={() => handleStatusUpdate(detail.id)}
+                disabled={statusSaving[detail.id]}
+              >
+                {statusSaving[detail.id] ? "Saving…" : "Update status"}
+              </button>
               {detail && (
                 <Link
                   className={styles.secondaryButton}
@@ -743,63 +843,6 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
         sourceEventId={detailSourceEventId}
         onClose={() => setDetailSourceEventId(null)}
       />
-
-      {statusModal.open && (
-        <div className={styles.modalOverlay} role="dialog" aria-modal="true">
-          <div className={styles.modal}>
-            <div className={styles.modalHeader}>
-              <div>
-                <div className={styles.modalTitle}>Update status</div>
-                <div className={styles.modalSubtitle}>
-                  Provide who is making this change and why.
-                </div>
-              </div>
-              <button type="button" className={styles.modalClose} onClick={closeStatusModal}>
-                Close
-              </button>
-            </div>
-            <div className={styles.modalBody}>
-              <label className={styles.modalField}>
-                Actor
-                <input
-                  className={styles.input}
-                  type="text"
-                  value={actor}
-                  onChange={(event) => setActor(event.target.value)}
-                  placeholder="Name"
-                />
-              </label>
-              <label className={styles.modalField}>
-                Reason
-                <textarea
-                  className={styles.textarea}
-                  value={reason}
-                  onChange={(event) => setReason(event.target.value)}
-                  placeholder="Why are you updating this signal?"
-                />
-              </label>
-              <div className={styles.modalActions}>
-                <button
-                  className={styles.secondaryButton}
-                  type="button"
-                  onClick={closeStatusModal}
-                  disabled={savingStatus}
-                >
-                  Cancel
-                </button>
-                <button
-                  className={styles.primaryButton}
-                  type="button"
-                  onClick={handleStatusSubmit}
-                  disabled={savingStatus || !actor.trim() || !reason.trim()}
-                >
-                  {savingStatus ? "Saving…" : "Confirm update"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       <HealthScoreBreakdownDrawer
         open={breakdownOpen}

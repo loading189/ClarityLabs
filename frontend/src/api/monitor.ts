@@ -9,8 +9,11 @@ export type MonitorStatus = {
   business_id: string;
   last_pulse_at: string | null;
   newest_event_at: string | null;
+  newest_event_source_event_id: string | null;
   open_count: number;
   counts: MonitorCounts;
+  gated: boolean;
+  gating_reason: string | null;
 };
 
 export type MonitorPulseResponse = {

@@ -17,6 +17,7 @@ from backend.app.models import (
     Business,
     BusinessCategoryMap,
     Category,
+    HealthSignalState,
     Organization,
     RawEvent,
     TxnCategorization,
@@ -98,6 +99,18 @@ def test_transaction_detail_includes_raw_and_categorization(db_session):
             after_state={"category_id": cat.id},
         )
     )
+    db_session.add(
+        HealthSignalState(
+            business_id=biz.id,
+            signal_id="sig-evt-1",
+            signal_type="expense_creep_by_vendor",
+            status="resolved",
+            severity="high",
+            title="Expense creep: Coffee Shop",
+            summary="Spend increased",
+            payload_json={"evidence_source_event_ids": ["evt-1"]},
+        )
+    )
     db_session.commit()
 
     detail = transaction_detail(db_session, biz.id, "evt-1")
@@ -109,3 +122,4 @@ def test_transaction_detail_includes_raw_and_categorization(db_session):
     assert detail["categorization"]["category_id"] == cat.id
     assert detail["ledger_context"] is not None
     assert detail["audit_history"][0]["event_type"] == "categorization_change"
+    assert detail["related_signals"][0]["signal_id"] == "sig-evt-1"

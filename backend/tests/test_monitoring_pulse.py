@@ -143,6 +143,8 @@ def test_expense_creep_detector():
     assert len(signals) == 1
     assert signals[0].signal_type == "expense_creep_by_vendor"
     assert signals[0].payload["delta"] >= 200.0
+    assert "p0" in signals[0].payload["evidence_source_event_ids"]
+    assert "c0" in signals[0].payload["evidence_source_event_ids"]
 
 
 def test_low_cash_runway_detector():
@@ -154,6 +156,8 @@ def test_low_cash_runway_detector():
     signals = detect_low_cash_runway("biz-2", txns)
     assert len(signals) == 1
     assert signals[0].severity == "high"
+    assert "burn0" in signals[0].payload["evidence_source_event_ids"]
+    assert "burn29" in signals[0].payload["evidence_source_event_ids"]
 
 
 def test_unusual_outflow_spike_detector():
@@ -167,6 +171,7 @@ def test_unusual_outflow_spike_detector():
     signals = detect_unusual_outflow_spike("biz-3", txns)
     assert len(signals) == 1
     assert signals[0].signal_type == "unusual_outflow_spike"
+    assert signals[0].payload["evidence_source_event_ids"] == ["spike"]
 
 
 def test_pulse_idempotency_and_audit(db_session):

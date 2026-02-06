@@ -207,6 +207,7 @@ def _upsert_signal_states(
             continue
 
         before_state = _serialize_state(state)
+        payload_changed = before_state.get("payload_json") != signal.payload
         if state.status not in ALLOWED_STATUSES:
             state.status = "open"
         if state.status == "ignored":
@@ -230,15 +231,16 @@ def _upsert_signal_states(
         if _signal_changed(before_state, signal, target_status):
             state.updated_at = now
             touched.append(signal.signal_id)
-            audit_service.log_audit_event(
-                db,
-                business_id=business_id,
-                event_type="signal_updated",
-                actor="system",
-                reason="updated",
-                before=before_state,
-                after=_serialize_state(state),
-            )
+            if payload_changed:
+                audit_service.log_audit_event(
+                    db,
+                    business_id=business_id,
+                    event_type="signal_updated",
+                    actor="system",
+                    reason="updated",
+                    before=before_state,
+                    after=_serialize_state(state),
+                )
 
     for state in existing_states:
         if state.signal_id in detected_ids:
@@ -364,7 +366,20 @@ def pulse(
 
 def get_monitor_status(db: Session, business_id: str) -> Dict[str, Any]:
     require_business(db, business_id)
+    now = _now()
     runtime = db.get(MonitorRuntime, business_id)
+    newest_event_at, newest_event_source_event_id = _fetch_newest_event_cursor(db, business_id)
+    gating_reason = None
+    gated = False
+    if (
+        runtime
+        and runtime.last_pulse_at
+        and runtime.newest_event_at == newest_event_at
+        and runtime.newest_event_source_event_id == newest_event_source_event_id
+        and (now - _normalize_dt(runtime.last_pulse_at)) < timedelta(minutes=10)
+    ):
+        gated = True
+        gating_reason = "Cooldown: last pulse was under 10 minutes ago and no new events have arrived."
     states = (
         db.execute(
             select(HealthSignalState).where(
@@ -380,8 +395,10 @@ def get_monitor_status(db: Session, business_id: str) -> Dict[str, Any]:
     return {
         "business_id": business_id,
         "last_pulse_at": runtime.last_pulse_at if runtime else None,
-        "newest_event_at": runtime.newest_event_at if runtime else None,
-        "newest_event_source_event_id": runtime.newest_event_source_event_id if runtime else None,
+        "newest_event_at": newest_event_at,
+        "newest_event_source_event_id": newest_event_source_event_id,
         "open_count": open_count,
         "counts": counts,
+        "gated": gated,
+        "gating_reason": gating_reason,
     }

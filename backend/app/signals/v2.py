@@ -116,6 +116,11 @@ def _txn_ids(txns: Iterable[NormalizedTransaction]) -> List[str]:
     return [txn.source_event_id for txn in txns if txn.source_event_id]
 
 
+def _evidence_source_event_ids(txns: Iterable[NormalizedTransaction]) -> List[str]:
+    ids = {str(txn.source_event_id) for txn in txns if txn.source_event_id}
+    return sorted(ids)
+
+
 def detect_expense_creep_by_vendor(
     business_id: str,
     txns: List[NormalizedTransaction],
@@ -134,6 +139,8 @@ def detect_expense_creep_by_vendor(
 
     current: Dict[str, float] = {}
     prior: Dict[str, float] = {}
+    current_txns: Dict[str, List[NormalizedTransaction]] = {}
+    prior_txns: Dict[str, List[NormalizedTransaction]] = {}
     vendor_label: Dict[str, str] = {}
 
     for txn in txns:
@@ -144,8 +151,10 @@ def detect_expense_creep_by_vendor(
         vendor_label.setdefault(vendor_key, vendor_raw or "Unknown")
         if prior_start <= txn.date <= prior_end:
             prior[vendor_key] = prior.get(vendor_key, 0.0) + float(txn.amount or 0.0)
+            prior_txns.setdefault(vendor_key, []).append(txn)
         if current_start <= txn.date <= last_date:
             current[vendor_key] = current.get(vendor_key, 0.0) + float(txn.amount or 0.0)
+            current_txns.setdefault(vendor_key, []).append(txn)
 
     signals: List[DetectedSignal] = []
     for vendor_key, current_total in current.items():
@@ -161,6 +170,7 @@ def detect_expense_creep_by_vendor(
 
         severity = "high" if increase_pct >= 1.0 or delta >= (min_delta * 3) else "medium"
         vendor_name = vendor_label.get(vendor_key, vendor_key)
+        evidence_txns = (current_txns.get(vendor_key) or []) + (prior_txns.get(vendor_key) or [])
         payload = {
             "vendor_key": vendor_key,
             "vendor_name": vendor_name,
@@ -173,6 +183,7 @@ def detect_expense_creep_by_vendor(
             "min_delta": min_delta,
             "current_window": {"start": current_start.isoformat(), "end": last_date.isoformat()},
             "prior_window": {"start": prior_start.isoformat(), "end": prior_end.isoformat()},
+            "evidence_source_event_ids": _evidence_source_event_ids(evidence_txns),
         }
         signal_type = "expense_creep_by_vendor"
         fingerprint = _fingerprint([business_id, signal_type, vendor_key])
@@ -210,17 +221,10 @@ def detect_low_cash_runway(
     ledger = build_cash_ledger(txns, opening_balance=0.0)
     current_cash = float(ledger[-1].balance) if ledger else 0.0
 
-    burn_start = last_date - timedelta(days=burn_window_days - 1)
-    inflow_total = 0.0
-    outflow_total = 0.0
-
-    for txn in txns:
-        if txn.date < burn_start or txn.date > last_date:
-            continue
-        if txn.direction == "inflow":
-            inflow_total += float(txn.amount or 0.0)
-        else:
-            outflow_total += float(txn.amount or 0.0)
+    burn_start, burn_end = _window_dates(last_date, burn_window_days)
+    burn_txns = _txns_in_window(txns, burn_start, burn_end)
+    inflow_total = _sum_total(burn_txns, "inflow")
+    outflow_total = _sum_total(burn_txns, "outflow")
 
     net_burn = outflow_total - inflow_total
     burn_per_day = net_burn / burn_window_days
@@ -235,11 +239,15 @@ def detect_low_cash_runway(
     if not severity:
         return []
 
+    evidence_ids = _evidence_source_event_ids(burn_txns)
+    if ledger and ledger[-1].source_event_id:
+        evidence_ids.append(ledger[-1].source_event_id)
+        evidence_ids = sorted(set(evidence_ids))
     payload = {
         "current_cash": round(current_cash, 2),
         "burn_window_days": burn_window_days,
         "burn_start": burn_start.isoformat(),
-        "burn_end": last_date.isoformat(),
+        "burn_end": burn_end.isoformat(),
         "total_inflow": round(inflow_total, 2),
         "total_outflow": round(outflow_total, 2),
         "net_burn": round(net_burn, 2),
@@ -247,6 +255,7 @@ def detect_low_cash_runway(
         "runway_days": round(runway_days, 2),
         "epsilon": epsilon,
         "thresholds": {"high": high_threshold_days, "medium": medium_threshold_days},
+        "evidence_source_event_ids": evidence_ids,
     }
     signal_type = "low_cash_runway"
     fingerprint = _fingerprint([business_id, signal_type])
@@ -310,6 +319,11 @@ def detect_unusual_outflow_spike(
         return []
 
     severity = "high" if trigger_sigma else "medium"
+    spike_txns = [
+        txn
+        for txn in txns
+        if txn.direction == "outflow" and txn.date == last_date
+    ]
     payload = {
         "latest_date": last_date.isoformat(),
         "latest_total": round(latest_total, 2),
@@ -322,6 +336,7 @@ def detect_unusual_outflow_spike(
         "window_days": window_days,
         "spike_sigma": spike_sigma,
         "spike_mult": spike_mult,
+        "evidence_source_event_ids": _evidence_source_event_ids(spike_txns),
     }
     signal_type = "unusual_outflow_spike"
     fingerprint = _fingerprint([business_id, signal_type, last_date.isoformat()])

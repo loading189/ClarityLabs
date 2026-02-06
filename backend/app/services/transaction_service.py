@@ -98,19 +98,29 @@ def _related_signals(
             payload = {}
         matched_on: Optional[str] = None
 
-        txn_ids = payload.get("txn_ids")
-        if isinstance(txn_ids, list) and source_event_id in {str(item) for item in txn_ids}:
-            matched_on = "txn_id"
+        evidence_ids = payload.get("evidence_source_event_ids")
+        if isinstance(evidence_ids, list) and source_event_id in {str(item) for item in evidence_ids}:
+            matched_on = "evidence_source_event_ids"
         else:
-            vendor_fields = [
-                payload.get("vendor"),
-                payload.get("vendor_name"),
-                payload.get("counterparty_name"),
-                payload.get("merchant_name"),
-            ]
-            vendor_fields = [str(v).strip().lower() for v in vendor_fields if v]
-            if vendor_norm and any(vendor_norm == v for v in vendor_fields):
-                matched_on = "vendor"
+            evidence_txn_ids = payload.get("evidence_txn_ids")
+            if isinstance(evidence_txn_ids, list) and source_event_id in {
+                str(item) for item in evidence_txn_ids
+            }:
+                matched_on = "evidence_txn_ids"
+            else:
+                txn_ids = payload.get("txn_ids")
+                if isinstance(txn_ids, list) and source_event_id in {str(item) for item in txn_ids}:
+                    matched_on = "txn_ids"
+                else:
+                    vendor_fields = [
+                        payload.get("vendor"),
+                        payload.get("vendor_name"),
+                        payload.get("counterparty_name"),
+                        payload.get("merchant_name"),
+                    ]
+                    vendor_fields = [str(v).strip().lower() for v in vendor_fields if v]
+                    if vendor_norm and any(vendor_norm == v for v in vendor_fields):
+                        matched_on = "vendor"
 
         if not matched_on:
             continue
@@ -182,6 +192,7 @@ def transaction_detail(db: Session, business_id: str, source_event_id: str) -> D
             "confidence": txnc.confidence,
             "note": txnc.note,
             "created_at": txnc.created_at,
+            "rule_id": None,
         }
 
     vendor_label = brain.lookup_label(business_id=business_id, alias_key=mk)
@@ -220,6 +231,11 @@ def transaction_detail(db: Session, business_id: str, source_event_id: str) -> D
         }
         for row in audit_rows
     ]
+    if categorization and audit_rows:
+        for row in audit_rows:
+            if row.rule_id:
+                categorization["rule_id"] = row.rule_id
+                break
 
     processing_assumptions = _build_processing_assumptions(
         raw_event.payload if isinstance(raw_event.payload, dict) else {},
@@ -229,6 +245,52 @@ def transaction_detail(db: Session, business_id: str, source_event_id: str) -> D
     ledger_context = ledger_context_for_source_event(db, business_id, source_event_id)
 
     related = _related_signals(db, business_id, source_event_id, vendor_normalization.get("canonical_name"))
+
+    signal_ids = {item["signal_id"] for item in related if item.get("signal_id")}
+    if signal_ids:
+        signal_audits = (
+            db.execute(
+                select(AuditLog)
+                .where(
+                    and_(
+                        AuditLog.business_id == business_id,
+                        AuditLog.event_type.in_(
+                            [
+                                "signal_status_changed",
+                                "signal_resolved",
+                                "signal_updated",
+                                "signal_detected",
+                            ]
+                        ),
+                    )
+                )
+                .order_by(AuditLog.created_at.desc())
+            )
+            .scalars()
+            .all()
+        )
+        for row in signal_audits:
+            after_state = row.after_state if isinstance(row.after_state, dict) else {}
+            before_state = row.before_state if isinstance(row.before_state, dict) else {}
+            signal_id = after_state.get("signal_id") or before_state.get("signal_id")
+            if signal_id and signal_id in signal_ids:
+                audit_history.append(
+                    {
+                        "id": row.id,
+                        "event_type": row.event_type,
+                        "actor": row.actor,
+                        "reason": row.reason,
+                        "before_state": row.before_state,
+                        "after_state": row.after_state,
+                        "rule_id": row.rule_id,
+                        "created_at": row.created_at,
+                    }
+                )
+
+    audit_history.sort(
+        key=lambda row: row.get("created_at") or datetime.min,
+        reverse=True,
+    )
 
     normalized_txn = {
         "source_event_id": txn.source_event_id,
