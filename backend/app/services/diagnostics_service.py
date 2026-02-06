@@ -4,7 +4,7 @@ import logging
 from typing import Any, Dict, List
 
 from fastapi import HTTPException
-from sqlalchemy import and_, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.app.models import (
@@ -13,13 +13,11 @@ from backend.app.models import (
     BusinessCategoryMap,
     Category,
     CategoryRule,
-    RawEvent,
-    TxnCategorization,
 )
-from backend.app.norma.from_events import raw_event_to_txn
 from backend.app.norma.ledger import LedgerIntegrityError, build_cash_ledger, check_ledger_integrity
 from backend.app.norma.normalize import NormalizedTransaction
 from backend.app.services.category_resolver import resolve_system_key
+from backend.app.services.posted_txn_service import fetch_posted_transactions
 from backend.app.norma.categorize_brain import brain
 
 logger = logging.getLogger(__name__)
@@ -33,41 +31,7 @@ def require_business(db: Session, business_id: str) -> Business:
 
 
 def _fetch_posted_transactions(db: Session, business_id: str) -> List[NormalizedTransaction]:
-    stmt = (
-        select(TxnCategorization, RawEvent, Category, Account)
-        .join(
-            RawEvent,
-            and_(
-                RawEvent.business_id == TxnCategorization.business_id,
-                RawEvent.source_event_id == TxnCategorization.source_event_id,
-            ),
-        )
-        .join(Category, Category.id == TxnCategorization.category_id)
-        .join(Account, Account.id == Category.account_id)
-        .where(TxnCategorization.business_id == business_id)
-        .order_by(RawEvent.occurred_at.asc(), RawEvent.source_event_id.asc())
-    )
-
-    rows = db.execute(stmt).all()
-    txns: List[NormalizedTransaction] = []
-    for _, ev, cat, acct in rows:
-        txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
-        txns.append(
-            NormalizedTransaction(
-                id=txn.id,
-                source_event_id=txn.source_event_id,
-                occurred_at=txn.occurred_at,
-                date=txn.date,
-                description=txn.description,
-                amount=txn.amount,
-                direction=txn.direction,
-                account=acct.name,
-                category=(cat.name or cat.system_key or "uncategorized"),
-                counterparty_hint=txn.counterparty_hint,
-            )
-        )
-
-    return txns
+    return fetch_posted_transactions(db, business_id)
 
 
 def collect_diagnostics(db: Session, business_id: str) -> Dict[str, Any]:
