@@ -5,11 +5,13 @@ import logging
 from typing import List, Optional, Literal, Dict, Iterable, Any
 
 from fastapi import HTTPException
-from sqlalchemy import select, and_
 from sqlalchemy.orm import Session
 
-from backend.app.models import Business, RawEvent, TxnCategorization, Category, Account
-from backend.app.norma.from_events import raw_event_to_txn
+from backend.app.models import Business
+from backend.app.services.posted_txn_service import (
+    fetch_posted_transaction_details,
+    fetch_posted_transactions,
+)
 
 Direction = Literal["inflow", "outflow"]
 
@@ -61,21 +63,6 @@ def default_ledger_window() -> tuple[date, date]:
     return start, end
 
 
-def _ledger_join_rows(db: Session, business_id: str):
-    stmt = (
-        select(TxnCategorization, RawEvent, Category, Account)
-        .join(RawEvent, and_(
-            RawEvent.business_id == TxnCategorization.business_id,
-            RawEvent.source_event_id == TxnCategorization.source_event_id,
-        ))
-        .join(Category, Category.id == TxnCategorization.category_id)
-        .join(Account, Account.id == Category.account_id)
-        .where(TxnCategorization.business_id == business_id)
-        .order_by(RawEvent.occurred_at.asc(), RawEvent.source_event_id.asc())
-    )
-    return db.execute(stmt).all()
-
-
 def _vendor_label(txn) -> str:
     return (txn.counterparty_hint or txn.description or "Unknown").strip() or "Unknown"
 
@@ -103,23 +90,23 @@ def ledger_query(
     if not start_date or not end_date:
         start_date, end_date = default_ledger_window()
 
-    base_rows = _ledger_join_rows(db, business_id)
+    details = fetch_posted_transaction_details(db, business_id)
     q = (search or "").strip().lower()
     filtered: List[Dict[str, Any]] = []
     start_balance = 0.0
 
-    for _, ev, cat, acct in base_rows:
-        txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
+    for detail in details:
+        txn = detail.txn
         amount = signed_amount(txn.amount or 0.0, txn.direction)
         vendor = _vendor_label(txn)
-        account = (acct.name or "").strip() or "Unknown"
-        account_id = acct.id
-        category = (cat.name or "").strip() or "Uncategorized"
+        account = (detail.account_name or txn.account or "").strip() or "Unknown"
+        account_id = detail.account_id
+        category = (detail.category_name or txn.category or "").strip() or "Uncategorized"
 
-        if ev.occurred_at.date() < start_date:
+        if txn.occurred_at.date() < start_date:
             start_balance += amount
             continue
-        if ev.occurred_at.date() > end_date:
+        if txn.occurred_at.date() > end_date:
             continue
         if not (_matches_any(account, accounts) or _matches_any(account_id, accounts)):
             continue
@@ -132,15 +119,15 @@ def ledger_query(
 
         filtered.append(
             {
-                "occurred_at": ev.occurred_at,
-                "date": ev.occurred_at.date(),
+                "occurred_at": txn.occurred_at,
+                "date": txn.occurred_at.date(),
                 "description": txn.description,
                 "vendor": vendor,
                 "amount": round(amount, 2),
                 "category": category,
                 "account": account,
                 "balance": 0.0,
-                "source_event_id": ev.source_event_id,
+                "source_event_id": txn.source_event_id,
             }
         )
 
@@ -218,45 +205,35 @@ def ledger_lines(
     """
     require_business(db, business_id)
 
-    # join: categorizations -> events -> category -> account
-    stmt = (
-        select(TxnCategorization, RawEvent, Category, Account)
-        .join(RawEvent, and_(
-            RawEvent.business_id == TxnCategorization.business_id,
-            RawEvent.source_event_id == TxnCategorization.source_event_id,
-        ))
-        .join(Category, Category.id == TxnCategorization.category_id)
-        .join(Account, Account.id == Category.account_id)
-        .where(TxnCategorization.business_id == business_id)
-        .order_by(RawEvent.occurred_at.desc(), RawEvent.source_event_id.desc())
-        .limit(limit)
+    details = fetch_posted_transaction_details(
+        db,
+        business_id,
+        order_desc=True,
+        limit=limit,
     )
 
-    rows = db.execute(stmt).all()
-
     out: List[Dict[str, Any]] = []
-    for txncat, ev, cat, acct in rows:
-        if not _date_range_filter(ev.occurred_at, start_date, end_date):
+    for detail in details:
+        txn = detail.txn
+        if not _date_range_filter(txn.occurred_at, start_date, end_date):
             continue
-
-        txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
 
         direction: Direction = txn.direction
 
         out.append(
             {
-                "occurred_at": ev.occurred_at,
-                "source_event_id": ev.source_event_id,
+                "occurred_at": txn.occurred_at,
+                "source_event_id": txn.source_event_id,
                 "description": txn.description,
                 "direction": direction,
                 "signed_amount": signed_amount(txn.amount or 0.0, direction),
                 "display_amount": float(txn.amount or 0.0),
-                "category_id": cat.id,
-                "category_name": cat.name,
-                "account_id": acct.id,
-                "account_name": acct.name,
-                "account_type": (acct.type or "").lower(),
-                "account_subtype": (acct.subtype or None),
+                "category_id": detail.category_id,
+                "category_name": detail.category_name,
+                "account_id": detail.account_id,
+                "account_name": detail.account_name,
+                "account_type": detail.account_type,
+                "account_subtype": detail.account_subtype,
             }
         )
 
@@ -273,14 +250,13 @@ def ledger_context_for_source_event(
     Includes balance and running totals up to that row.
     """
     require_business(db, business_id)
-    rows = _ledger_join_rows(db, business_id)
+    txns = fetch_posted_transactions(db, business_id)
 
     balance = 0.0
     total_in = 0.0
     total_out = 0.0
 
-    for _txncat, ev, cat, acct in rows:
-        txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
+    for txn in txns:
         amount = signed_amount(txn.amount or 0.0, txn.direction)
         balance += amount
         if amount >= 0:
@@ -288,16 +264,16 @@ def ledger_context_for_source_event(
         else:
             total_out += abs(amount)
 
-        if ev.source_event_id == source_event_id:
+        if txn.source_event_id == source_event_id:
             row = {
-                "source_event_id": ev.source_event_id,
-                "occurred_at": ev.occurred_at,
-                "date": ev.occurred_at.date(),
+                "source_event_id": txn.source_event_id,
+                "occurred_at": txn.occurred_at,
+                "date": txn.occurred_at.date(),
                 "description": txn.description,
                 "vendor": _vendor_label(txn),
                 "amount": round(amount, 2),
-                "category": (cat.name or "").strip() or "Uncategorized",
-                "account": (acct.name or "").strip() or "Unknown",
+                "category": (txn.category or "").strip() or "Uncategorized",
+                "account": (txn.account or "").strip() or "Unknown",
                 "balance": round(balance, 2),
             }
             return {
@@ -323,41 +299,29 @@ def ledger_trace_transactions(
     if not txn_ids and not (start_date and end_date):
         raise HTTPException(status_code=400, detail="txn_ids or date range required")
 
-    stmt = (
-        select(TxnCategorization, RawEvent, Category, Account)
-        .join(RawEvent, and_(
-            RawEvent.business_id == TxnCategorization.business_id,
-            RawEvent.source_event_id == TxnCategorization.source_event_id,
-        ))
-        .join(Category, Category.id == TxnCategorization.category_id)
-        .join(Account, Account.id == Category.account_id)
-        .where(TxnCategorization.business_id == business_id)
+    details = fetch_posted_transaction_details(
+        db,
+        business_id,
+        source_event_ids=txn_ids,
+        limit=limit,
     )
-
-    if txn_ids:
-        stmt = stmt.where(RawEvent.source_event_id.in_(txn_ids))
-
-    stmt = stmt.order_by(RawEvent.occurred_at.asc(), RawEvent.source_event_id.asc()).limit(limit)
-
-    rows = db.execute(stmt).all()
-
     out: List[Dict[str, Any]] = []
-    for _, ev, cat, acct in rows:
-        if not txn_ids and not _date_range_filter(ev.occurred_at, start_date, end_date):
+    for detail in details:
+        txn = detail.txn
+        if not txn_ids and not _date_range_filter(txn.occurred_at, start_date, end_date):
             continue
 
-        txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
         direction: Direction = txn.direction
         out.append(
             {
-                "occurred_at": ev.occurred_at,
-                "source_event_id": ev.source_event_id,
+                "occurred_at": txn.occurred_at,
+                "source_event_id": txn.source_event_id,
                 "description": txn.description,
                 "direction": direction,
                 "signed_amount": signed_amount(txn.amount or 0.0, direction),
                 "display_amount": float(txn.amount or 0.0),
-                "category_name": cat.name,
-                "account_name": acct.name,
+                "category_name": detail.category_name,
+                "account_name": detail.account_name,
                 "counterparty_hint": txn.counterparty_hint,
             }
         )
@@ -377,21 +341,7 @@ def income_statement(
     - expenses = sum absolute value of amounts where account.type == 'expense' OR acct.subtype == 'cogs'
     """
     require_business(db, business_id)
-
-    # pull posted lines for range (we reuse same join but no limit)
-    stmt = (
-        select(TxnCategorization, RawEvent, Category, Account)
-        .join(RawEvent, and_(
-            RawEvent.business_id == TxnCategorization.business_id,
-            RawEvent.source_event_id == TxnCategorization.source_event_id,
-        ))
-        .join(Category, Category.id == TxnCategorization.category_id)
-        .join(Account, Account.id == Category.account_id)
-        .where(TxnCategorization.business_id == business_id)
-        .order_by(RawEvent.occurred_at.asc(), RawEvent.source_event_id.asc())
-    )
-
-    rows = db.execute(stmt).all()
+    details = fetch_posted_transaction_details(db, business_id)
 
     rev_by_name: Dict[str, float] = {}
     exp_by_name: Dict[str, float] = {}
@@ -399,24 +349,24 @@ def income_statement(
     rev_total = 0.0
     exp_total = 0.0
 
-    for _, ev, cat, acct in rows:
-        if not _date_range_filter(ev.occurred_at, start_date, end_date):
+    for detail in details:
+        txn = detail.txn
+        if not _date_range_filter(txn.occurred_at, start_date, end_date):
             continue
 
-        txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
         amt = signed_amount(txn.amount or 0.0, txn.direction)
-        t = (acct.type or "").strip().lower()
-        st = (acct.subtype or "").strip().lower()
+        t = (detail.account_type or "").strip().lower()
+        st = (detail.account_subtype or "").strip().lower()
 
         if t == "revenue":
             # revenue should be positive; if negative (refund), it reduces revenue
             rev_total += amt
-            rev_by_name[cat.name] = rev_by_name.get(cat.name, 0.0) + amt
+            rev_by_name[detail.category_name] = rev_by_name.get(detail.category_name, 0.0) + amt
         elif t == "expense" or st == "cogs":
             # expenses we report as positive numbers; rebates reduce expense
             exp = -amt
             exp_total += exp
-            exp_by_name[cat.name] = exp_by_name.get(cat.name, 0.0) + exp
+            exp_by_name[detail.category_name] = exp_by_name.get(detail.category_name, 0.0) + exp
 
     revenue_lines = [
         {"name": k, "amount": round(v, 2)} for k, v in sorted(rev_by_name.items())
@@ -451,25 +401,14 @@ def cash_flow(
     """
     require_business(db, business_id)
 
-    # reuse ledger_lines join; compute totals
-    stmt = (
-        select(TxnCategorization, RawEvent)
-        .join(RawEvent, and_(
-            RawEvent.business_id == TxnCategorization.business_id,
-            RawEvent.source_event_id == TxnCategorization.source_event_id,
-        ))
-        .where(TxnCategorization.business_id == business_id)
-        .order_by(RawEvent.occurred_at.asc(), RawEvent.source_event_id.asc())
-    )
-    rows = db.execute(stmt).all()
+    txns = fetch_posted_transactions(db, business_id)
 
     cash_in = 0.0
     cash_out = 0.0
 
-    for _, ev in rows:
-        if not _date_range_filter(ev.occurred_at, start_date, end_date):
+    for txn in txns:
+        if not _date_range_filter(txn.occurred_at, start_date, end_date):
             continue
-        txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
         signed = signed_amount(txn.amount or 0.0, txn.direction)
         if is_inflow(txn.direction):
             cash_in += abs(signed)
@@ -499,24 +438,11 @@ def cash_series(
     NOTE: This assumes your posted lines represent cash-impacting events.
     """
     require_business(db, business_id)
-
-    stmt = (
-        select(TxnCategorization, RawEvent)
-        .join(RawEvent, and_(
-            RawEvent.business_id == TxnCategorization.business_id,
-            RawEvent.source_event_id == TxnCategorization.source_event_id,
-        ))
-        .where(TxnCategorization.business_id == business_id)
-        .order_by(RawEvent.occurred_at.asc(), RawEvent.source_event_id.asc())
-    )
-    rows = db.execute(stmt).all()
-
     txns = []
-
-    for _, ev in rows:
-        if not _date_range_filter(ev.occurred_at, start_date, end_date):
+    for txn in fetch_posted_transactions(db, business_id):
+        if not _date_range_filter(txn.occurred_at, start_date, end_date):
             continue
-        txns.append(raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id))
+        txns.append(txn)
 
     return _build_cash_series(txns, starting_cash)
 
@@ -536,21 +462,9 @@ def balance_sheet_v1(
     """
     require_business(db, business_id)
 
-    stmt = (
-        select(TxnCategorization, RawEvent)
-        .join(RawEvent, and_(
-            RawEvent.business_id == TxnCategorization.business_id,
-            RawEvent.source_event_id == TxnCategorization.source_event_id,
-        ))
-        .where(TxnCategorization.business_id == business_id)
-        .order_by(RawEvent.occurred_at.asc(), RawEvent.source_event_id.asc())
-    )
-    rows = db.execute(stmt).all()
-
     bal = float(starting_cash or 0.0)
-    for _, ev in rows:
-        if ev.occurred_at.date() <= as_of:
-            txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
+    for txn in fetch_posted_transactions(db, business_id):
+        if txn.occurred_at.date() <= as_of:
             bal += signed_amount(txn.amount or 0.0, txn.direction)
 
     assets = bal

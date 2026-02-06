@@ -4,23 +4,20 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import HTTPException
-from sqlalchemy import and_, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.app.models import (
-    Account,
     AuditLog,
     Business,
-    Category,
     HealthSignalState,
     MonitorRuntime,
     RawEvent,
-    TxnCategorization,
 )
-from backend.app.norma.from_events import raw_event_to_txn
 from backend.app.norma.normalize import NormalizedTransaction
 from backend.app.services import audit_service
 from backend.app.services.health_signal_service import ALLOWED_STATUSES
+from backend.app.services.posted_txn_service import fetch_posted_transactions
 from backend.app.signals.v2 import DetectorRunSummary, DetectedSignal, run_v2_detectors_with_summary
 
 
@@ -88,40 +85,7 @@ def _serialize_state(state: HealthSignalState) -> Dict[str, Any]:
 
 
 def _fetch_posted_transactions(db: Session, business_id: str) -> List[NormalizedTransaction]:
-    stmt = (
-        select(TxnCategorization, RawEvent, Category, Account)
-        .join(
-            RawEvent,
-            and_(
-                RawEvent.business_id == TxnCategorization.business_id,
-                RawEvent.source_event_id == TxnCategorization.source_event_id,
-            ),
-        )
-        .join(Category, Category.id == TxnCategorization.category_id)
-        .join(Account, Account.id == Category.account_id)
-        .where(TxnCategorization.business_id == business_id)
-        .order_by(RawEvent.occurred_at.asc(), RawEvent.source_event_id.asc())
-    )
-
-    rows = db.execute(stmt).all()
-    txns: List[NormalizedTransaction] = []
-    for _, ev, cat, acct in rows:
-        txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
-        txns.append(
-            NormalizedTransaction(
-                id=txn.id,
-                source_event_id=txn.source_event_id,
-                occurred_at=txn.occurred_at,
-                date=txn.date,
-                description=txn.description,
-                amount=txn.amount,
-                direction=txn.direction,
-                account=acct.name,
-                category=(cat.name or cat.system_key or "uncategorized"),
-                counterparty_hint=txn.counterparty_hint,
-            )
-        )
-    return txns
+    return fetch_posted_transactions(db, business_id)
 
 
 def _fetch_signal_audit_entries(
@@ -246,11 +210,11 @@ def _upsert_signal_states(
         if state.status not in ALLOWED_STATUSES:
             state.status = "open"
         if state.status == "ignored":
-            new_status = "ignored"
+            target_status = "ignored"
         elif state.status == "resolved":
-            new_status = "open"
+            target_status = "open"
         else:
-            new_status = state.status
+            target_status = state.status
         state.last_seen_at = now
         state.signal_type = signal.signal_type
         state.fingerprint = signal.fingerprint
@@ -258,13 +222,12 @@ def _upsert_signal_states(
         state.title = signal.title
         state.summary = signal.summary
         state.payload_json = signal.payload
-        if state.status == "resolved":
-            state.status = "open"
-            state.resolved_at = None
-        if state.status == "ignored":
-            state.status = "ignored"
+        if target_status != state.status:
+            if state.status == "resolved" and target_status == "open":
+                state.resolved_at = None
+            state.status = target_status
 
-        if _signal_changed(before_state, signal, new_status):
+        if _signal_changed(before_state, signal, target_status):
             state.updated_at = now
             touched.append(signal.signal_id)
             audit_service.log_audit_event(

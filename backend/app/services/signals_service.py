@@ -7,14 +7,14 @@ import os
 from typing import Any, Dict, List, Literal, Optional, Tuple
 
 from fastapi import HTTPException
-from sqlalchemy import and_, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from backend.app.models import Account, Business, Category, HealthSignalState, RawEvent, TxnCategorization
-from backend.app.norma.from_events import raw_event_to_txn
+from backend.app.models import Business, HealthSignalState
 from backend.app.norma.ledger import LedgerIntegrityError, build_cash_ledger
 from backend.app.norma.normalize import NormalizedTransaction
 from backend.app.services import audit_service, health_signal_service
+from backend.app.services.posted_txn_service import fetch_posted_transactions
 
 
 logger = logging.getLogger(__name__)
@@ -1126,53 +1126,13 @@ def _require_business(db: Session, business_id: str) -> Business:
     return biz
 
 
-def _date_range_filter(occurred_at: date, start: date, end: date) -> bool:
-    return start <= occurred_at <= end
-
-
 def _fetch_posted_transactions(
     db: Session,
     business_id: str,
     start_date: date,
     end_date: date,
 ) -> List[NormalizedTransaction]:
-    stmt = (
-        select(TxnCategorization, RawEvent, Category, Account)
-        .join(
-            RawEvent,
-            and_(
-                RawEvent.business_id == TxnCategorization.business_id,
-                RawEvent.source_event_id == TxnCategorization.source_event_id,
-            ),
-        )
-        .join(Category, Category.id == TxnCategorization.category_id)
-        .join(Account, Account.id == Category.account_id)
-        .where(TxnCategorization.business_id == business_id)
-        .order_by(RawEvent.occurred_at.asc(), RawEvent.source_event_id.asc())
-    )
-
-    rows = db.execute(stmt).all()
-    txns: List[NormalizedTransaction] = []
-    for _, ev, cat, acct in rows:
-        if not _date_range_filter(ev.occurred_at.date(), start_date, end_date):
-            continue
-        txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
-        txns.append(
-            NormalizedTransaction(
-                id=txn.id,
-                source_event_id=txn.source_event_id,
-                occurred_at=txn.occurred_at,
-                date=txn.date,
-                description=txn.description,
-                amount=txn.amount,
-                direction=txn.direction,
-                account=acct.name,
-                category=(cat.name or cat.system_key or "uncategorized"),
-                counterparty_hint=txn.counterparty_hint,
-            )
-        )
-
-    return txns
+    return fetch_posted_transactions(db, business_id, start_date=start_date, end_date=end_date)
 
 
 def fetch_signals(
