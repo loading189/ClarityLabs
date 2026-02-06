@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timezone
 from typing import List, Optional, Sequence
 
-from sqlalchemy import and_, select
+from sqlalchemy import and_, select, func
 from sqlalchemy.orm import Session
 
 from backend.app.models import Account, Category, RawEvent, TxnCategorization
@@ -175,3 +175,66 @@ def fetch_posted_transaction_details(
             )
         )
     return details
+
+
+def fetch_uncategorized_raw_events(
+    db: Session,
+    business_id: str,
+    *,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    limit: Optional[int] = None,
+):
+    start_dt, end_dt = _date_to_bounds(start_date, end_date)
+    stmt = (
+        select(RawEvent)
+        .outerjoin(
+            TxnCategorization,
+            and_(
+                RawEvent.business_id == TxnCategorization.business_id,
+                RawEvent.source_event_id == TxnCategorization.source_event_id,
+            ),
+        )
+        .where(
+            RawEvent.business_id == business_id,
+            TxnCategorization.id.is_(None),
+        )
+    )
+    if start_dt is not None:
+        stmt = stmt.where(RawEvent.occurred_at >= start_dt)
+    if end_dt is not None:
+        stmt = stmt.where(RawEvent.occurred_at <= end_dt)
+    stmt = stmt.order_by(RawEvent.occurred_at.desc(), RawEvent.source_event_id.desc())
+    if limit:
+        stmt = stmt.limit(limit)
+    return db.execute(stmt).scalars().all()
+
+
+def count_uncategorized_raw_events(
+    db: Session,
+    business_id: str,
+    *,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+) -> int:
+    start_dt, end_dt = _date_to_bounds(start_date, end_date)
+    stmt = (
+        select(func.count())
+        .select_from(RawEvent)
+        .outerjoin(
+            TxnCategorization,
+            and_(
+                RawEvent.business_id == TxnCategorization.business_id,
+                RawEvent.source_event_id == TxnCategorization.source_event_id,
+            ),
+        )
+        .where(
+            RawEvent.business_id == business_id,
+            TxnCategorization.id.is_(None),
+        )
+    )
+    if start_dt is not None:
+        stmt = stmt.where(RawEvent.occurred_at >= start_dt)
+    if end_dt is not None:
+        stmt = stmt.where(RawEvent.occurred_at <= end_dt)
+    return int(db.execute(stmt).scalar_one())

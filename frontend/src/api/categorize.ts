@@ -106,6 +106,12 @@ export type CategoryRuleApplyOut = {
   audit_id?: string | null;
 };
 
+export type AutoCategorizeOut = {
+  status: string;
+  applied: number;
+  audit_id?: string | null;
+};
+
 export function labelVendor(
   businessId: string,
   payload: { source_event_id: string; system_key: string; canonical_name?: string; confidence?: number }
@@ -120,6 +126,10 @@ export function getBrainVendors(businessId: string) {
 export function getBrainVendor(businessId: string, merchantKey: string) {
   const params = new URLSearchParams({ merchant_key: merchantKey });
   return apiGet<BrainVendor>(`/categorize/business/${businessId}/brain/vendor?${params.toString()}`);
+}
+
+export function autoCategorize(businessId: string) {
+  return apiPost<AutoCategorizeOut>(`/api/categorize/auto/${businessId}`);
 }
 
 export function setBrainVendor(

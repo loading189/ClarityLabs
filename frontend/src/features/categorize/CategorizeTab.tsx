@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   applyCategoryRule,
+  autoCategorize,
   bulkApplyByMerchantKey,
   deleteCategoryRule,
   getCategories,
@@ -78,6 +79,7 @@ export default function CategorizeTab({
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [toastAuditId, setToastAuditId] = useState<string | null>(null);
   const [reconciliationHint, setReconciliationHint] = useState<string | null>(null);
+  const [autoCategorizeRunning, setAutoCategorizeRunning] = useState(false);
   const toastTimeoutRef = useRef<number | null>(null);
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -376,6 +378,23 @@ export default function CategorizeTab({
     setDetailSourceEventId(null);
     updateDetailParam(null);
   }, [updateDetailParam]);
+
+  const handleAutoCategorize = useCallback(async () => {
+    if (!businessId || invalidBusinessId) return;
+    setActionErr(null);
+    setMsg(null);
+    setAutoCategorizeRunning(true);
+    try {
+      const res = await autoCategorize(businessId);
+      setMsg(`Auto-categorized ${res.applied} transactions.`);
+      bumpDataVersion();
+      await load();
+    } catch (e: any) {
+      setActionErr(e?.message ?? "Auto-categorize failed.");
+    } finally {
+      setAutoCategorizeRunning(false);
+    }
+  }, [businessId, bumpDataVersion, invalidBusinessId, load]);
 
   const activeDrilldown = useMemo(() => {
     if (!drilldown) return null;
@@ -881,9 +900,18 @@ export default function CategorizeTab({
         <div className={styles.panel}>
           <div className={styles.headerRow}>
             <h3 className={styles.title}>To categorize</h3>
-            <button className={styles.buttonSecondary} onClick={reloadAll}>
-              Reload
-            </button>
+            <div className={styles.headerActions}>
+              <button
+                className={styles.buttonSecondary}
+                onClick={handleAutoCategorize}
+                disabled={autoCategorizeRunning}
+              >
+                Auto-categorize
+              </button>
+              <button className={styles.buttonSecondary} onClick={reloadAll}>
+                Reload
+              </button>
+            </div>
           </div>
 
         {drilldown && (

@@ -165,6 +165,12 @@ class Business(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+    integration_connections = relationship(
+        "IntegrationConnection",
+        back_populates="business",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
 
 class Account(Base):
@@ -180,7 +186,6 @@ class Account(Base):
         String(36),
         ForeignKey("businesses.id", ondelete="CASCADE"),
         nullable=False,
-        index=True,
     )
 
     code: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
@@ -209,7 +214,6 @@ class RawEvent(Base):
         String(36),
         ForeignKey("businesses.id", ondelete="CASCADE"),
         nullable=False,
-        index=True,
     )
 
     source: Mapped[str] = mapped_column(String(40), nullable=False)  # plaid/shopify/stripe/etc
@@ -313,6 +317,37 @@ class BusinessIntegrationProfile(Base):
 
     business = relationship("Business", back_populates="integration_profile")
 
+
+class IntegrationConnection(Base):
+    __tablename__ = "integration_connections"
+    __table_args__ = (
+        UniqueConstraint("business_id", "provider", name="uq_integration_connection_business_provider"),
+        Index("ix_integration_connections_business_id", "business_id"),
+        Index("ix_integration_connections_provider", "provider"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    business_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    provider: Mapped[str] = mapped_column(String(40), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="connected")
+    connected_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_sync_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    config_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utcnow,
+        onupdate=utcnow,
+    )
+
+    business = relationship("Business", back_populates="integration_connections")
+
 class Category(Base):
     """
     Business-facing category list used in Categorize UI dropdown.
@@ -326,7 +361,6 @@ class Category(Base):
         String(36),
         ForeignKey("businesses.id", ondelete="CASCADE"),
         nullable=False,
-        index=True,
     )
 
     name: Mapped[str] = mapped_column(String(120), nullable=False)
@@ -528,3 +562,29 @@ class BusinessCategoryMap(Base):
     )
 
     category = relationship("Category", back_populates="mappings")
+
+
+class VendorCategoryMap(Base):
+    __tablename__ = "vendor_category_map"
+    __table_args__ = (
+        UniqueConstraint("business_id", "vendor_key", name="uq_vendor_category_map_business_vendor"),
+        Index("ix_vendor_category_map_business_id", "business_id"),
+        Index("ix_vendor_category_map_vendor_key", "vendor_key"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    business_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    vendor_key: Mapped[str] = mapped_column(String(160), nullable=False)
+    category_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("categories.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    confidence: Mapped[float] = mapped_column(Float, nullable=False, default=1.0)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    category = relationship("Category")

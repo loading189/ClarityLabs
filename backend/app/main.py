@@ -29,6 +29,10 @@ from backend.app.api.routes.assistant_plans import router as assistant_plans_rou
 from backend.app.api.routes.assistant_progress import router as assistant_progress_router
 from backend.app.api.routes.assistant_work_queue import router as assistant_work_queue_router
 from backend.app.api.routes.transactions import router as transactions_router
+from backend.app.api.routes.integration_connections import router as integration_connections_router
+from backend.app.api.routes.webhooks import router as webhooks_router
+from backend.app.api.routes.assistant_tools import router as assistant_tools_router
+from backend.app.api.routes.categorize_auto import router as categorize_auto_router
 
 
 logger = logging.getLogger(__name__)
@@ -97,3 +101,7 @@ app.include_router(assistant_progress_router)
 
 app.include_router(assistant_work_queue_router)
 app.include_router(transactions_router)
+app.include_router(integration_connections_router)
+app.include_router(webhooks_router)
+app.include_router(assistant_tools_router)
+app.include_router(categorize_auto_router)

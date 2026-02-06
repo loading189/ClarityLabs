@@ -24,6 +24,12 @@
   gap: 12px;
 }
 
+.headerActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .drilldownBanner {
   margin-top: 10px;
   display: inline-flex;

@@ -12,6 +12,7 @@ const applyCategoryRule = vi.fn();
 const getBrainVendors = vi.fn();
 const fetchTransactionDetail = vi.fn();
 const saveCategorization = vi.fn();
+const autoCategorize = vi.fn();
 
 let mockAppState = {
   dateRange: { start: "2025-01-01", end: "2025-01-31" },
@@ -25,6 +26,7 @@ vi.mock("../../app/state/appState", () => ({
 
 vi.mock("../../api/categorize", () => ({
   applyCategoryRule: (...args: unknown[]) => applyCategoryRule(...args),
+  autoCategorize: (...args: unknown[]) => autoCategorize(...args),
   bulkApplyByMerchantKey: vi.fn(),
   createCategoryRule: vi.fn(),
   deleteCategoryRule: vi.fn(),
@@ -62,6 +64,7 @@ describe("CategorizeTab", () => {
     getBrainVendors.mockReset();
     fetchTransactionDetail.mockReset();
     saveCategorization.mockReset();
+    autoCategorize.mockReset();
 
     getTxnsToCategorize.mockResolvedValue([
       {
@@ -153,6 +156,65 @@ describe("CategorizeTab", () => {
       audit_history: [],
       related_signals: [],
     });
+  });
+
+  it("auto-categorize reduces uncategorized count", async () => {
+    const businessId = "11111111-1111-4111-8111-111111111111";
+    getTxnsToCategorize.mockResolvedValueOnce([
+      {
+        source_event_id: "evt-1",
+        occurred_at: new Date().toISOString(),
+        description: "Coffee",
+        amount: 12,
+        direction: "outflow",
+        account: "Operating",
+        category_hint: "uncategorized",
+        merchant_key: "coffee",
+      },
+    ]);
+    getCategories.mockResolvedValueOnce([
+      {
+        id: "cat-1",
+        name: "Meals",
+        account_id: "acct-1",
+        account_name: "Meals",
+      },
+    ]);
+    getCategorizeMetrics
+      .mockResolvedValueOnce({
+        total_events: 3,
+        posted: 1,
+        uncategorized: 2,
+        suggestion_coverage: 0,
+        brain_coverage: 0,
+      })
+      .mockResolvedValueOnce({
+        total_events: 3,
+        posted: 2,
+        uncategorized: 1,
+        suggestion_coverage: 0,
+        brain_coverage: 0,
+      });
+    listCategoryRules.mockResolvedValueOnce([]);
+    getBrainVendors.mockResolvedValueOnce([]);
+    autoCategorize.mockResolvedValueOnce({ status: "ok", applied: 1 });
+
+    render(
+      <MemoryRouter initialEntries={[`/app/${businessId}/categorize`]}>
+        <Routes>
+          <Route path="/app/:businessId/categorize" element={<CategorizeTab businessId={businessId} />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => expect(getTxnsToCategorize).toHaveBeenCalled());
+    expect(screen.getByText("Remaining")).toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /auto-categorize/i }));
+
+    await waitFor(() => expect(autoCategorize).toHaveBeenCalledWith(businessId));
+    await waitFor(() => expect(getCategorizeMetrics).toHaveBeenCalledTimes(2));
   });
 
   it("loads APIs only once when app state rerenders with new dateRange identity", async () => {
