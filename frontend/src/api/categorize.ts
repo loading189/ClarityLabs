@@ -103,6 +103,7 @@ export type CategoryRuleApplyOut = {
   rule_id: string;
   matched: number;
   updated: number;
+  audit_id?: string | null;
 };
 
 export function labelVendor(
@@ -223,8 +224,13 @@ export function deleteCategoryRule(businessId: string, ruleId: string) {
   return apiDelete<{ deleted: boolean }>(`/categorize/${businessId}/rules/${ruleId}`);
 }
 
-export function previewCategoryRule(businessId: string, ruleId: string) {
-  return apiGet<CategoryRulePreviewOut>(`/categorize/${businessId}/rules/${ruleId}/preview`);
+export function previewCategoryRule(
+  businessId: string,
+  ruleId: string,
+  options?: { include_posted?: boolean }
+) {
+  const query = options?.include_posted ? "?include_posted=true" : "";
+  return apiGet<CategoryRulePreviewOut>(`/categorize/${businessId}/rules/${ruleId}/preview${query}`);
 }
 
 export function applyCategoryRule(businessId: string, ruleId: string) {

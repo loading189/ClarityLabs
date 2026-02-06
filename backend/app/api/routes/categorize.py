@@ -146,6 +146,7 @@ class CategoryRuleApplyOut(BaseModel):
     rule_id: str
     matched: int
     updated: int
+    audit_id: Optional[str] = None
 
 
 @router.post("/business/{business_id}/label_vendor")
@@ -256,10 +257,16 @@ def delete_category_rule(
 def preview_category_rule(
     business_id: str,
     rule_id: str,
+    include_posted: bool = Query(False),
     db: Session = Depends(get_db),
 ):
     return CategoryRulePreviewOut(
-        **categorize_service.preview_category_rule(db, business_id, rule_id)
+        **categorize_service.preview_category_rule(
+            db,
+            business_id,
+            rule_id,
+            include_posted=include_posted,
+        )
     )
 
 

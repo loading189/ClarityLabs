@@ -66,13 +66,20 @@ class SignalExplainPlaybookOut(BaseModel):
     requires_confirmation: Optional[bool] = None
 
 
+class SignalRecommendedActionOut(BaseModel):
+    action_id: str
+    label: str
+    rationale: str
+    parameters: Optional[Dict[str, Any]] = None
+
+
 class SignalExplainDetectorOut(BaseModel):
     type: str
     title: str
     description: str
     domain: str
     default_severity: Optional[str]
-    recommended_actions: List[str]
+    recommended_actions: List[SignalRecommendedActionOut]
     evidence_schema: List[str]
     scoring_profile: Dict[str, Any]
 

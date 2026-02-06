@@ -1,8 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import Drawer from "../common/Drawer";
 import { fetchTransactionDetail, type TransactionDetail } from "../../api/transactions";
 import { updateSignalStatus, type SignalStatus } from "../../api/signals";
+import {
+  applyCategoryRule,
+  createCategoryRule,
+  previewCategoryRule,
+  saveCategorization,
+} from "../../api/categorize";
+import { getMonitorStatus, runMonitorPulse, type MonitorPulseResponse, type MonitorStatus } from "../../api/monitor";
 import styles from "./TransactionDetailDrawer.module.css";
 
 function formatDate(value?: string | null) {
@@ -43,39 +50,68 @@ export default function TransactionDetailDrawer({
   const [statusSelections, setStatusSelections] = useState<Record<string, SignalStatus>>({});
   const [statusSaving, setStatusSaving] = useState<Record<string, boolean>>({});
   const [statusErrors, setStatusErrors] = useState<Record<string, string>>({});
+  const [ruleId, setRuleId] = useState<string | null>(null);
+  const [rulePreviewCount, setRulePreviewCount] = useState<number | null>(null);
+  const [ruleCreating, setRuleCreating] = useState(false);
+  const [ruleApplying, setRuleApplying] = useState(false);
+  const [ruleError, setRuleError] = useState<string | null>(null);
+  const [categorizeSaving, setCategorizeSaving] = useState(false);
+  const [categorizeError, setCategorizeError] = useState<string | null>(null);
+  const [verification, setVerification] = useState<{
+    status?: MonitorStatus | null;
+    pulse?: MonitorPulseResponse | null;
+    ledgerUpdated?: number;
+    auditIds?: string[];
+    lastAction?: string;
+    error?: string | null;
+    loading?: boolean;
+  }>({});
 
-  useEffect(() => {
-    let active = true;
-    if (!open || !businessId || !sourceEventId) return;
+  const loadDetail = useCallback(async () => {
+    if (!businessId || !sourceEventId) return;
     setLoading(true);
     setErr(null);
-    fetchTransactionDetail(businessId, sourceEventId)
-      .then((data) => {
-        if (!active) return;
-        setDetail(data);
-      })
-      .catch((error: Error) => {
-        if (!active) return;
-        setErr(error.message);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
+    try {
+      const data = await fetchTransactionDetail(businessId, sourceEventId);
+      setDetail(data);
+    } catch (error: any) {
+      setErr(error?.message ?? "Failed to load transaction detail");
+    } finally {
+      setLoading(false);
+    }
+  }, [businessId, sourceEventId]);
+
+  useEffect(() => {
+    if (!open || !businessId || !sourceEventId) return;
+    let active = true;
+    loadDetail().finally(() => {
+      if (!active) return;
+    });
     return () => {
       active = false;
     };
-  }, [businessId, open, sourceEventId]);
+  }, [businessId, loadDetail, open, sourceEventId]);
 
   useEffect(() => {
     if (!detail) return;
     setStatusSelections({});
     setStatusErrors({});
     setStatusSaving({});
+    setRuleId(null);
+    setRulePreviewCount(null);
+    setRuleError(null);
+    setRuleCreating(false);
+    setRuleApplying(false);
+    setCategorizeSaving(false);
+    setCategorizeError(null);
+    setVerification({});
   }, [detail?.source_event_id]);
 
   const assumptions = useMemo(() => detail?.processing_assumptions ?? [], [detail]);
   const auditRows = useMemo(() => detail?.audit_history ?? [], [detail]);
   const relatedSignals = useMemo(() => detail?.related_signals ?? [], [detail]);
+  const suggestedCategory = useMemo(() => detail?.suggested_category ?? null, [detail]);
+  const ruleSuggestion = useMemo(() => detail?.rule_suggestion ?? null, [detail]);
 
   const handleStatusSelect = (signalId: string, status: SignalStatus) => {
     setStatusSelections((prev) => ({ ...prev, [signalId]: status }));
@@ -105,6 +141,139 @@ export default function TransactionDetailDrawer({
       }));
     } finally {
       setStatusSaving((prev) => ({ ...prev, [signalId]: false }));
+    }
+  };
+
+  const handleCategorize = async () => {
+    if (!businessId || !detail?.source_event_id || !suggestedCategory) return;
+    setCategorizeSaving(true);
+    setCategorizeError(null);
+    try {
+      const payload = await saveCategorization(businessId, {
+        source_event_id: detail.source_event_id,
+        category_id: suggestedCategory.category_id,
+        source: "manual",
+        confidence: 1.0,
+        note: "transaction_detail",
+      });
+      await loadDetail();
+      await handleVerification({
+        ledgerUpdated: payload.updated ? 1 : 0,
+        auditIds: payload.audit_id ? [payload.audit_id] : [],
+        lastAction: "Categorization applied",
+      });
+    } catch (error: any) {
+      setCategorizeError(error?.message ?? "Failed to apply categorization");
+    } finally {
+      setCategorizeSaving(false);
+    }
+  };
+
+  const handleCreateRule = async () => {
+    if (!businessId || !ruleSuggestion) return;
+    setRuleCreating(true);
+    setRuleError(null);
+    try {
+      const rule = await createCategoryRule(businessId, {
+        contains_text: ruleSuggestion.contains_text,
+        category_id: ruleSuggestion.category_id,
+        direction: ruleSuggestion.direction ?? null,
+        account: ruleSuggestion.account ?? null,
+        priority: 90,
+      });
+      setRuleId(rule.id);
+      const preview = await previewCategoryRule(businessId, rule.id, { include_posted: true });
+      setRulePreviewCount(preview.matched);
+    } catch (error: any) {
+      setRuleError(error?.message ?? "Failed to create rule");
+    } finally {
+      setRuleCreating(false);
+    }
+  };
+
+  const handleApplyRule = async () => {
+    if (!businessId || !ruleId) return;
+    setRuleApplying(true);
+    setRuleError(null);
+    try {
+      const applied = await applyCategoryRule(businessId, ruleId);
+      await loadDetail();
+      await handleVerification({
+        ledgerUpdated: applied.updated ?? 0,
+        auditIds: applied.audit_id ? [applied.audit_id] : [],
+        lastAction: "Rule applied",
+      });
+    } catch (error: any) {
+      setRuleError(error?.message ?? "Failed to apply rule");
+    } finally {
+      setRuleApplying(false);
+    }
+  };
+
+  const handleVerification = async ({
+    ledgerUpdated,
+    auditIds,
+    lastAction,
+  }: {
+    ledgerUpdated: number;
+    auditIds: string[];
+    lastAction: string;
+  }) => {
+    if (!businessId) return;
+    setVerification({ loading: true, error: null, ledgerUpdated, auditIds, lastAction });
+    try {
+      const status = await getMonitorStatus(businessId);
+      if (!status.gated) {
+        const pulse = await runMonitorPulse(businessId);
+        setVerification({
+          status,
+          pulse,
+          ledgerUpdated,
+          auditIds,
+          lastAction,
+          loading: false,
+          error: null,
+        });
+      } else {
+        setVerification({
+          status,
+          pulse: null,
+          ledgerUpdated,
+          auditIds,
+          lastAction,
+          loading: false,
+          error: null,
+        });
+      }
+    } catch (error: any) {
+      setVerification({
+        ledgerUpdated,
+        auditIds,
+        lastAction,
+        loading: false,
+        error: error?.message ?? "Verification failed",
+      });
+    }
+  };
+
+  const handleForcePulse = async () => {
+    if (!businessId) return;
+    setVerification((prev) => ({ ...prev, loading: true, error: null }));
+    try {
+      const pulse = await runMonitorPulse(businessId, { force: true });
+      setVerification((prev) => ({
+        ...prev,
+        pulse,
+        status: prev.status ?? null,
+        loading: false,
+        error: null,
+      }));
+    } catch (error: any) {
+      setVerification((prev) => ({
+        ...prev,
+        loading: false,
+        error: error?.message ?? "Failed to run monitoring pulse",
+      }));
     }
   };
 
@@ -270,6 +439,100 @@ export default function TransactionDetailDrawer({
             ) : (
               <div className={styles.muted}>No categorization applied yet.</div>
             )}
+            <div className={styles.subSection}>
+              <div className={styles.label}>Suggested category</div>
+              {suggestedCategory ? (
+                <>
+                  <div className={styles.grid}>
+                    <div>
+                      <div className={styles.label}>Category</div>
+                      <div>{suggestedCategory.category_name}</div>
+                    </div>
+                    <div>
+                      <div className={styles.label}>System key</div>
+                      <div className={styles.code}>{suggestedCategory.system_key}</div>
+                    </div>
+                    <div>
+                      <div className={styles.label}>Source</div>
+                      <div>{suggestedCategory.source}</div>
+                    </div>
+                    <div>
+                      <div className={styles.label}>Confidence</div>
+                      <div>{Math.round(suggestedCategory.confidence * 100)}%</div>
+                    </div>
+                  </div>
+                  <div className={styles.actionRow}>
+                    <button
+                      className={styles.primaryButton}
+                      type="button"
+                      onClick={handleCategorize}
+                      disabled={categorizeSaving}
+                    >
+                      {categorizeSaving ? "Applying…" : "Apply suggested category"}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className={styles.muted}>No category suggestion available.</div>
+              )}
+              {categorizeError && <div className={styles.error}>{categorizeError}</div>}
+            </div>
+          </section>
+
+          <section className={styles.section}>
+            <h3>Rule from Evidence</h3>
+            {ruleSuggestion ? (
+              <>
+                <div className={styles.grid}>
+                  <div>
+                    <div className={styles.label}>Contains text</div>
+                    <div className={styles.code}>{ruleSuggestion.contains_text}</div>
+                  </div>
+                  <div>
+                    <div className={styles.label}>Category</div>
+                    <div>{ruleSuggestion.category_name}</div>
+                  </div>
+                  <div>
+                    <div className={styles.label}>Direction</div>
+                    <div>{ruleSuggestion.direction ?? "—"}</div>
+                  </div>
+                  <div>
+                    <div className={styles.label}>Account</div>
+                    <div>{ruleSuggestion.account ?? "—"}</div>
+                  </div>
+                </div>
+                <div className={styles.actionRow}>
+                  <button
+                    className={styles.primaryButton}
+                    type="button"
+                    onClick={handleCreateRule}
+                    disabled={ruleCreating || !!ruleId}
+                  >
+                    {ruleId ? "Rule created" : ruleCreating ? "Creating…" : "Create rule from this transaction"}
+                  </button>
+                  {ruleId && (
+                    <button
+                      className={styles.secondaryButton}
+                      type="button"
+                      onClick={handleApplyRule}
+                      disabled={ruleApplying}
+                    >
+                      {ruleApplying ? "Applying…" : "Apply rule"}
+                    </button>
+                  )}
+                </div>
+                {rulePreviewCount != null && (
+                  <div className={styles.muted}>
+                    Preview: {rulePreviewCount} historical transactions would match this rule.
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className={styles.muted}>
+                Add a category suggestion to unlock rule creation.
+              </div>
+            )}
+            {ruleError && <div className={styles.error}>{ruleError}</div>}
           </section>
 
           <section className={styles.section}>
@@ -300,6 +563,18 @@ export default function TransactionDetailDrawer({
                       )}
                       {signal.facts && (
                         <pre className={styles.payload}>{prettyJson(signal.facts)}</pre>
+                      )}
+                      {signal.recommended_actions && signal.recommended_actions.length > 0 && (
+                        <div className={styles.subSection}>
+                          <div className={styles.label}>Recommended actions</div>
+                          <ul className={styles.list}>
+                            {signal.recommended_actions.map((action) => (
+                              <li key={action.action_id}>
+                                <strong>{action.label}:</strong> {action.rationale}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
                       )}
                       <div className={styles.statusRow}>
                         <select
@@ -334,6 +609,65 @@ export default function TransactionDetailDrawer({
                 })}
               </div>
             )}
+          </section>
+
+          <section className={styles.section}>
+            <h3>Verification</h3>
+            {verification.lastAction ? (
+              <>
+                <div className={styles.cardMeta}>Last action: {verification.lastAction}</div>
+                <div className={styles.grid}>
+                  <div>
+                    <div className={styles.label}>Ledger rows updated</div>
+                    <div>{verification.ledgerUpdated ?? 0}</div>
+                  </div>
+                  <div>
+                    <div className={styles.label}>Audit entries</div>
+                    <div>{verification.auditIds?.length ?? 0}</div>
+                  </div>
+                  <div>
+                    <div className={styles.label}>Signals touched</div>
+                    <div>{verification.pulse?.touched_signal_ids?.length ?? 0}</div>
+                  </div>
+                </div>
+                {verification.auditIds && verification.auditIds.length > 0 && (
+                  <div className={styles.subSection}>
+                    <div className={styles.label}>Audit IDs</div>
+                    <div className={styles.codeBlock}>
+                      {verification.auditIds.join(", ")}
+                    </div>
+                  </div>
+                )}
+                {verification.pulse?.touched_signal_ids?.length ? (
+                  <div className={styles.subSection}>
+                    <div className={styles.label}>Signal updates</div>
+                    <div className={styles.codeBlock}>
+                      {verification.pulse.touched_signal_ids.join(", ")}
+                    </div>
+                  </div>
+                ) : null}
+                {verification.status?.gated && !verification.pulse && (
+                  <div className={styles.subSection}>
+                    <div className={styles.muted}>
+                      Monitoring is gated: {verification.status.gating_reason}
+                    </div>
+                    <button
+                      className={styles.secondaryButton}
+                      type="button"
+                      onClick={handleForcePulse}
+                      disabled={verification.loading}
+                    >
+                      {verification.loading ? "Running…" : "Re-run monitoring (force)"}
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className={styles.muted}>
+                Apply a rule or categorization to start verification.
+              </div>
+            )}
+            {verification.error && <div className={styles.error}>{verification.error}</div>}
           </section>
 
           <section className={styles.section}>

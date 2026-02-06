@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from backend.app.db import get_db
@@ -15,5 +15,9 @@ def get_monitor_status(business_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/pulse/{business_id}")
-def pulse_monitor(business_id: str, db: Session = Depends(get_db)):
-    return monitoring_service.pulse(db, business_id)
+def pulse_monitor(
+    business_id: str,
+    force: bool = Query(False),
+    db: Session = Depends(get_db),
+):
+    return monitoring_service.pulse(db, business_id, force_run=force)

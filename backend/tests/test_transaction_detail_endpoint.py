@@ -123,3 +123,6 @@ def test_transaction_detail_includes_raw_and_categorization(db_session):
     assert detail["ledger_context"] is not None
     assert detail["audit_history"][0]["event_type"] == "categorization_change"
     assert detail["related_signals"][0]["signal_id"] == "sig-evt-1"
+    assert "suggested_category" in detail
+    assert "rule_suggestion" in detail
+    assert detail["related_signals"][0]["recommended_actions"]

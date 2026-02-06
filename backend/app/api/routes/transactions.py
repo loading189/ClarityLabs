@@ -93,6 +93,24 @@ class RelatedSignalOut(BaseModel):
     matched_on: Optional[str] = None
     window: Optional[Dict[str, Any]] = None
     facts: Optional[Dict[str, Any]] = None
+    recommended_actions: List[Dict[str, Any]] = []
+
+
+class SuggestedCategoryOut(BaseModel):
+    system_key: str
+    category_id: str
+    category_name: str
+    source: str
+    confidence: float
+    reason: str
+
+
+class RuleSuggestionOut(BaseModel):
+    contains_text: str
+    category_id: str
+    category_name: str
+    direction: Optional[str] = None
+    account: Optional[str] = None
 
 
 class TransactionDetailOut(BaseModel):
@@ -102,6 +120,8 @@ class TransactionDetailOut(BaseModel):
     normalized_txn: NormalizedTxnOut
     vendor_normalization: VendorNormalizationOut
     categorization: Optional[CategorizationOut] = None
+    suggested_category: Optional[SuggestedCategoryOut] = None
+    rule_suggestion: Optional[RuleSuggestionOut] = None
     processing_assumptions: List[Dict[str, str]]
     ledger_context: Optional[LedgerContextOut] = None
     audit_history: List[AuditLogOut]

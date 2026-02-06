@@ -181,7 +181,12 @@ export type SignalExplainOut = {
     description: string;
     domain: string;
     default_severity: string | null;
-    recommended_actions: string[];
+    recommended_actions: Array<{
+      action_id: string;
+      label: string;
+      rationale: string;
+      parameters?: Record<string, unknown> | null;
+    }>;
     evidence_schema: string[];
     scoring_profile: Record<string, unknown>;
   };

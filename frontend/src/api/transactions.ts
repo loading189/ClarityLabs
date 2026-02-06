@@ -69,6 +69,21 @@ export type TransactionDetail = {
     rule_id?: string | null;
     created_at: string;
   } | null;
+  suggested_category?: {
+    system_key: string;
+    category_id: string;
+    category_name: string;
+    source: string;
+    confidence: number;
+    reason: string;
+  } | null;
+  rule_suggestion?: {
+    contains_text: string;
+    category_id: string;
+    category_name: string;
+    direction?: "inflow" | "outflow" | null;
+    account?: string | null;
+  } | null;
   processing_assumptions: Array<{ field: string; detail: string }>;
   ledger_context?: {
     row: {
@@ -106,6 +121,12 @@ export type TransactionDetail = {
     matched_on?: string | null;
     window?: Record<string, any> | null;
     facts?: Record<string, any> | null;
+    recommended_actions?: Array<{
+      action_id: string;
+      label: string;
+      rationale: string;
+      parameters?: Record<string, any> | null;
+    }>;
   }>;
 };
 

@@ -811,6 +811,7 @@ def preview_category_rule(
     *,
     sample_limit: int = 10,
     max_events: int = 5000,
+    include_posted: bool = False,
 ) -> Dict[str, Any]:
     """
     Preview a single rule using the same conflict policy as the rules engine.
@@ -832,11 +833,13 @@ def preview_category_rule(
         rules.append(rule)
         rules.sort(key=_rule_order_key)
 
-    existing_ids = set(
-        db.execute(
-            select(TxnCategorization.source_event_id).where(TxnCategorization.business_id == business_id)
-        ).scalars().all()
-    )
+    existing_ids: set[str] = set()
+    if not include_posted:
+        existing_ids = set(
+            db.execute(
+                select(TxnCategorization.source_event_id).where(TxnCategorization.business_id == business_id)
+            ).scalars().all()
+        )
 
     rows = (
         db.execute(
@@ -946,7 +949,40 @@ def apply_category_rule(db: Session, business_id: str, rule_id: str) -> Dict[str
     db.add(rule)
     db.commit()
 
-    return {"rule_id": rule.id, "matched": len(matched_ids), "updated": updated}
+    audit_row = audit_service.log_audit_event(
+        db,
+        business_id=business_id,
+        event_type="rule_apply",
+        actor="user",
+        reason="apply_rule",
+        before={
+            **_category_snapshot(db, rule.category_id),
+            "contains_text": rule.contains_text,
+            "direction": rule.direction,
+            "account": rule.account,
+            "priority": rule.priority,
+            "active": rule.active,
+        },
+        after={
+            **_category_snapshot(db, rule.category_id),
+            "contains_text": rule.contains_text,
+            "direction": rule.direction,
+            "account": rule.account,
+            "priority": rule.priority,
+            "active": rule.active,
+            "matched": len(matched_ids),
+            "updated": updated,
+        },
+        rule_id=rule.id,
+    )
+    db.commit()
+
+    return {
+        "rule_id": rule.id,
+        "matched": len(matched_ids),
+        "updated": updated,
+        "audit_id": audit_row.id,
+    }
 
 
 def upsert_categorization(db: Session, business_id: str, req) -> Dict[str, Any]:

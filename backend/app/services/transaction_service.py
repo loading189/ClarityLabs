@@ -19,7 +19,10 @@ from backend.app.models import (
 from backend.app.norma.categorize_brain import brain
 from backend.app.norma.from_events import raw_event_to_txn
 from backend.app.norma.merchant import canonical_merchant_name, merchant_key
+from backend.app.norma.category_engine import suggest_category
+from backend.app.services.category_resolver import resolve_system_key
 from backend.app.services.ledger_service import ledger_context_for_source_event
+from backend.app.services import signals_service
 
 
 def _require_business(db: Session, business_id: str) -> Business:
@@ -77,6 +80,31 @@ def _build_processing_assumptions(
         assumptions.append({"field": "category", "detail": "Category left uncategorized for review."})
 
     return assumptions
+
+
+def _category_suggestion_for_txn(
+    db: Session,
+    business_id: str,
+    txn,
+) -> Optional[Dict[str, Any]]:
+    suggested = suggest_category(db, txn, business_id=business_id)
+    cat_obj = getattr(suggested, "categorization", None)
+    if not cat_obj:
+        return None
+    candidate = (cat_obj.category or "").strip().lower()
+    if not candidate or candidate == "uncategorized":
+        return None
+    resolved = resolve_system_key(db, business_id, candidate)
+    if not resolved:
+        return None
+    return {
+        "system_key": candidate,
+        "category_id": resolved["category_id"],
+        "category_name": resolved["category_name"],
+        "source": (cat_obj.source or "rule").strip().lower(),
+        "confidence": float(cat_obj.confidence or 0.0),
+        "reason": cat_obj.reason or "—",
+    }
 
 
 def _related_signals(
@@ -143,6 +171,12 @@ def _related_signals(
                     "end": payload.get("window_end") or payload.get("date_end"),
                 },
                 "facts": facts,
+                "recommended_actions": signals_service._normalize_recommended_actions(
+                    row.signal_type or "",
+                    signals_service.SIGNAL_CATALOG.get(row.signal_type or "", {}).get(
+                        "recommended_actions"
+                    ),
+                ),
             }
         )
 
@@ -305,6 +339,17 @@ def transaction_detail(db: Session, business_id: str, source_event_id: str) -> D
         "merchant_key": mk,
     }
 
+    suggested_category = _category_suggestion_for_txn(db, business_id, txn)
+    rule_suggestion = None
+    if suggested_category:
+        rule_suggestion = {
+            "contains_text": vendor_normalization.get("canonical_name") or txn.description,
+            "category_id": suggested_category["category_id"],
+            "category_name": suggested_category["category_name"],
+            "direction": txn.direction,
+            "account": txn.account,
+        }
+
     return {
         "business_id": business_id,
         "source_event_id": source_event_id,
@@ -319,6 +364,8 @@ def transaction_detail(db: Session, business_id: str, source_event_id: str) -> D
         "normalized_txn": normalized_txn,
         "vendor_normalization": vendor_normalization,
         "categorization": categorization,
+        "suggested_category": suggested_category,
+        "rule_suggestion": rule_suggestion,
         "processing_assumptions": processing_assumptions,
         "ledger_context": ledger_context,
         "audit_history": audit_history,

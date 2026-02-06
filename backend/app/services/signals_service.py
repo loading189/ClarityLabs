@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 PlaybookKind = Literal["inspect", "adjust", "decide"]
 PlaybookTarget = Literal["ledger", "vendors", "rules", "categorize", "assistant"]
+RecommendedAction = Dict[str, Any]
 
 
 def _default_clear_condition(signal_type: str) -> Dict[str, Any]:
@@ -86,6 +87,48 @@ def _detector_guidance(signal_type: str, catalog: Dict[str, Any]) -> Dict[str, A
         "clear_condition": _default_clear_condition(signal_type),
         "playbooks": sorted(_default_playbooks_for_domain(catalog.get("domain", "assistant")), key=lambda item: str(item.get("id", ""))),
     }
+
+
+def _slugify_action_id(text: str) -> str:
+    safe = "".join(ch if ch.isalnum() else "_" for ch in text.strip().lower())
+    safe = "_".join([part for part in safe.split("_") if part])
+    return safe or "action"
+
+
+def _normalize_recommended_actions(
+    signal_type: str,
+    actions: Optional[List[Any]],
+) -> List[RecommendedAction]:
+    if not actions:
+        return []
+    normalized: List[RecommendedAction] = []
+    for idx, item in enumerate(actions):
+        if isinstance(item, dict):
+            action_id = str(item.get("action_id") or item.get("id") or "").strip()
+            label = str(item.get("label") or "").strip()
+            rationale = str(item.get("rationale") or "").strip()
+            parameters = item.get("parameters")
+            if not action_id:
+                action_id = f"{signal_type}.{_slugify_action_id(label or rationale)}"
+            normalized.append(
+                {
+                    "action_id": action_id,
+                    "label": label or rationale or f"Recommended action {idx + 1}",
+                    "rationale": rationale or label or "",
+                    "parameters": parameters if parameters is not None else None,
+                }
+            )
+        elif isinstance(item, str):
+            action_id = f"{signal_type}.{_slugify_action_id(item)}"
+            normalized.append(
+                {
+                    "action_id": action_id,
+                    "label": item,
+                    "rationale": item,
+                    "parameters": None,
+                }
+            )
+    return normalized
 SIGNAL_CATALOG: Dict[str, Dict[str, Any]] = {
     "expense_creep_by_vendor": {
         "signal_id": "expense_creep_by_vendor",
@@ -94,9 +137,21 @@ SIGNAL_CATALOG: Dict[str, Dict[str, Any]] = {
         "description": "Identifies vendors with a sustained increase in outflows over a recent window.",
         "default_severity": "warning",
         "recommended_actions": [
-            "Review vendor invoices for pricing changes.",
-            "Confirm contract terms and check for duplicate charges.",
-            "Identify opportunities to renegotiate or consolidate spend.",
+            {
+                "action_id": "expense_creep_by_vendor.review_vendor",
+                "label": "Review vendor spend and invoices",
+                "rationale": "Confirm pricing changes, contract terms, and recurring items tied to this vendor.",
+            },
+            {
+                "action_id": "expense_creep_by_vendor.set_budget_threshold",
+                "label": "Set a budget threshold for this vendor or category",
+                "rationale": "Create a deterministic threshold that flags repeat overages before the window closes.",
+            },
+            {
+                "action_id": "expense_creep_by_vendor.create_vendor_rule",
+                "label": "Create a vendor/category rule for recurring items",
+                "rationale": "Automate classification for repeat charges so future creep is visible immediately.",
+            },
         ],
         "evidence_schema": [
             "vendor_name",
@@ -121,9 +176,22 @@ SIGNAL_CATALOG: Dict[str, Dict[str, Any]] = {
         "description": "Detects when cash runway falls below defined thresholds based on recent burn.",
         "default_severity": "critical",
         "recommended_actions": [
-            "Reforecast cash flow and adjust discretionary spend.",
-            "Accelerate collections or delay noncritical outflows.",
-            "Review burn assumptions and update runway targets.",
+            {
+                "action_id": "low_cash_runway.delay_discretionary_outflows",
+                "label": "Delay discretionary outflows",
+                "rationale": "Push noncritical payments to preserve runway while you validate inflow timing.",
+            },
+            {
+                "action_id": "low_cash_runway.review_top_expenses",
+                "label": "Review top expenses driving burn",
+                "rationale": "Identify the largest current outflows to target immediate relief actions.",
+            },
+            {
+                "action_id": "low_cash_runway.project_reduced_outflows",
+                "label": "Project runway if outflows drop by 10%",
+                "rationale": "Quantify how reducing burn changes runway so decisions stay deterministic.",
+                "parameters": {"reduce_outflows_pct": 10},
+            },
         ],
         "evidence_schema": [
             "current_cash",
@@ -147,9 +215,16 @@ SIGNAL_CATALOG: Dict[str, Dict[str, Any]] = {
         "description": "Flags outflow spikes that deviate from recent spending patterns.",
         "default_severity": "warning",
         "recommended_actions": [
-            "Validate the transaction details for one-off expenses.",
-            "Confirm approvals for unusually large payments.",
-            "Investigate potential anomalies or fraud.",
+            {
+                "action_id": "unusual_outflow_spike.review_top_day_transactions",
+                "label": "Review that day's top transactions",
+                "rationale": "Focus on the largest outflows for the spike date to validate expected activity.",
+            },
+            {
+                "action_id": "unusual_outflow_spike.flag_outliers",
+                "label": "Flag outliers or one-time events",
+                "rationale": "Mark one-off purchases so monitoring can distinguish them from repeat behavior.",
+            },
         ],
         "evidence_schema": [
             "latest_date",
@@ -1364,13 +1439,17 @@ def _detector_meta(signal_type: Optional[str], state: HealthSignalState) -> Dict
     if signal_type and signal_type in SIGNAL_CATALOG:
         catalog = SIGNAL_CATALOG[signal_type]
         guidance = _detector_guidance(signal_type, catalog)
+        recommended_actions = _normalize_recommended_actions(
+            signal_type,
+            catalog.get("recommended_actions"),
+        )
         return {
             "type": catalog["signal_id"],
             "title": catalog["title"],
             "description": catalog["description"],
             "domain": catalog["domain"],
             "default_severity": catalog["default_severity"],
-            "recommended_actions": catalog["recommended_actions"],
+            "recommended_actions": recommended_actions,
             "evidence_schema": catalog["evidence_schema"],
             "scoring_profile": catalog["scoring_profile"],
             "clear_condition": guidance["clear_condition"],
@@ -1461,7 +1540,13 @@ def _next_actions(state: HealthSignalState, detector: Dict[str, Any], related_au
     status = state.status or "open"
     severity = (state.severity or detector.get("default_severity") or "warning").lower()
     recommended = detector.get("recommended_actions") or []
-    primary_recommendation = recommended[0] if recommended else "Review the supporting evidence before changing status."
+    primary_recommendation = "Review the supporting evidence before changing status."
+    if recommended:
+        first = recommended[0]
+        if isinstance(first, dict):
+            primary_recommendation = first.get("label") or first.get("rationale") or primary_recommendation
+        elif isinstance(first, str):
+            primary_recommendation = first
 
     persistence_days = 0
     if state.detected_at and state.updated_at:
