@@ -87,6 +87,8 @@ export default function CategorizeTab({
   const [ruleEdits, setRuleEdits] = useState<
     Record<string, { priority: string; category_id: string }>
   >({});
+  const dateRangeStart = dateRange.start;
+  const dateRangeEnd = dateRange.end;
 
   // Prevent stale-load races when businessId changes quickly
   const loadSeq = useRef(0);
@@ -140,11 +142,36 @@ export default function CategorizeTab({
 
   const invalidDateRange = useMemo(() => {
     return (
-      !isValidIsoDate(dateRange.start) ||
-      !isValidIsoDate(dateRange.end) ||
-      dateRange.start > dateRange.end
+      !isValidIsoDate(dateRangeStart) ||
+      !isValidIsoDate(dateRangeEnd) ||
+      dateRangeStart > dateRangeEnd
     );
-  }, [dateRange.end, dateRange.start]);
+  }, [dateRangeEnd, dateRangeStart]);
+
+  const formatTxnDateTime = useCallback((occurredAt?: string | null): string => {
+    if (!occurredAt) return "—";
+    const timestamp = Date.parse(occurredAt);
+    if (!Number.isFinite(timestamp)) return occurredAt;
+    return new Date(timestamp).toLocaleString();
+  }, []);
+
+  const formatTxnDate = useCallback((occurredAt?: string | null): string => {
+    if (!occurredAt) return "—";
+    const timestamp = Date.parse(occurredAt);
+    if (!Number.isFinite(timestamp)) return occurredAt;
+    return new Date(timestamp).toLocaleDateString();
+  }, []);
+
+  const formatSignedAmount = useCallback(
+    (amount: number, direction?: string | null): string => {
+      const normalizedDirection = (direction || "").toLowerCase();
+      const sign =
+        normalizedDirection === "inflow" ? "+" : normalizedDirection === "outflow" ? "-" : "";
+      const normalizedAmount = Number.isFinite(amount) ? Math.abs(amount) : 0;
+      return `${sign}${currencyFormatter.format(normalizedAmount)}`;
+    },
+    [currencyFormatter]
+  );
 
   const formatLastRun = useCallback((rule: CategoryRuleOut): string => {
     if (!rule.last_run_at) return "Never";
@@ -245,7 +272,8 @@ export default function CategorizeTab({
         if (seq !== loadSeq.current) return;
         console.error("[categorize] vendor fetch failed", {
           businessId,
-          dateRange,
+          dateRangeStart,
+          dateRangeEnd,
           url: `/categorize/business/${businessId}/brain/vendors`,
           error: e?.message ?? e,
         });
@@ -263,7 +291,8 @@ export default function CategorizeTab({
       if (seq !== loadSeq.current) return;
       console.error("[categorize] load failed", {
         businessId,
-        dateRange,
+        dateRangeStart,
+        dateRangeEnd,
         url: `/categorize/business/${businessId}/txns?limit=50&only_uncategorized=true`,
         error: e?.message ?? e,
       });
@@ -271,7 +300,14 @@ export default function CategorizeTab({
     } finally {
       if (seq === loadSeq.current) setLoading(false);
     }
-  }, [businessId, dateRange, invalidBusinessId, invalidDateRange, pickBestCategoryId]);
+  }, [
+    businessId,
+    dateRangeEnd,
+    dateRangeStart,
+    invalidBusinessId,
+    invalidDateRange,
+    pickBestCategoryId,
+  ]);
 
   const loadRules = useCallback(async () => {
     if (!businessId || invalidBusinessId) return;
@@ -283,7 +319,8 @@ export default function CategorizeTab({
     } catch (e: any) {
       console.error("[categorize] rules fetch failed", {
         businessId,
-        dateRange,
+        dateRangeStart,
+        dateRangeEnd,
         url: `/categorize/${businessId}/rules`,
         error: e?.message ?? e,
       });
@@ -291,7 +328,7 @@ export default function CategorizeTab({
     } finally {
       setRulesLoading(false);
     }
-  }, [businessId, dateRange, invalidBusinessId]);
+  }, [businessId, dateRangeEnd, dateRangeStart, invalidBusinessId]);
 
   const pickTxn = useCallback(
     (t: NormalizedTxn) => {
@@ -324,12 +361,13 @@ export default function CategorizeTab({
   }, [drilldown]);
 
   const filteredTxns = useMemo(() => {
-    const start = Date.parse(dateRange.start);
-    const end = Date.parse(dateRange.end);
+    const start = Date.parse(dateRangeStart);
+    const endDay = Date.parse(dateRangeEnd);
+    const end = Number.isFinite(endDay) ? endDay + 24 * 60 * 60 * 1000 - 1 : Number.NaN;
     let filtered = txns.filter((t) => {
       if (!Number.isFinite(start) || !Number.isFinite(end)) return true;
       const occurredAt = t.occurred_at ? Date.parse(t.occurred_at) : Number.NaN;
-      if (!Number.isFinite(occurredAt)) return true;
+      if (!Number.isFinite(occurredAt)) return false;
       return occurredAt >= start && occurredAt <= end;
     });
 
@@ -361,7 +399,7 @@ export default function CategorizeTab({
       }
       return true;
     });
-  }, [activeDrilldown, dateRange.end, dateRange.start, txns]);
+  }, [activeDrilldown, dateRangeEnd, dateRangeStart, txns]);
 
   const sortedRules = useMemo(() => {
     return [...rules].sort((a, b) => {
@@ -398,7 +436,8 @@ export default function CategorizeTab({
 
   const doSave = useCallback(
     async (categoryId: string, source: "manual" | "rule" | "ml") => {
-      if (!selectedTxn) return;
+      const txn = selectedTxnRef.current;
+      if (!txn) return;
       const category = catsById.get(categoryId);
       if (!hasValidCategoryMapping(category)) {
         setActionErr("Selected category is missing a valid COA mapping.");
@@ -410,10 +449,10 @@ export default function CategorizeTab({
 
       try {
         const res: any = await saveCategorization(businessId, {
-          source_event_id: selectedTxn.source_event_id,
+          source_event_id: txn.source_event_id,
           category_id: categoryId,
           source,
-          confidence: source === "manual" ? 1.0 : Number(selectedTxn.confidence ?? 0.75),
+          confidence: source === "manual" ? 1.0 : Number(txn.confidence ?? 0.75),
         });
 
         setMsg(
@@ -431,12 +470,13 @@ export default function CategorizeTab({
         setActionErr(e?.message ?? "Save failed");
       }
     },
-    [bumpDataVersion, businessId, catsById, load, onCategorizationChange, selectedTxn, showToast]
+    [bumpDataVersion, businessId, catsById, load, onCategorizationChange, showToast]
   );
 
   const doBulkApply = useCallback(
     async (categoryId: string) => {
-      if (!selectedTxn) return;
+      const txn = selectedTxnRef.current;
+      if (!txn) return;
 
       const category = catsById.get(categoryId);
       if (!hasValidCategoryMapping(category)) {
@@ -444,7 +484,7 @@ export default function CategorizeTab({
         return;
       }
 
-      if (!selectedTxn.merchant_key) {
+      if (!txn.merchant_key) {
         setActionErr("No merchant key available for this vendor.");
         return;
       }
@@ -454,10 +494,10 @@ export default function CategorizeTab({
 
       try {
         const res = await bulkApplyByMerchantKey(businessId, {
-          merchant_key: selectedTxn.merchant_key,
+          merchant_key: txn.merchant_key,
           category_id: categoryId,
           source: "bulk",
-          confidence: Number(selectedTxn.confidence ?? 1.0),
+          confidence: Number(txn.confidence ?? 1.0),
         });
 
         setMsg(
@@ -471,7 +511,7 @@ export default function CategorizeTab({
         setActionErr(e?.message ?? "Failed to apply vendor categorization");
       }
     },
-    [bumpDataVersion, businessId, catsById, load, onCategorizationChange, selectedTxn, showToast]
+    [bumpDataVersion, businessId, catsById, load, onCategorizationChange, showToast]
   );
 
   const updateRuleEdit = useCallback(
@@ -755,9 +795,11 @@ export default function CategorizeTab({
       (txn) => txn.source_event_id === selectedTxn.source_event_id
     );
     if (!stillVisible) {
-      setSelectedTxn(filteredTxns[0] ?? null);
+      const nextTxn = filteredTxns[0] ?? null;
+      setSelectedTxn(nextTxn);
+      setSelectedCategoryId(pickBestCategoryId(nextTxn, cats));
     }
-  }, [filteredTxns, selectedTxn]);
+  }, [cats, filteredTxns, pickBestCategoryId, selectedTxn]);
 
   const reloadAll = useCallback(() => {
     load();
@@ -871,7 +913,7 @@ export default function CategorizeTab({
                   )}
                 </div>
                 <div className={styles.txnMeta}>
-                  {new Date(t.occurred_at).toLocaleString()} • {t.account} • {t.direction} •{" "}
+                  {formatTxnDateTime(t.occurred_at)} • {t.account} • {t.direction} •{" "}
                   {formatAmount(t)}
                 </div>
 
@@ -899,9 +941,7 @@ export default function CategorizeTab({
             <span>{toastMsg}</span>
             <Link
               className={styles.toastLink}
-              to={`${location.pathname}${
-                toastAuditId ? `?auditId=${toastAuditId}` : ""
-              }#recent-changes`}
+              to={`${location.pathname}${toastAuditId ? `?auditId=${encodeURIComponent(toastAuditId)}` : ""}#recent-changes`}
             >
               View in Recent Changes
             </Link>
@@ -1084,9 +1124,9 @@ export default function CategorizeTab({
                       <tbody>
                         {previewData.samples.map((sample) => (
                           <tr key={sample.source_event_id}>
-                            <td>{new Date(sample.occurred_at).toLocaleDateString()}</td>
+                            <td>{formatTxnDate(sample.occurred_at)}</td>
                             <td>{sample.description}</td>
-                            <td>{currencyFormatter.format(sample.amount)}</td>
+                            <td>{formatSignedAmount(sample.amount, sample.direction)}</td>
                             <td>{sample.direction}</td>
                             <td>{sample.account || "—"}</td>
                           </tr>
@@ -1171,7 +1211,7 @@ export default function CategorizeTab({
                         </select>
                       </td>
                       <td>{formatLastRun(rule)}</td>
-                      <td>{new Date(rule.created_at).toLocaleDateString()}</td>
+                      <td>{formatTxnDate(rule.created_at)}</td>
                       <td>
                         <div className={styles.buttonRow}>
                           <button
