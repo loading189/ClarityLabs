@@ -28,6 +28,7 @@ import { normalizeVendorDisplay } from "../../utils/vendors";
 import { hasValidCategoryMapping } from "../../utils/categories";
 import RecentChangesPanel from "../../components/audit/RecentChangesPanel";
 import { Link, useLocation } from "react-router-dom";
+import TransactionDetailDrawer from "../../components/transactions/TransactionDetailDrawer";
 
 export type CategorizeDrilldown = {
   merchant_key?: string;
@@ -63,6 +64,7 @@ export default function CategorizeTab({
   const [vendorErr, setVendorErr] = useState<string | null>(null);
   const [selectedTxn, setSelectedTxn] = useState<NormalizedTxn | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
+  const [detailSourceEventId, setDetailSourceEventId] = useState<string | null>(null);
   const selectedTxnRef = useRef<NormalizedTxn | null>(null);
   const { dateRange, dataVersion, bumpDataVersion } = useAppState();
 
@@ -252,7 +254,7 @@ export default function CategorizeTab({
     try {
       logRefresh("categorize", "reload");
       const [t, c, m] = await Promise.all([
-        getTxnsToCategorize(businessId, 50),
+        getTxnsToCategorize(businessId, 50, { start_date: dateRangeStart, end_date: dateRangeEnd }),
         getCategories(businessId),
         getCategorizeMetrics(businessId),
       ]);
@@ -293,7 +295,7 @@ export default function CategorizeTab({
         businessId,
         dateRangeStart,
         dateRangeEnd,
-        url: `/categorize/business/${businessId}/txns?limit=50&only_uncategorized=true`,
+        url: `/categorize/business/${businessId}/txns?limit=50&only_uncategorized=true&start_date=${dateRangeStart}&end_date=${dateRangeEnd}`,
         error: e?.message ?? e,
       });
       setLoadErr(e?.message ?? "Failed to load categorization");
@@ -334,6 +336,7 @@ export default function CategorizeTab({
     (t: NormalizedTxn) => {
       setSelectedTxn(t);
       setSelectedCategoryId(pickBestCategoryId(t, cats));
+      setDetailSourceEventId(t.source_event_id);
       setMsg(null);
       setActionErr(null);
     },
@@ -1253,6 +1256,13 @@ export default function CategorizeTab({
       <div id="recent-changes">
         <RecentChangesPanel businessId={businessId} dataVersion={dataVersion} />
       </div>
+
+      <TransactionDetailDrawer
+        open={Boolean(detailSourceEventId)}
+        businessId={businessId}
+        sourceEventId={detailSourceEventId}
+        onClose={() => setDetailSourceEventId(null)}
+      />
     </div>
   );
 }

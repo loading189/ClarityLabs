@@ -34,7 +34,28 @@ vi.mock("../../api/monitor", () => ({ getMonitorStatus: (...args: unknown[]) => 
 vi.mock("../../api/workQueue", () => ({ fetchWorkQueue: (...args: unknown[]) => fetchWorkQueue(...args) }));
 
 function renderAssistant(path = "/app/biz-1/assistant") {
-  return render(<AppStateProvider><MemoryRouter initialEntries={[path]}><Routes><Route path="/app/:businessId/assistant" element={<AssistantPage />} /></Routes></MemoryRouter></AppStateProvider>);
+  return render(
+    <AppStateProvider>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route path="/app/:businessId/assistant" element={<AssistantPage />} />
+        </Routes>
+      </MemoryRouter>
+    </AppStateProvider>
+  );
+}
+
+function renderAssistantWithRoutes(path = "/app/biz-1/assistant") {
+  return render(
+    <AppStateProvider>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route path="/app/:businessId/assistant" element={<AssistantPage />} />
+          <Route path="/app/:businessId/vendors" element={<div>vendors-route</div>} />
+        </Routes>
+      </MemoryRouter>
+    </AppStateProvider>
+  );
 }
 
 describe("AssistantPage work queue", () => {
@@ -82,5 +103,34 @@ describe("AssistantPage work queue", () => {
     renderAssistant();
     await screen.findByText("Today's Work Queue");
     expect(getMonitorStatus).not.toHaveBeenCalled();
+  });
+
+  it("does not auto-navigate on resume when work queue suggests deep link", async () => {
+    fetchWorkQueue.mockResolvedValueOnce({
+      business_id: "biz-1",
+      generated_at: new Date().toISOString(),
+      items: [
+        {
+          kind: "signal",
+          id: "sig-9",
+          title: "Vendor issue",
+          severity: "warning",
+          status: "open",
+          domain: "expense",
+          score: 80,
+          why_now: "test",
+          primary_action: {
+            label: "Open playbook",
+            type: "start_playbook",
+            payload: { signal_id: "sig-9", deep_link: "/app/{businessId}/vendors" },
+          },
+          links: { assistant: "/" },
+        },
+      ],
+    });
+
+    renderAssistantWithRoutes();
+    await screen.findByText("Today's Work Queue");
+    expect(screen.queryByText("vendors-route")).not.toBeInTheDocument();
   });
 });

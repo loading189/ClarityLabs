@@ -28,6 +28,7 @@ from backend.app.api.routes.daily_brief import router as daily_brief_router
 from backend.app.api.routes.assistant_plans import router as assistant_plans_router
 from backend.app.api.routes.assistant_progress import router as assistant_progress_router
 from backend.app.api.routes.assistant_work_queue import router as assistant_work_queue_router
+from backend.app.api.routes.transactions import router as transactions_router
 
 
 logger = logging.getLogger(__name__)
@@ -95,3 +96,4 @@ app.include_router(assistant_plans_router)
 app.include_router(assistant_progress_router)
 
 app.include_router(assistant_work_queue_router)
+app.include_router(transactions_router)

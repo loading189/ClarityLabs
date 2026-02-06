@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime, time, timezone
 from typing import List, Optional, Dict, Any
 
 from fastapi import HTTPException
@@ -427,16 +427,18 @@ def list_txns_to_categorize(
     business_id: str,
     limit: int,
     only_uncategorized: bool,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
 ) -> List[Dict[str, Any]]:
     require_business(db, business_id)
     seed_coa_and_categories_and_mappings(db, business_id)
 
-    rows = db.execute(
-        select(RawEvent)
-        .where(RawEvent.business_id == business_id)
-        .order_by(RawEvent.occurred_at.desc())
-        .limit(500)
-    ).scalars().all()
+    stmt = select(RawEvent).where(RawEvent.business_id == business_id)
+    if start_date:
+        stmt = stmt.where(RawEvent.occurred_at >= datetime.combine(start_date, time.min, tzinfo=timezone.utc))
+    if end_date:
+        stmt = stmt.where(RawEvent.occurred_at <= datetime.combine(end_date, time.max, tzinfo=timezone.utc))
+    rows = db.execute(stmt.order_by(RawEvent.occurred_at.desc()).limit(500)).scalars().all()
 
     existing = db.execute(
         select(TxnCategorization.source_event_id).where(TxnCategorization.business_id == business_id)

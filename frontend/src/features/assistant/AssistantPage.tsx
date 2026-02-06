@@ -57,7 +57,7 @@ function playbookIcon(kind: "inspect" | "adjust" | "decide") {
 
 export default function AssistantPage() {
   const { businessId: businessIdParam } = useParams();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const businessId = businessIdParam?.trim() || searchParams.get("businessId")?.trim() || "";
   const initialSignalId = searchParams.get("signalId")?.trim() || null;
@@ -298,8 +298,9 @@ const loadDailyBrief = useCallback(async (signal?: AbortSignal) => {
     }
   }, [businessId, loadThread, navigate, selectedSignalId]);
 
-  const handleWorkQueueAction = useCallback(async (item: WorkQueueItem) => {
+  const handleWorkQueueAction = useCallback(async (item: WorkQueueItem, options?: { allowNavigation?: boolean }) => {
     if (!businessId) return;
+    const allowNavigation = options?.allowNavigation ?? true;
     const payload = item.primary_action.payload || {};
     if (item.primary_action.type === "open_plan") {
       const planId = String(payload.plan_id ?? item.id);
@@ -323,7 +324,7 @@ const loadDailyBrief = useCallback(async (signal?: AbortSignal) => {
       content_json: { action: "playbook_started", playbook_id: playbookId, title, source: "work_queue", signal_id: signalId, created_at: new Date().toISOString(), links: { signal: `/app/${businessId}/assistant?signalId=${signalId}` } },
     });
     await loadThread();
-    if (deepLink) {
+    if (deepLink && allowNavigation) {
       navigate(deepLink);
       return;
     }
@@ -397,7 +398,7 @@ const loadDailyBrief = useCallback(async (signal?: AbortSignal) => {
     const topSignal = workQueue.find((item) => item.kind === "signal");
     if (topSignal) {
       resumedRef.current = true;
-      void handleWorkQueueAction(topSignal);
+      void handleWorkQueueAction(topSignal, { allowNavigation: false });
       return;
     }
     resumedRef.current = true;
@@ -413,6 +414,7 @@ const loadDailyBrief = useCallback(async (signal?: AbortSignal) => {
     const plan = await createPlan({ business_id: businessId, title, signal_ids: signalIds });
     await Promise.all([loadPlans(), loadThread()]);
     setSelectedPlanId(plan.plan_id);
+    return plan;
   }, [businessId, loadPlans, loadThread]);
 
   const handlePlanStepDone = useCallback(async (stepId: string) => {
@@ -445,8 +447,20 @@ const loadDailyBrief = useCallback(async (signal?: AbortSignal) => {
 
   useEffect(() => {
     if (!createPlanSignalId || !businessId) return;
-    handleCreatePlan([createPlanSignalId], `Plan · ${createPlanSignalId}`);
-  }, [businessId, createPlanSignalId, handleCreatePlan]);
+    let active = true;
+    const run = async () => {
+      const plan = await handleCreatePlan([createPlanSignalId], `Plan · ${createPlanSignalId}`);
+      if (!active || !plan) return;
+      const next = new URLSearchParams(searchParams);
+      next.delete("createPlanSignalId");
+      next.set("planId", plan.plan_id);
+      setSearchParams(next, { replace: true });
+    };
+    void run();
+    return () => {
+      active = false;
+    };
+  }, [businessId, createPlanSignalId, handleCreatePlan, searchParams, setSearchParams]);
 
   if (!businessId) {
     return (

@@ -135,8 +135,17 @@ export function forgetBrainVendor(businessId: string, payload: { merchant_key: s
   );
 }
 
-export function getTxnsToCategorize(businessId: string, limit = 50) {
-  return apiGet<NormalizedTxn[]>(`/categorize/business/${businessId}/txns?limit=${limit}&only_uncategorized=true`);
+export function getTxnsToCategorize(
+  businessId: string,
+  limit = 50,
+  params?: { start_date?: string; end_date?: string }
+) {
+  const query = new URLSearchParams();
+  query.set("limit", String(limit));
+  query.set("only_uncategorized", "true");
+  if (params?.start_date) query.set("start_date", params.start_date);
+  if (params?.end_date) query.set("end_date", params.end_date);
+  return apiGet<NormalizedTxn[]>(`/categorize/business/${businessId}/txns?${query.toString()}`);
 }
 
 export function getCategories(businessId: string) {

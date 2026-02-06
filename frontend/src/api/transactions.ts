@@ -30,6 +30,84 @@ export type TransactionsResponse = {
   transactions: NormalizedTxn[];
 };
 
+export type TransactionDetail = {
+  business_id: string;
+  source_event_id: string;
+  raw_event: {
+    source: string;
+    source_event_id: string;
+    payload: Record<string, any>;
+    occurred_at: string;
+    created_at: string;
+    processed_at?: string | null;
+  };
+  normalized_txn: {
+    source_event_id: string;
+    occurred_at: string;
+    date: string;
+    description: string;
+    amount: number;
+    direction: "inflow" | "outflow";
+    account: string;
+    category_hint: string;
+    counterparty_hint?: string | null;
+    merchant_key?: string | null;
+  };
+  vendor_normalization: {
+    canonical_name: string;
+    source: string;
+  };
+  categorization?: {
+    category_id: string;
+    category_name: string;
+    system_key?: string | null;
+    account_id: string;
+    account_name: string;
+    source: string;
+    confidence: number;
+    note?: string | null;
+    created_at: string;
+  } | null;
+  processing_assumptions: Array<{ field: string; detail: string }>;
+  ledger_context?: {
+    row: {
+      source_event_id: string;
+      occurred_at: string;
+      date: string;
+      description: string;
+      vendor: string;
+      amount: number;
+      category: string;
+      account: string;
+      balance: number;
+    };
+    balance: number;
+    running_total_in: number;
+    running_total_out: number;
+  } | null;
+  audit_history: Array<{
+    id: string;
+    event_type: string;
+    actor: string;
+    reason?: string | null;
+    before_state?: Record<string, any> | null;
+    after_state?: Record<string, any> | null;
+    rule_id?: string | null;
+    created_at: string;
+  }>;
+  related_signals: Array<{
+    signal_id: string;
+    title?: string | null;
+    severity?: string | null;
+    status?: string | null;
+    domain?: string | null;
+    updated_at?: string | null;
+    matched_on?: string | null;
+    window?: Record<string, any> | null;
+    facts?: Record<string, any> | null;
+  }>;
+};
+
 export async function fetchTransactions(
   businessId: string,
   limit = 50,
@@ -44,4 +122,11 @@ export async function fetchTransactions(
   if (direction) params.set("direction", direction);
 
   return apiGet(`/demo/transactions/${businessId}?${params.toString()}`);
+}
+
+export async function fetchTransactionDetail(
+  businessId: string,
+  sourceEventId: string
+): Promise<TransactionDetail> {
+  return apiGet(`/api/transactions/${businessId}/${encodeURIComponent(sourceEventId)}`);
 }

@@ -125,3 +125,17 @@ def test_plan_list_deterministic_ordering(db_session):
     plans = list_plans(db_session, biz.id)
     assert plans[0].plan_id == p2.plan_id
     assert plans[-1].plan_id == p1.plan_id
+
+
+def test_plan_round_trip_persists_updates(db_session):
+    biz = _biz(db_session)
+    _seed_signal(db_session, biz.id, "sig-expense", "expense_creep_by_vendor")
+    db_session.commit()
+
+    created = create_plan(db_session, PlanCreateIn(business_id=biz.id, title="Round trip", signal_ids=["sig-expense"]))
+    update_plan_status(db_session, biz.id, created.plan_id, PlanStatusIn(actor="analyst", status="in_progress"))
+    noted = add_plan_note(db_session, biz.id, created.plan_id, PlanNoteIn(actor="analyst", text="Follow up"))
+
+    plans = list_plans(db_session, biz.id)
+    assert any(plan.plan_id == created.plan_id and plan.status == "in_progress" for plan in plans)
+    assert noted.notes[-1]["text"] == "Follow up"

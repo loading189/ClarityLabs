@@ -16,6 +16,13 @@ function getString(payload: Record<string, unknown>, key: string) {
   return typeof value === "string" ? value : undefined;
 }
 
+function getFirstString(payload: Record<string, unknown>, key: string) {
+  const value = payload[key];
+  if (typeof value === "string") return value;
+  if (Array.isArray(value) && typeof value[0] === "string") return value[0];
+  return undefined;
+}
+
 function mapDrilldownToFilters(
   current: FilterState,
   payload?: Record<string, unknown> | null
@@ -31,10 +38,21 @@ function mapDrilldownToFilters(
   if (direction === "inflow" || direction === "outflow") {
     next.direction = direction;
   }
+  const vendor = getString(payload, "vendor") ?? getString(payload, "merchant_key");
+  if (vendor) {
+    next.vendor = vendor;
+  }
   const search = getString(payload, "search");
   const query = getString(payload, "q");
   if (search || query) {
     next.q = search ?? query;
+  }
+  const anchorId =
+    getString(payload, "source_event_id") ??
+    getString(payload, "txn_id") ??
+    getFirstString(payload, "txn_ids");
+  if (anchorId) {
+    next.anchor_source_event_id = anchorId;
   }
   const windowDaysValue = payload.window_days;
   if (typeof windowDaysValue === "number") {

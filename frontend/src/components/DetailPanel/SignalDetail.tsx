@@ -1,5 +1,6 @@
 // src/components/detail/SignalDetail.tsx
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import type { HealthSignal, HealthSignalStatus } from "../../types";
 import {
   bulkApplyByMerchantKey,
@@ -9,6 +10,7 @@ import {
 } from "../../api/categorize";
 import { updateSignalStatus } from "../../api/signals";
 import styles from "../../features/signals/HealthTab.module.css";
+import TransactionDetailDrawer from "../transactions/TransactionDetailDrawer";
 
 type Props = {
   businessId: string;
@@ -37,6 +39,7 @@ export default function SignalDetail({ businessId, signal, onNavigate, onAfterAc
   const [impactLine, setImpactLine] = useState<string | null>(null);
   const [actionErr, setActionErr] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [detailSourceEventId, setDetailSourceEventId] = useState<string | null>(null);
 
   useEffect(() => {
     setStatus(signal.status ?? "open");
@@ -252,6 +255,25 @@ export default function SignalDetail({ businessId, signal, onNavigate, onAfterAc
                               ).toFixed(2)}`
                             : "—"}
                         </div>
+                        {ex.source_event_id && (
+                          <div className={styles.signalEvidenceActions}>
+                            <button
+                              className={styles.actionButton}
+                              type="button"
+                              onClick={() => setDetailSourceEventId(String(ex.source_event_id))}
+                            >
+                              View details
+                            </button>
+                            <Link
+                              className={styles.actionButton}
+                              to={`/app/${businessId}/ledger?anchor_source_event_id=${encodeURIComponent(
+                                ex.source_event_id
+                              )}`}
+                            >
+                              View in Ledger
+                            </Link>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -315,6 +337,13 @@ export default function SignalDetail({ businessId, signal, onNavigate, onAfterAc
       {drilldownButtons.length > 0 && (
         <div className={styles.signalActions}>{drilldownButtons}</div>
       )}
+
+      <TransactionDetailDrawer
+        open={Boolean(detailSourceEventId)}
+        businessId={businessId}
+        sourceEventId={detailSourceEventId}
+        onClose={() => setDetailSourceEventId(null)}
+      />
     </div>
   );
 }

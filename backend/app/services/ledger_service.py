@@ -263,6 +263,53 @@ def ledger_lines(
     return sorted(out, key=lambda row: (row["occurred_at"], row["source_event_id"]))
 
 
+def ledger_context_for_source_event(
+    db: Session,
+    business_id: str,
+    source_event_id: str,
+) -> Optional[Dict[str, Any]]:
+    """
+    Return ledger snapshot context for a single source_event_id, if it exists.
+    Includes balance and running totals up to that row.
+    """
+    require_business(db, business_id)
+    rows = _ledger_join_rows(db, business_id)
+
+    balance = 0.0
+    total_in = 0.0
+    total_out = 0.0
+
+    for _txncat, ev, cat, acct in rows:
+        txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
+        amount = signed_amount(txn.amount or 0.0, txn.direction)
+        balance += amount
+        if amount >= 0:
+            total_in += amount
+        else:
+            total_out += abs(amount)
+
+        if ev.source_event_id == source_event_id:
+            row = {
+                "source_event_id": ev.source_event_id,
+                "occurred_at": ev.occurred_at,
+                "date": ev.occurred_at.date(),
+                "description": txn.description,
+                "vendor": _vendor_label(txn),
+                "amount": round(amount, 2),
+                "category": (cat.name or "").strip() or "Uncategorized",
+                "account": (acct.name or "").strip() or "Unknown",
+                "balance": round(balance, 2),
+            }
+            return {
+                "row": row,
+                "balance": round(balance, 2),
+                "running_total_in": round(total_in, 2),
+                "running_total_out": round(total_out, 2),
+            }
+
+    return None
+
+
 def ledger_trace_transactions(
     db: Session,
     business_id: str,
