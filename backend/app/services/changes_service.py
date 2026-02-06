@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import logging
 from typing import Any, Dict, List, Optional
 
 from fastapi import HTTPException
@@ -10,9 +11,12 @@ from sqlalchemy.orm import Session
 from backend.app.models import AuditLog, Business
 from backend.app.services.signals_service import SIGNAL_CATALOG
 
+logger = logging.getLogger(__name__)
+
 
 def _require_business(db: Session, business_id: str) -> None:
     if not db.get(Business, business_id):
+        logger.warning("Changes feed requested for missing business_id=%s", business_id)
         raise HTTPException(status_code=404, detail="business not found")
 
 

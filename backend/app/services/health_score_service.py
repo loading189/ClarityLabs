@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import logging
 from typing import Any, Dict, List, Optional
 
 from fastapi import HTTPException
@@ -10,6 +11,8 @@ from sqlalchemy.orm import Session
 from backend.app.models import AuditLog, Business, HealthSignalState
 from backend.app.services.signals_service import SIGNAL_CATALOG
 from backend.app.services import changes_service
+
+logger = logging.getLogger(__name__)
 
 
 DOMAIN_WEIGHTS: Dict[str, float] = {
@@ -42,6 +45,7 @@ STATUS_MULTIPLIERS: Dict[str, float] = {
 def _require_business(db: Session, business_id: str) -> Business:
     biz = db.get(Business, business_id)
     if not biz:
+        logger.warning("Health score requested for missing business_id=%s", business_id)
         raise HTTPException(status_code=404, detail="business not found")
     return biz
 

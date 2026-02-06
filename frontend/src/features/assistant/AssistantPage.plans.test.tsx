@@ -39,6 +39,8 @@ const listPlans = vi.fn().mockResolvedValue([{ plan_id: "plan-1", business_id: "
 const createPlan = vi.fn().mockResolvedValue({ plan_id: "plan-2", business_id: "biz-1", title: "Plan 2", status: "open", created_at: new Date().toISOString(), updated_at: new Date().toISOString(), signal_ids: ["sig-1"], steps: [], notes: [] });
 const markPlanStepDone = vi.fn().mockResolvedValue({});
 const addPlanNote = vi.fn().mockResolvedValue({});
+const updatePlanStatus = vi.fn().mockResolvedValue({});
+const verifyPlan = vi.fn().mockResolvedValue({ plan_id: "plan-1", checked_at: new Date().toISOString(), signals: [], totals: { met: 0, not_met: 0, unknown: 0 } });
 const getMonitorStatus = vi.fn();
 const fetchAssistantProgress = vi.fn().mockResolvedValue({ business_id: "biz-1", window_days: 7, generated_at: new Date().toISOString(), health_score: { current: 78, delta_window: 0 }, open_signals: { current: 1, delta_window: 0 }, plans: { active_count: 1, completed_count_window: 0 }, streak_days: 1, top_domains_open: [{ domain: "expense", count: 1 }] });
 

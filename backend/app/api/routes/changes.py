@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from typing import List, Literal, Optional
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -23,9 +24,19 @@ class ChangeEventOut(BaseModel):
     type: Literal["signal_detected", "signal_resolved", "signal_status_updated"]
     business_id: str
     signal_id: str
-    severity: Optional[Literal["info", "warning", "critical"]] = None
+    severity: Optional[
+        Literal["info", "warning", "critical", "low", "medium", "high", "green", "yellow", "red"]
+    ] = None
     domain: Optional[
-        Literal["liquidity", "revenue", "expense", "timing", "concentration", "hygiene"]
+        Literal[
+            "liquidity",
+            "revenue",
+            "expense",
+            "timing",
+            "concentration",
+            "hygiene",
+            "unknown",
+        ]
     ] = None
     title: Optional[str] = None
     actor: Optional[str] = None
@@ -40,4 +51,8 @@ def list_changes(
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
 ):
+    try:
+        UUID(business_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="business_id must be a valid UUID") from exc
     return changes_service.list_changes(db, business_id=business_id, limit=limit)

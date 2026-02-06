@@ -1,3 +1,6 @@
+import logging
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -27,6 +30,22 @@ from backend.app.api.routes.assistant_progress import router as assistant_progre
 from backend.app.api.routes.assistant_work_queue import router as assistant_work_queue_router
 
 
+logger = logging.getLogger(__name__)
+
+
+def _cors_origins() -> list[str]:
+    raw = os.getenv("CORS_ALLOW_ORIGINS")
+    if raw is None:
+        origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
+    else:
+        origins = [origin.strip() for origin in raw.split(",") if origin.strip()]
+    if not origins:
+        raise RuntimeError("CORS_ALLOW_ORIGINS must not be empty.")
+    if not any(origin in origins for origin in ("http://localhost:5173", "http://127.0.0.1:5173")):
+        logger.warning("CORS allowlist does not include local dev origins: %s", origins)
+    return origins
+
+
 app = FastAPI(title="Clarity Labs API", version="0.1.0")
 
 # @app.on_event("startup")
@@ -39,8 +58,8 @@ app = FastAPI(title="Clarity Labs API", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
-    allow_credentials=True,
+    allow_origins=_cors_origins(),
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

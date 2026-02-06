@@ -1,4 +1,5 @@
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { FormEvent } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { fetchAssistantThread, postAssistantMessage, type AssistantThreadMessage } from "../../api/assistantThread";
 import { publishDailyBrief, type DailyBriefOut, type DailyBriefPlaybook } from "../../api/dailyBrief";
@@ -71,6 +72,8 @@ export default function AssistantPage() {
   const [explain, setExplain] = useState<SignalExplainOut | null>(null);
   const [thread, setThread] = useState<AssistantThreadMessage[]>([]);
   const [scoreExplain, setScoreExplain] = useState<HealthScoreExplainChangeOut | null>(null);
+  const [changesError, setChangesError] = useState<string | null>(null);
+  const [scoreExplainError, setScoreExplainError] = useState<string | null>(null);
   const [dailyBrief, setDailyBrief] = useState<DailyBriefOut | null>(null);
   const [actor, setActor] = useState("analyst");
   const [reason, setReason] = useState("");
@@ -90,54 +93,103 @@ export default function AssistantPage() {
     resumedRef.current = false;
   }, [businessId]);
 
-  const loadAll = useCallback(async () => {
+  const loadAll = useCallback(async (signal?: AbortSignal) => {
     if (!businessId) return;
-    const [signalsData, scoreData, changesData, scoreChangeData] = await Promise.all([
-      listSignalStates(businessId),
-      fetchHealthScore(businessId),
-      listChanges(businessId, 10),
-      fetchHealthScoreExplainChange(businessId, 72, 20),
+    setChangesError(null);
+    setScoreExplainError(null);
+    const [signalsResult, scoreResult, changesResult, scoreChangeResult] = await Promise.allSettled([
+      listSignalStates(businessId, signal),
+      fetchHealthScore(businessId, signal),
+      listChanges(businessId, 10, signal),
+      fetchHealthScoreExplainChange(businessId, 72, 20, signal),
     ]);
-    setSignals(signalsData.signals ?? []);
-    setHealthScore(scoreData);
-    setChanges(changesData ?? []);
-    setScoreExplain(scoreChangeData);
+    if (signal?.aborted) return;
+    if (signalsResult.status === "fulfilled") {
+      setSignals(signalsResult.value.signals ?? []);
+    } else {
+      setSignals([]);
+    }
+    if (scoreResult.status === "fulfilled") {
+      setHealthScore(scoreResult.value);
+    } else {
+      setHealthScore(null);
+    }
+    if (changesResult.status === "fulfilled") {
+      setChanges(changesResult.value ?? []);
+    } else {
+      setChanges([]);
+      setChangesError("Couldn't load changes.");
+    }
+    if (scoreChangeResult.status === "fulfilled") {
+      setScoreExplain(scoreChangeResult.value);
+    } else {
+      setScoreExplain(null);
+      setScoreExplainError("Couldn't load explanation.");
+    }
   }, [businessId]);
 
-  const loadThread = useCallback(async () => {
+  const loadThread = useCallback(async (signal?: AbortSignal) => {
     if (!businessId) return;
-    const rows = await fetchAssistantThread(businessId, 200);
-    setThread(rows);
+    try {
+      const rows = await fetchAssistantThread(businessId, 200, signal);
+      if (signal?.aborted) return;
+      setThread(rows);
+    } catch {
+      if (signal?.aborted) return;
+      setThread([]);
+    }
   }, [businessId]);
 
 
-  const loadPlans = useCallback(async () => {
+  const loadPlans = useCallback(async (signal?: AbortSignal) => {
     if (!businessId) return;
-    const rows = await listPlans(businessId);
-    setPlans(rows);
-    setSelectedPlanId((prev) => prev ?? initialPlanId ?? rows[0]?.plan_id ?? null);
+    try {
+      const rows = await listPlans(businessId, signal);
+      if (signal?.aborted) return;
+      setPlans(rows);
+      setSelectedPlanId((prev) => prev ?? initialPlanId ?? rows[0]?.plan_id ?? null);
+    } catch {
+      if (signal?.aborted) return;
+      setPlans([]);
+    }
   }, [businessId, initialPlanId]);
 
-  const loadWorkQueue = useCallback(async () => {
+  const loadWorkQueue = useCallback(async (signal?: AbortSignal) => {
     if (!businessId) return;
-    const queue = await fetchWorkQueue(businessId, 50);
-    setWorkQueue(queue.items ?? []);
+    try {
+      const queue = await fetchWorkQueue(businessId, 50, signal);
+      if (signal?.aborted) return;
+      setWorkQueue(queue.items ?? []);
+    } catch {
+      if (signal?.aborted) return;
+      setWorkQueue([]);
+    }
   }, [businessId]);
 
-  const loadDailyBrief = useCallback(async () => {
+  const loadDailyBrief = useCallback(async (signal?: AbortSignal) => {
     if (!businessId) return;
-    const result = await publishDailyBrief(businessId);
-    setDailyBrief(result.brief);
-    const progressData = await fetchAssistantProgress(businessId, 7);
-    setProgress(progressData);
+    try {
+      const result = await publishDailyBrief(businessId);
+      if (signal?.aborted) return;
+      setDailyBrief(result.brief);
+      const progressData = await fetchAssistantProgress(businessId, 7, signal);
+      if (signal?.aborted) return;
+      setProgress(progressData);
+    } catch {
+      if (signal?.aborted) return;
+      setDailyBrief(null);
+      setProgress(null);
+    }
   }, [businessId]);
 
   useEffect(() => {
-    loadDailyBrief();
-    loadAll();
-    loadThread();
-    loadPlans();
-    loadWorkQueue();
+    const controller = new AbortController();
+    void loadDailyBrief(controller.signal);
+    void loadAll(controller.signal);
+    void loadThread(controller.signal);
+    void loadPlans(controller.signal);
+    void loadWorkQueue(controller.signal);
+    return () => controller.abort();
   }, [loadAll, loadThread, loadDailyBrief, loadPlans, loadWorkQueue]);
 
   const topPriorities = useMemo(() => {
@@ -209,7 +261,7 @@ export default function AssistantPage() {
 
   const handleAction = async (action: SignalExplainOut["next_actions"][number]) => {
     if (!businessId || !selectedSignalId || !actor.trim() || !reason.trim()) return;
-    const result = await updateSignalStatus(businessId, selectedSignalId, {
+    await updateSignalStatus(businessId, selectedSignalId, {
       status: actionToStatus(action.action),
       actor,
       reason,
@@ -424,23 +476,36 @@ export default function AssistantPage() {
 
         <div className={styles.card}>
           <div className={styles.cardTitle}>Recent changes</div>
-          {changes.slice(0, 10).map((change) => (
-            <button key={change.id} className={styles.alertRow} onClick={() => appendExplainMessage(change.signal_id, "change")}>
-              <div>
-                {change.type.replace(/_/g, " ")} · {change.title ?? change.signal_id}
-              </div>
-              <div className={styles.muted}>
-                {formatDate(change.occurred_at)} {change.actor ? `· ${change.actor}` : ""}
-              </div>
-            </button>
-          ))}
+          {changesError ? (
+            <div className={styles.muted}>{changesError}</div>
+          ) : (
+            <>
+              {changes.length === 0 && (
+                <div className={styles.muted}>No changes yet.</div>
+              )}
+              {changes.slice(0, 10).map((change) => (
+                <button key={change.id} className={styles.alertRow} onClick={() => appendExplainMessage(change.signal_id, "change")}>
+                  <div>
+                    {change.type.replace(/_/g, " ")} · {change.title ?? change.signal_id}
+                  </div>
+                  <div className={styles.muted}>
+                    {formatDate(change.occurred_at)} {change.actor ? `· ${change.actor}` : ""}
+                  </div>
+                </button>
+              ))}
+            </>
+          )}
         </div>
 
         <div className={styles.card}>
           <div className={styles.cardTitle}>Score changed because…</div>
-          <button className={styles.alertRow} onClick={appendScoreChangeSummary}>
-            {scoreExplain?.summary.headline ?? "No recent score-impacting changes."}
-          </button>
+          {scoreExplainError ? (
+            <div className={styles.muted}>{scoreExplainError}</div>
+          ) : (
+            <button className={styles.alertRow} onClick={appendScoreChangeSummary} disabled={!scoreExplain}>
+              {scoreExplain?.summary.headline ?? "No recent score-impacting changes."}
+            </button>
+          )}
         </div>
       </div>
 
@@ -553,7 +618,7 @@ export default function AssistantPage() {
                 <div>Receipt: {String(message.content_json.action ?? message.kind)}</div>
                 {message.audit_id && <div><a href={String((message.content_json.links as Record<string, string> | undefined)?.audit ?? "#")}>Audit {String(message.audit_id)}</a></div>}
                 {(message.content_json.signal_id || message.signal_id) && <div><a href={String((message.content_json.links as Record<string, string> | undefined)?.signal ?? "#")}>Signal link</a></div>}
-                {message.content_json.plan_id && <div><a href={String((message.content_json.links as Record<string, string> | undefined)?.plan ?? "#")}>Plan link</a></div>}
+                {message.content_json.plan_id != null && <div><a href={String((message.content_json.links as Record<string, string> | undefined)?.plan ?? "#")}>Plan link</a></div>}
               </div>
             )}
           </div>

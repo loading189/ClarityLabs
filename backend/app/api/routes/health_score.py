@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -89,6 +90,10 @@ def get_health_score(
     business_id: str = Query(...),
     db: Session = Depends(get_db),
 ):
+    try:
+        UUID(business_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="business_id must be a valid UUID") from exc
     return health_score_service.compute_health_score(db, business_id)
 
 
@@ -99,6 +104,10 @@ def get_health_score_change_explain(
     limit: int = Query(20, ge=1, le=20),
     db: Session = Depends(get_db),
 ):
+    try:
+        UUID(business_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="business_id must be a valid UUID") from exc
     return health_score_service.explain_health_score_change(
         db,
         business_id=business_id,
