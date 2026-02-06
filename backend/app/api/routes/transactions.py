@@ -49,6 +49,7 @@ class CategorizationOut(BaseModel):
     source: str
     confidence: float
     note: Optional[str] = None
+    rule_id: Optional[str] = None
     created_at: datetime
 
 

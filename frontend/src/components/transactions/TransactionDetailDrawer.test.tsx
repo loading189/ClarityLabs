@@ -10,7 +10,7 @@ vi.mock("../../api/transactions", () => ({
 }));
 
 describe("TransactionDetailDrawer", () => {
-  it("renders raw payload and processing sections", async () => {
+  it("renders transaction audit sections", async () => {
     fetchTransactionDetail.mockResolvedValueOnce({
       business_id: "biz-1",
       source_event_id: "evt-1",
@@ -55,10 +55,74 @@ describe("TransactionDetailDrawer", () => {
       </MemoryRouter>
     );
 
-    expect(await screen.findByText(/Raw event \/ ingestion/i)).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /Raw Event/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Normalized/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Categorization/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Related Signals/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Audit History/i })).toBeInTheDocument();
     expect(screen.getAllByText(/Coffee Shop/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/Processing assumptions/i)).toBeInTheDocument();
     expect(screen.getByText(/Direction derived from amount sign/i)).toBeInTheDocument();
     expect(screen.getByText(/Raw payload/i)).toBeInTheDocument();
+  });
+
+  it("shows related signals when evidence matches", async () => {
+    fetchTransactionDetail.mockResolvedValueOnce({
+      business_id: "biz-1",
+      source_event_id: "evt-2",
+      raw_event: {
+        source: "bank",
+        source_event_id: "evt-2",
+        payload: { transaction: { amount: -90, name: "Office Depot" } },
+        occurred_at: "2025-01-11T15:00:00.000Z",
+        created_at: "2025-01-11T15:01:00.000Z",
+        processed_at: null,
+      },
+      normalized_txn: {
+        source_event_id: "evt-2",
+        occurred_at: "2025-01-11T15:00:00.000Z",
+        date: "2025-01-11",
+        description: "Office Depot",
+        amount: -90,
+        direction: "outflow",
+        account: "card",
+        category_hint: "supplies",
+        counterparty_hint: "Office Depot",
+        merchant_key: "office-depot",
+      },
+      vendor_normalization: { canonical_name: "Office Depot", source: "inferred" },
+      categorization: null,
+      processing_assumptions: [],
+      ledger_context: null,
+      audit_history: [],
+      related_signals: [
+        {
+          signal_id: "sig-1",
+          title: "Unusual outflow spike",
+          severity: "high",
+          status: "open",
+          domain: "expense",
+          updated_at: "2025-01-12T00:00:00.000Z",
+          matched_on: "evidence_source_event_ids",
+          window: { start: "2025-01-01", end: "2025-01-11" },
+          facts: { latest_total: 900 },
+        },
+      ],
+    });
+
+    render(
+      <MemoryRouter>
+        <TransactionDetailDrawer
+          open
+          businessId="biz-1"
+          sourceEventId="evt-2"
+          onClose={() => undefined}
+        />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByRole("heading", { name: /Related Signals/i })).toBeInTheDocument();
+    expect(screen.getByText(/Unusual outflow spike/i)).toBeInTheDocument();
+    expect(screen.getByText(/Matched on/i)).toBeInTheDocument();
   });
 });

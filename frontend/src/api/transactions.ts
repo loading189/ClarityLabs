@@ -66,6 +66,7 @@ export type TransactionDetail = {
     source: string;
     confidence: number;
     note?: string | null;
+    rule_id?: string | null;
     created_at: string;
   } | null;
   processing_assumptions: Array<{ field: string; detail: string }>;

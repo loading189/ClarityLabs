@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import Drawer from "../common/Drawer";
 import { fetchTransactionDetail, type TransactionDetail } from "../../api/transactions";
+import { updateSignalStatus, type SignalStatus } from "../../api/signals";
 import styles from "./TransactionDetailDrawer.module.css";
 
 function formatDate(value?: string | null) {
@@ -39,6 +40,9 @@ export default function TransactionDetailDrawer({
   const [detail, setDetail] = useState<TransactionDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [statusSelections, setStatusSelections] = useState<Record<string, SignalStatus>>({});
+  const [statusSaving, setStatusSaving] = useState<Record<string, boolean>>({});
+  const [statusErrors, setStatusErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let active = true;
@@ -62,9 +66,47 @@ export default function TransactionDetailDrawer({
     };
   }, [businessId, open, sourceEventId]);
 
+  useEffect(() => {
+    if (!detail) return;
+    setStatusSelections({});
+    setStatusErrors({});
+    setStatusSaving({});
+  }, [detail?.source_event_id]);
+
   const assumptions = useMemo(() => detail?.processing_assumptions ?? [], [detail]);
   const auditRows = useMemo(() => detail?.audit_history ?? [], [detail]);
   const relatedSignals = useMemo(() => detail?.related_signals ?? [], [detail]);
+
+  const handleStatusSelect = (signalId: string, status: SignalStatus) => {
+    setStatusSelections((prev) => ({ ...prev, [signalId]: status }));
+  };
+
+  const handleStatusSave = async (signalId: string) => {
+    if (!businessId) return;
+    const current = relatedSignals.find((signal) => signal.signal_id === signalId);
+    const nextStatus = statusSelections[signalId] ?? (current?.status as SignalStatus) ?? "open";
+    setStatusSaving((prev) => ({ ...prev, [signalId]: true }));
+    setStatusErrors((prev) => ({ ...prev, [signalId]: "" }));
+    try {
+      await updateSignalStatus(businessId, signalId, { status: nextStatus });
+      setDetail((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          related_signals: prev.related_signals.map((signal) =>
+            signal.signal_id === signalId ? { ...signal, status: nextStatus } : signal
+          ),
+        };
+      });
+    } catch (error: any) {
+      setStatusErrors((prev) => ({
+        ...prev,
+        [signalId]: error?.message ?? "Failed to update status",
+      }));
+    } finally {
+      setStatusSaving((prev) => ({ ...prev, [signalId]: false }));
+    }
+  };
 
   return (
     <Drawer open={open} title="Transaction detail" onClose={onClose}>
@@ -74,7 +116,7 @@ export default function TransactionDetailDrawer({
       {!loading && !err && detail && (
         <div className={styles.body}>
           <section className={styles.section}>
-            <h3>Raw event / ingestion</h3>
+            <h3>Raw Event</h3>
             <div className={styles.grid}>
               <div>
                 <div className={styles.label}>Source</div>
@@ -104,7 +146,7 @@ export default function TransactionDetailDrawer({
           </section>
 
           <section className={styles.section}>
-            <h3>Normalization &amp; processing</h3>
+            <h3>Normalized</h3>
             <div className={styles.grid}>
               <div>
                 <div className={styles.label}>Date</div>
@@ -143,36 +185,6 @@ export default function TransactionDetailDrawer({
             </div>
 
             <div className={styles.subSection}>
-              <div className={styles.label}>Categorization</div>
-              {detail.categorization ? (
-                <div className={styles.grid}>
-                  <div>
-                    <div className={styles.label}>Category</div>
-                    <div>{detail.categorization.category_name}</div>
-                  </div>
-                  <div>
-                    <div className={styles.label}>Account</div>
-                    <div>{detail.categorization.account_name}</div>
-                  </div>
-                  <div>
-                    <div className={styles.label}>Source</div>
-                    <div>{detail.categorization.source}</div>
-                  </div>
-                  <div>
-                    <div className={styles.label}>Confidence</div>
-                    <div>{Math.round(detail.categorization.confidence * 100)}%</div>
-                  </div>
-                  <div>
-                    <div className={styles.label}>Note</div>
-                    <div>{detail.categorization.note ?? "—"}</div>
-                  </div>
-                </div>
-              ) : (
-                <div className={styles.muted}>No categorization applied yet.</div>
-              )}
-            </div>
-
-            <div className={styles.subSection}>
               <div className={styles.label}>Processing assumptions</div>
               {assumptions.length === 0 ? (
                 <div className={styles.muted}>No assumptions recorded.</div>
@@ -186,10 +198,7 @@ export default function TransactionDetailDrawer({
                 </ul>
               )}
             </div>
-          </section>
 
-          <section className={styles.section}>
-            <h3>Related objects</h3>
             <div className={styles.subSection}>
               <div className={styles.label}>Ledger snapshot</div>
               {detail.ledger_context ? (
@@ -227,20 +236,63 @@ export default function TransactionDetailDrawer({
                 </Link>
               </div>
             </div>
+          </section>
 
-            <div className={styles.subSection}>
-              <div className={styles.label}>Related signals</div>
-              {relatedSignals.length === 0 ? (
-                <div className={styles.muted}>No related signals found.</div>
-              ) : (
-                <div className={styles.stack}>
-                  {relatedSignals.map((signal) => (
+          <section className={styles.section}>
+            <h3>Categorization</h3>
+            {detail.categorization ? (
+              <div className={styles.grid}>
+                <div>
+                  <div className={styles.label}>Category</div>
+                  <div>{detail.categorization.category_name}</div>
+                </div>
+                <div>
+                  <div className={styles.label}>Account</div>
+                  <div>{detail.categorization.account_name}</div>
+                </div>
+                <div>
+                  <div className={styles.label}>Source</div>
+                  <div>{detail.categorization.source}</div>
+                </div>
+                <div>
+                  <div className={styles.label}>Confidence</div>
+                  <div>{Math.round(detail.categorization.confidence * 100)}%</div>
+                </div>
+                <div>
+                  <div className={styles.label}>Rule ID</div>
+                  <div className={styles.code}>{detail.categorization.rule_id ?? "—"}</div>
+                </div>
+                <div>
+                  <div className={styles.label}>Note</div>
+                  <div>{detail.categorization.note ?? "—"}</div>
+                </div>
+              </div>
+            ) : (
+              <div className={styles.muted}>No categorization applied yet.</div>
+            )}
+          </section>
+
+          <section className={styles.section}>
+            <h3>Related Signals</h3>
+            {relatedSignals.length === 0 ? (
+              <div className={styles.muted}>No related signals found.</div>
+            ) : (
+              <div className={styles.stack}>
+                {relatedSignals.map((signal) => {
+                  const selectedStatus =
+                    statusSelections[signal.signal_id] ??
+                    (signal.status as SignalStatus) ??
+                    "open";
+                  return (
                     <div key={signal.signal_id} className={styles.card}>
                       <div className={styles.cardTitle}>{signal.title ?? signal.signal_id}</div>
                       <div className={styles.cardMeta}>
                         {signal.domain ?? "signal"} · {signal.severity ?? "—"} ·{" "}
                         {signal.status ?? "—"}
                       </div>
+                      {signal.matched_on && (
+                        <div className={styles.cardMeta}>Matched on: {signal.matched_on}</div>
+                      )}
                       {signal.window && (
                         <div className={styles.cardMeta}>
                           Window: {signal.window.start ?? "—"} → {signal.window.end ?? "—"}
@@ -249,15 +301,43 @@ export default function TransactionDetailDrawer({
                       {signal.facts && (
                         <pre className={styles.payload}>{prettyJson(signal.facts)}</pre>
                       )}
+                      <div className={styles.statusRow}>
+                        <select
+                          className={styles.statusSelect}
+                          value={selectedStatus}
+                          onChange={(event) =>
+                            handleStatusSelect(
+                              signal.signal_id,
+                              event.target.value as SignalStatus
+                            )
+                          }
+                        >
+                          <option value="open">Open</option>
+                          <option value="in_progress">In progress</option>
+                          <option value="resolved">Resolved</option>
+                          <option value="ignored">Ignored</option>
+                        </select>
+                        <button
+                          className={styles.statusButton}
+                          type="button"
+                          onClick={() => handleStatusSave(signal.signal_id)}
+                          disabled={statusSaving[signal.signal_id]}
+                        >
+                          {statusSaving[signal.signal_id] ? "Saving…" : "Update status"}
+                        </button>
+                      </div>
+                      {statusErrors[signal.signal_id] && (
+                        <div className={styles.error}>{statusErrors[signal.signal_id]}</div>
+                      )}
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </section>
 
           <section className={styles.section}>
-            <h3>Audit history</h3>
+            <h3>Audit History</h3>
             {auditRows.length === 0 ? (
               <div className={styles.muted}>No audit history recorded.</div>
             ) : (
