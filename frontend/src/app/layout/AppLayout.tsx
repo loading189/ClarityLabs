@@ -1,10 +1,12 @@
 // frontend/src/app/layout/AppLayout.tsx
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { NavLink, Outlet, useParams } from "react-router-dom";
 import styles from "./AppLayout.module.css";
 import { assertBusinessId } from "../../utils/businessId";
 import { useAppState } from "../state/appState";
 import ErrorBoundary from "../../components/common/ErrorBoundary";
+import { useFilters } from "../filters/useFilters";
+import { buildSearchParams, resolveDateRange } from "../filters/filters";
 
 type NavItem = { label: string; path: string };
 
@@ -30,10 +32,12 @@ function NavSection({
   title,
   items,
   businessId,
+  search,
 }: {
   title?: string;
   items: NavItem[];
   businessId: string;
+  search: string;
 }) {
   return (
     <div className={styles.navSection}>
@@ -42,7 +46,7 @@ function NavSection({
         {items.map((item) => (
           <NavLink
             key={item.path}
-            to={`/app/${businessId}/${item.path}`}
+            to={`/app/${businessId}/${item.path}${search}`}
             className={({ isActive }) =>
               `${styles.navItem} ${isActive ? styles.navItemActive : ""}`
             }
@@ -58,11 +62,26 @@ function NavSection({
 export default function AppLayout() {
   const { businessId: businessIdParam } = useParams();
   const businessId = assertBusinessId(businessIdParam, "AppLayout");
-  const { setActiveBusinessId } = useAppState();
+  const { setActiveBusinessId, setDateRange } = useAppState();
+  const [filters] = useFilters();
+  const resolvedRange = useMemo(() => resolveDateRange(filters), [filters]);
+  const navSearch = useMemo(() => {
+    const params = buildSearchParams({
+      start: resolvedRange.start,
+      end: resolvedRange.end,
+      window: resolvedRange.window,
+    });
+    const query = params.toString();
+    return query ? `?${query}` : "";
+  }, [resolvedRange.end, resolvedRange.start, resolvedRange.window]);
 
   useEffect(() => {
     setActiveBusinessId(businessId || null);
   }, [businessId, setActiveBusinessId]);
+
+  useEffect(() => {
+    setDateRange({ start: resolvedRange.start, end: resolvedRange.end });
+  }, [resolvedRange.end, resolvedRange.start, setDateRange]);
 
   if (!businessId) {
     return (
@@ -92,14 +111,14 @@ export default function AppLayout() {
           </div>
         </div>
 
-        <NavSection title="Workspace" items={primaryNav} businessId={businessId} />
+        <NavSection title="Workspace" items={primaryNav} businessId={businessId} search={navSearch} />
         <details className={styles.toolsDropdown} open>
           <summary className={styles.toolsSummary}>Tools</summary>
           <div className={styles.navItems}>
             {toolsNav.map((item) => (
               <NavLink
                 key={item.path}
-                to={`/app/${businessId}/${item.path}`}
+                to={`/app/${businessId}/${item.path}${navSearch}`}
                 className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navItemActive : ""}`}
               >
                 <span className={styles.navLabel}>{item.label}</span>

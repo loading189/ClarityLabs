@@ -1,7 +1,7 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import CategorizeTab from "./CategorizeTab";
 
 const getTxnsToCategorize = vi.fn();
@@ -11,6 +11,7 @@ const listCategoryRules = vi.fn();
 const applyCategoryRule = vi.fn();
 const getBrainVendors = vi.fn();
 const fetchTransactionDetail = vi.fn();
+const saveCategorization = vi.fn();
 
 let mockAppState = {
   dateRange: { start: "2025-01-01", end: "2025-01-31" },
@@ -33,7 +34,7 @@ vi.mock("../../api/categorize", () => ({
   getTxnsToCategorize: (...args: unknown[]) => getTxnsToCategorize(...args),
   listCategoryRules: (...args: unknown[]) => listCategoryRules(...args),
   previewCategoryRule: vi.fn(),
-  saveCategorization: vi.fn(),
+  saveCategorization: (...args: unknown[]) => saveCategorization(...args),
   updateCategoryRule: vi.fn(),
 }));
 
@@ -60,6 +61,7 @@ describe("CategorizeTab", () => {
     applyCategoryRule.mockReset();
     getBrainVendors.mockReset();
     fetchTransactionDetail.mockReset();
+    saveCategorization.mockReset();
 
     getTxnsToCategorize.mockResolvedValue([
       {
@@ -196,6 +198,114 @@ describe("CategorizeTab", () => {
     expect(screen.queryByText("No uncategorized transactions.")).not.toBeInTheDocument();
   });
 
+  it("reloads when date range changes", async () => {
+    const view = render(
+      <MemoryRouter>
+        <CategorizeTab businessId="11111111-1111-4111-8111-111111111111" />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => expect(getTxnsToCategorize).toHaveBeenCalledTimes(1));
+    expect(getTxnsToCategorize).toHaveBeenLastCalledWith(
+      "11111111-1111-4111-8111-111111111111",
+      50,
+      { start_date: "2025-01-01", end_date: "2025-01-31" }
+    );
+
+    mockAppState = {
+      ...mockAppState,
+      dateRange: { start: "2025-02-01", end: "2025-02-28" },
+    };
+
+    view.rerender(
+      <MemoryRouter>
+        <CategorizeTab businessId="11111111-1111-4111-8111-111111111111" />
+      </MemoryRouter>
+    );
+
+    await waitFor(() => expect(getTxnsToCategorize).toHaveBeenCalledTimes(2));
+    expect(getTxnsToCategorize).toHaveBeenLastCalledWith(
+      "11111111-1111-4111-8111-111111111111",
+      50,
+      { start_date: "2025-02-01", end_date: "2025-02-28" }
+    );
+  });
+
+  it("rehydrates the drawer selection from the URL", async () => {
+    getTxnsToCategorize.mockResolvedValue([
+      {
+        source_event_id: "evt-1",
+        occurred_at: "2025-01-10T15:00:00.000Z",
+        description: "Alpha Vendor",
+        amount: -10,
+        direction: "outflow",
+        account: "card",
+        category_hint: "uncategorized",
+        merchant_key: "alpha",
+        suggested_category_id: "cat-1",
+        confidence: 0.7,
+      },
+      {
+        source_event_id: "evt-2",
+        occurred_at: "2025-01-12T15:00:00.000Z",
+        description: "Beta Vendor",
+        amount: -20,
+        direction: "outflow",
+        account: "card",
+        category_hint: "uncategorized",
+        merchant_key: "beta",
+        suggested_category_id: "cat-2",
+        confidence: 0.6,
+      },
+    ]);
+
+    fetchTransactionDetail.mockResolvedValueOnce({
+      business_id: "biz-1",
+      source_event_id: "evt-2",
+      raw_event: {
+        source: "bank",
+        source_event_id: "evt-2",
+        payload: {},
+        occurred_at: "2025-01-12T15:00:00.000Z",
+        created_at: "2025-01-12T15:01:00.000Z",
+        processed_at: null,
+      },
+      normalized_txn: {
+        source_event_id: "evt-2",
+        occurred_at: "2025-01-12T15:00:00.000Z",
+        date: "2025-01-12",
+        description: "Beta Vendor",
+        amount: -20,
+        direction: "outflow",
+        account: "card",
+        category_hint: "uncategorized",
+        counterparty_hint: "Beta Vendor",
+        merchant_key: "beta",
+      },
+      vendor_normalization: { canonical_name: "Beta Vendor", source: "inferred" },
+      categorization: null,
+      processing_assumptions: [],
+      ledger_context: null,
+      audit_history: [],
+      related_signals: [],
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/categorize?source_event_id=evt-2"]}>
+        <Routes>
+          <Route
+            path="/categorize"
+            element={<CategorizeTab businessId="11111111-1111-4111-8111-111111111111" />}
+          />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText("Transaction detail")).toBeInTheDocument();
+    const betaButton = await screen.findByRole("button", { name: /Beta Vendor/i });
+    expect(betaButton).toHaveAttribute("aria-pressed", "true");
+  });
+
   it("updates selected category when filtered transactions force a new selected txn", async () => {
     getTxnsToCategorize.mockResolvedValue([
       {
@@ -321,5 +431,63 @@ describe("CategorizeTab", () => {
     await waitFor(() => expect(getCategorizeMetrics.mock.calls.length).toBeGreaterThanOrEqual(2));
     await waitFor(() => expect(listCategoryRules.mock.calls.length).toBeGreaterThanOrEqual(2));
     await waitFor(() => expect(onCategorizationChange).toHaveBeenCalled());
+  });
+
+  it("selects the next transaction after categorization removes the current one", async () => {
+    getTxnsToCategorize
+      .mockResolvedValueOnce([
+        {
+          source_event_id: "evt-1",
+          occurred_at: "2025-01-10T15:00:00.000Z",
+          description: "Alpha Vendor",
+          amount: -10,
+          direction: "outflow",
+          account: "card",
+          category_hint: "uncategorized",
+          merchant_key: "alpha",
+          suggested_category_id: "cat-1",
+          confidence: 0.7,
+        },
+        {
+          source_event_id: "evt-2",
+          occurred_at: "2025-01-12T15:00:00.000Z",
+          description: "Beta Vendor",
+          amount: -20,
+          direction: "outflow",
+          account: "card",
+          category_hint: "uncategorized",
+          merchant_key: "beta",
+          suggested_category_id: "cat-2",
+          confidence: 0.6,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          source_event_id: "evt-2",
+          occurred_at: "2025-01-12T15:00:00.000Z",
+          description: "Beta Vendor",
+          amount: -20,
+          direction: "outflow",
+          account: "card",
+          category_hint: "uncategorized",
+          merchant_key: "beta",
+          suggested_category_id: "cat-2",
+          confidence: 0.6,
+        },
+      ]);
+    saveCategorization.mockResolvedValue({ status: "ok", updated: false, audit_id: "audit-1" });
+
+    render(
+      <MemoryRouter>
+        <CategorizeTab businessId="11111111-1111-4111-8111-111111111111" />
+      </MemoryRouter>
+    );
+
+    const user = userEvent.setup();
+    const saveButton = await screen.findByRole("button", { name: /Save categorization/i });
+    await user.click(saveButton);
+
+    const betaButton = await screen.findByRole("button", { name: /Beta Vendor/i });
+    await waitFor(() => expect(betaButton).toHaveAttribute("aria-pressed", "true"));
   });
 });

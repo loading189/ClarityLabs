@@ -129,6 +129,26 @@ def test_product_truth_contract_posted_ledger_invariants():
     assert [row["source_event_id"] for row in ledger["rows"]] == [txn.source_event_id for txn in posted]
 
 
+def test_product_truth_contract_posted_txn_ordering():
+    db = _session()
+    biz = _create_business(db)
+    category = _create_category(db, biz.id)
+
+    same_day = datetime(2024, 2, 5, tzinfo=timezone.utc)
+    _add_posted_event(db, biz.id, category.id, "evt-b", -15.0, same_day)
+    _add_posted_event(db, biz.id, category.id, "evt-a", -20.0, same_day)
+    _add_posted_event(db, biz.id, category.id, "evt-c", -5.0, datetime(2024, 2, 6, tzinfo=timezone.utc))
+    db.commit()
+
+    posted = fetch_posted_transactions(
+        db,
+        biz.id,
+        start_date=date(2024, 2, 5),
+        end_date=date(2024, 2, 6),
+    )
+    assert [txn.source_event_id for txn in posted] == ["evt-a", "evt-b", "evt-c"]
+
+
 def test_product_truth_contract_uncategorized_window_excludes_posted():
     db = _session()
     biz = _create_business(db)

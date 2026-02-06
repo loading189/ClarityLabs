@@ -334,6 +334,36 @@ def test_monitor_and_sim_pulse_endpoints(db_session):
     assert len(after_count) == len(before_count) + 5
 
 
+def test_monitor_status_gating_and_stale_flags(db_session):
+    biz = _create_business(db_session)
+    cat = _create_account_and_category(db_session, biz.id)
+    now = datetime(2024, 7, 1, tzinfo=timezone.utc)
+
+    _add_raw_event(db_session, biz.id, "evt-1", now - timedelta(days=2), 120.0, "outflow", "Acme", "Acme")
+    _categorize(db_session, biz.id, "evt-1", cat.id)
+    db_session.commit()
+
+    monitoring_service.pulse(db_session, biz.id)
+    status = monitoring_service.get_monitor_status(db_session, biz.id)
+    assert status["gated"] is True
+    assert status["gating_reason_code"] == "cooldown"
+    assert status["stale"] is False
+
+    runtime = db_session.get(MonitorRuntime, biz.id)
+    runtime.last_pulse_at = runtime.last_pulse_at - timedelta(hours=1)
+    db_session.commit()
+    status = monitoring_service.get_monitor_status(db_session, biz.id)
+    assert status["gated"] is True
+    assert status["gating_reason_code"] == "no_new_events"
+    assert status["stale"] is False
+
+    runtime.last_pulse_at = runtime.last_pulse_at - timedelta(hours=7)
+    db_session.commit()
+    status = monitoring_service.get_monitor_status(db_session, biz.id)
+    assert status["stale"] is True
+    assert status["stale_reason"]
+
+
 def test_ignored_signal_is_not_reopened_or_resolved(db_session):
     biz = _create_business(db_session)
     cat = _create_account_and_category(db_session, biz.id)

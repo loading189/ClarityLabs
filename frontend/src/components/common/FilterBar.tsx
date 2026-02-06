@@ -15,12 +15,18 @@ export default function FilterBar({
   accounts = [],
   categories = [],
   showDirection = false,
+  showAccountFilter = true,
+  showCategoryFilter = true,
+  showSearch = true,
 }: {
   filters: FilterState;
   onChange: (updates: Partial<FilterState>) => void;
   accounts?: Option[];
   categories?: Option[];
   showDirection?: boolean;
+  showAccountFilter?: boolean;
+  showCategoryFilter?: boolean;
+  showSearch?: boolean;
 }) {
   const range = resolveDateRange(filters);
 
@@ -75,35 +81,39 @@ export default function FilterBar({
         </div>
       </div>
 
-      <div className={styles.group}>
-        <div className={styles.label}>Account</div>
-        <select
-          value={filters.account ?? ""}
-          onChange={(event) => onChange({ account: event.target.value || undefined })}
-        >
-          <option value="">All accounts</option>
-          {accounts.map((account) => (
-            <option key={account.value} value={account.value}>
-              {account.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      {showAccountFilter && (
+        <div className={styles.group}>
+          <div className={styles.label}>Account</div>
+          <select
+            value={filters.account ?? ""}
+            onChange={(event) => onChange({ account: event.target.value || undefined })}
+          >
+            <option value="">All accounts</option>
+            {accounts.map((account) => (
+              <option key={account.value} value={account.value}>
+                {account.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
-      <div className={styles.group}>
-        <div className={styles.label}>Category</div>
-        <select
-          value={filters.category ?? ""}
-          onChange={(event) => onChange({ category: event.target.value || undefined })}
-        >
-          <option value="">All categories</option>
-          {categories.map((category) => (
-            <option key={category.value} value={category.value}>
-              {category.label}
-            </option>
-          ))}
-        </select>
-      </div>
+      {showCategoryFilter && (
+        <div className={styles.group}>
+          <div className={styles.label}>Category</div>
+          <select
+            value={filters.category ?? ""}
+            onChange={(event) => onChange({ category: event.target.value || undefined })}
+          >
+            <option value="">All categories</option>
+            {categories.map((category) => (
+              <option key={category.value} value={category.value}>
+                {category.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {showDirection && (
         <div className={styles.group}>
@@ -125,15 +135,17 @@ export default function FilterBar({
         </div>
       )}
 
-      <div className={styles.group}>
-        <div className={styles.label}>Search</div>
-        <input
-          type="search"
-          value={filters.q ?? ""}
-          placeholder="Search description, vendor, memo…"
-          onChange={(event) => onChange({ q: event.target.value || undefined })}
-        />
-      </div>
+      {showSearch && (
+        <div className={styles.group}>
+          <div className={styles.label}>Search</div>
+          <input
+            type="search"
+            value={filters.q ?? ""}
+            placeholder="Search description, vendor, memo…"
+            onChange={(event) => onChange({ q: event.target.value || undefined })}
+          />
+        </div>
+      )}
     </div>
   );
 }

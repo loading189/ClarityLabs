@@ -266,6 +266,7 @@ def _upsert_signal_states(
             after=_serialize_state(state),
         )
 
+    db.flush()
     return touched
 
 
@@ -370,16 +371,29 @@ def get_monitor_status(db: Session, business_id: str) -> Dict[str, Any]:
     runtime = db.get(MonitorRuntime, business_id)
     newest_event_at, newest_event_source_event_id = _fetch_newest_event_cursor(db, business_id)
     gating_reason = None
+    gating_reason_code = None
     gated = False
-    if (
-        runtime
-        and runtime.last_pulse_at
-        and runtime.newest_event_at == newest_event_at
-        and runtime.newest_event_source_event_id == newest_event_source_event_id
-        and (now - _normalize_dt(runtime.last_pulse_at)) < timedelta(minutes=10)
-    ):
-        gated = True
-        gating_reason = "Cooldown: last pulse was under 10 minutes ago and no new events have arrived."
+    stale = False
+    stale_reason = None
+    runtime_last = _normalize_dt(runtime.last_pulse_at) if runtime else None
+    runtime_newest = _normalize_dt(runtime.newest_event_at) if runtime else None
+    if runtime_last:
+        if (now - runtime_last) > timedelta(hours=6):
+            stale = True
+            stale_reason = "Last monitoring pulse is older than 6 hours."
+    else:
+        stale = True
+        stale_reason = "Monitoring has not run yet."
+
+    if runtime_last and runtime_newest == newest_event_at and runtime.newest_event_source_event_id == newest_event_source_event_id:
+        if (now - runtime_last) < timedelta(minutes=10):
+            gated = True
+            gating_reason_code = "cooldown"
+            gating_reason = "Cooldown: last pulse was under 10 minutes ago and no new events have arrived."
+        else:
+            gated = True
+            gating_reason_code = "no_new_events"
+            gating_reason = "No new events since the last pulse. Monitoring will resume when new events arrive."
     states = (
         db.execute(
             select(HealthSignalState).where(
@@ -401,4 +415,7 @@ def get_monitor_status(db: Session, business_id: str) -> Dict[str, Any]:
         "counts": counts,
         "gated": gated,
         "gating_reason": gating_reason,
+        "gating_reason_code": gating_reason_code,
+        "stale": stale,
+        "stale_reason": stale_reason,
     }

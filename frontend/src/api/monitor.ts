@@ -14,6 +14,9 @@ export type MonitorStatus = {
   counts: MonitorCounts;
   gated: boolean;
   gating_reason: string | null;
+  gating_reason_code?: string | null;
+  stale?: boolean;
+  stale_reason?: string | null;
 };
 
 export type MonitorPulseResponse = {

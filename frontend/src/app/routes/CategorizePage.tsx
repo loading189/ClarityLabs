@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import PageHeader from "../../components/common/PageHeader";
+import FilterBar from "../../components/common/FilterBar";
 import { assertBusinessId } from "../../utils/businessId";
 import { CategorizeTab } from "../../features/categorize";
 import { useAppState } from "../state/appState";
@@ -11,7 +12,7 @@ import styles from "./CategorizePage.module.css";
 export default function CategorizePage() {
   const { businessId: businessIdParam } = useParams();
   const businessId = assertBusinessId(businessIdParam, "CategorizePage");
-  const [filters] = useFilters();
+  const [filters, setFilters] = useFilters();
   const { dateRange, setDateRange } = useAppState();
   const resolvedRange = useMemo(() => resolveDateRange(filters), [filters]);
 
@@ -43,6 +44,13 @@ export default function CategorizePage() {
             </span>
           </div>
         }
+      />
+      <FilterBar
+        filters={filters}
+        onChange={setFilters}
+        showAccountFilter={false}
+        showCategoryFilter={false}
+        showSearch={false}
       />
       <CategorizeTab businessId={businessId} />
     </div>
