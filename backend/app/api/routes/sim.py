@@ -210,8 +210,13 @@ def upsert_sim_config(business_id: str, req: SimulatorConfigUpsert, db: Session 
 
 
 @router.post("/sim/pulse/{business_id}")
-def pulse(business_id: str, n: int = Query(25, ge=1, le=500), db: Session = Depends(get_db)):
-    return sim_service.pulse(db, business_id, n)
+def pulse(
+    business_id: str,
+    n: int = Query(25, ge=1, le=500),
+    run_monitoring: bool = Query(True),
+    db: Session = Depends(get_db),
+):
+    return sim_service.pulse(db, business_id, n, run_monitoring=run_monitoring)
 
 
 @router.post("/sim/run_history/{business_id}")

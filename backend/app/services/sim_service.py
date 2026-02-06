@@ -1145,5 +1145,68 @@ def upsert_sim_config(db: Session, business_id: str, req) -> Dict[str, Any]:
     return _to_out(cfg)
 
 
-def pulse(db: Session, business_id: str, n: int) -> Dict[str, Any]:
-    return monitoring_service.pulse(db, business_id)
+def pulse(db: Session, business_id: str, n: int, *, run_monitoring: bool = True) -> Dict[str, Any]:
+    require_business(db, business_id)
+    cfg = db.execute(
+        select(SimulatorConfig).where(SimulatorConfig.business_id == business_id)
+    ).scalar_one_or_none()
+    if not cfg:
+        cfg = _default_config_for(business_id)
+        db.add(cfg)
+        db.commit()
+        db.refresh(cfg)
+
+    prof = _get_or_create_integration_profile(db, business_id)
+    enabled_streams: List[str] = []
+    if prof.bank:
+        enabled_streams.append("bank")
+    if prof.card_processor:
+        enabled_streams.append("card_processor")
+    if prof.ecommerce:
+        enabled_streams.append("ecommerce")
+    if prof.payroll:
+        enabled_streams.append("payroll")
+    if prof.invoicing:
+        enabled_streams.append("invoicing")
+    if not enabled_streams:
+        enabled_streams = ["bank"]
+
+    weights = {
+        "bank": 0.55,
+        "card_processor": 0.20,
+        "ecommerce": 0.15,
+        "payroll": 0.05,
+        "invoicing": 0.05,
+    }
+    total_w = sum(weights.get(s, 0.0) for s in enabled_streams) or 1.0
+    norm = {s: weights.get(s, 0.0) / total_w for s in enabled_streams}
+
+    rng = _rng(cfg.seed or 1337)
+    now = utcnow()
+    inserted = 0
+
+    for i in range(n):
+        stream = rng.choices(enabled_streams, weights=[norm[s] for s in enabled_streams], k=1)[0]
+        occurred_at = now - timedelta(seconds=(n - i))
+        if stream == "card_processor":
+            ev = make_stripe_payout_event(business_id=business_id, occurred_at=occurred_at, cfg=cfg)
+        elif stream == "ecommerce":
+            ev = make_shopify_order_paid_event(business_id=business_id, occurred_at=occurred_at)
+        elif stream == "payroll":
+            ev = make_payroll_run_event(business_id=business_id, occurred_at=occurred_at)
+        elif stream == "invoicing":
+            ev = make_invoice_paid_event(business_id=business_id, occurred_at=occurred_at)
+        else:
+            ev = make_plaid_transaction_event(business_id=business_id, occurred_at=occurred_at, cfg=cfg)
+        inserted += _insert_raw_event(db, business_id, ev)
+
+    db.commit()
+
+    monitor_result: Optional[Dict[str, Any]] = None
+    if run_monitoring:
+        monitor_result = monitoring_service.pulse(db, business_id)
+
+    return {
+        "generated": {"requested": n, "inserted": inserted},
+        "monitoring": monitor_result,
+    }

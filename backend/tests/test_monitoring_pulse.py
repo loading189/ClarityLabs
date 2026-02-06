@@ -13,6 +13,8 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///./test_monitoring_pulse.db")
 from sqlalchemy import delete, select
 
 from backend.app.db import Base, SessionLocal, engine
+from backend.app.api.routes import monitor as monitor_routes
+from backend.app.api.routes import sim as sim_routes
 from backend.app.sim import models as sim_models  # noqa: F401
 from backend.app.models import (
     Account,
@@ -265,6 +267,26 @@ def test_pulse_gating_and_resolution(db_session):
     assert "signal_resolved" in event_types
 
 
+def test_pulse_gating_same_timestamp_new_source_event_id(db_session):
+    biz = _create_business(db_session)
+    cat = _create_account_and_category(db_session, biz.id)
+    occurred_at = datetime(2024, 7, 20, tzinfo=timezone.utc)
+
+    _add_raw_event(db_session, biz.id, "aaa", occurred_at, 400.0, "outflow", "Acme", "Acme")
+    _categorize(db_session, biz.id, "aaa", cat.id)
+    db_session.commit()
+
+    first = monitoring_service.pulse(db_session, biz.id)
+    assert first["ran"] is True
+
+    _add_raw_event(db_session, biz.id, "zzz", occurred_at, 450.0, "outflow", "Acme", "Acme")
+    _categorize(db_session, biz.id, "zzz", cat.id)
+    db_session.commit()
+
+    second = monitoring_service.pulse(db_session, biz.id)
+    assert second["ran"] is True
+
+
 def test_api_signals_list_matches_pulse(db_session):
     biz = _create_business(db_session)
     cat = _create_account_and_category(db_session, biz.id)
@@ -288,3 +310,73 @@ def test_api_signals_list_matches_pulse(db_session):
         select(HealthSignalState).where(HealthSignalState.business_id == biz.id)
     ).scalars().all()
     assert {row["id"] for row in signals} == {state.signal_id for state in db_states}
+
+
+def test_monitor_and_sim_pulse_endpoints(db_session):
+    biz = _create_business(db_session)
+    db_session.commit()
+
+    monitor_resp = monitor_routes.pulse_monitor(biz.id, db_session)
+    assert monitor_resp["ran"] is True
+
+    before_count = db_session.execute(select(RawEvent).where(RawEvent.business_id == biz.id)).scalars().all()
+    payload = sim_routes.pulse(biz.id, n=5, run_monitoring=True, db=db_session)
+    assert payload["generated"]["inserted"] == 5
+    assert payload["monitoring"]["ran"] is True
+
+    db_session.expire_all()
+    after_count = db_session.execute(select(RawEvent).where(RawEvent.business_id == biz.id)).scalars().all()
+    assert len(after_count) == len(before_count) + 5
+
+
+def test_ignored_signal_is_not_reopened_or_resolved(db_session):
+    biz = _create_business(db_session)
+    cat = _create_account_and_category(db_session, biz.id)
+    now = datetime(2024, 9, 10, tzinfo=timezone.utc)
+
+    _add_raw_event(db_session, biz.id, "prior", now - timedelta(days=20), 300.0, "outflow", "Acme", "Acme")
+    _add_raw_event(db_session, biz.id, "current", now - timedelta(days=5), 600.0, "outflow", "Acme", "Acme")
+    _categorize(db_session, biz.id, "prior", cat.id)
+    _categorize(db_session, biz.id, "current", cat.id)
+    db_session.commit()
+
+    first = monitoring_service.pulse(db_session, biz.id)
+    assert first["ran"] is True
+
+    state = db_session.execute(
+        select(HealthSignalState).where(HealthSignalState.business_id == biz.id)
+    ).scalars().first()
+    assert state is not None
+
+    signals_service.update_signal_status(
+        db_session,
+        biz.id,
+        state.signal_id,
+        status="ignored",
+        reason="no action",
+        actor="tester",
+    )
+
+    runtime = db_session.get(MonitorRuntime, biz.id)
+    runtime.last_pulse_at = runtime.last_pulse_at - timedelta(minutes=11)
+    db_session.commit()
+
+    reopened = monitoring_service.pulse(db_session, biz.id)
+    assert reopened["ran"] is True
+
+    db_session.refresh(state)
+    assert state.status == "ignored"
+
+    db_session.execute(delete(TxnCategorization).where(TxnCategorization.business_id == biz.id))
+    db_session.execute(delete(RawEvent).where(RawEvent.business_id == biz.id))
+    db_session.commit()
+
+    runtime = db_session.get(MonitorRuntime, biz.id)
+    runtime.last_pulse_at = runtime.last_pulse_at - timedelta(minutes=11)
+    db_session.commit()
+
+    resolved = monitoring_service.pulse(db_session, biz.id)
+    assert resolved["ran"] is True
+    db_session.refresh(state)
+    assert state.status == "ignored"
+    assert state.resolved_at is None
