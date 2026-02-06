@@ -166,21 +166,31 @@ export default function AssistantPage() {
     }
   }, [businessId]);
 
-  const loadDailyBrief = useCallback(async (signal?: AbortSignal) => {
-    if (!businessId) return;
-    try {
-      const result = await publishDailyBrief(businessId);
-      if (signal?.aborted) return;
-      setDailyBrief(result.brief);
-      const progressData = await fetchAssistantProgress(businessId, 7, signal);
-      if (signal?.aborted) return;
-      setProgress(progressData);
-    } catch {
-      if (signal?.aborted) return;
-      setDailyBrief(null);
-      setProgress(null);
-    }
-  }, [businessId]);
+const loadDailyBrief = useCallback(async (signal?: AbortSignal) => {
+  if (!businessId) return;
+
+  // Daily brief should not block progress
+  try {
+    const result = await publishDailyBrief(businessId);
+    if (signal?.aborted) return;
+    setDailyBrief(result.brief);
+  } catch {
+    if (signal?.aborted) return;
+    setDailyBrief(null);
+  }
+
+  // Progress should load even if daily brief fails
+  try {
+    const progressData = await fetchAssistantProgress(businessId, 7, signal);
+    if (signal?.aborted) return;
+    setProgress(progressData);
+  } catch {
+    if (signal?.aborted) return;
+    // keep whatever progress we already had instead of wiping it
+    // OR: setProgress(null) if you want explicit empty-state
+  }
+}, [businessId]);
+
 
   useEffect(() => {
     const controller = new AbortController();

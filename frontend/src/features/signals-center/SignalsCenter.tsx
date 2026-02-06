@@ -95,41 +95,76 @@ function RelatedChanges({
   const [loadingMore, setLoadingMore] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  const DISPLAY_LIMIT = 10;
+  const FETCH_LIMIT = 20;
+
+  async function fetchFilteredAuditPage(
+    businessId: string,
+    cursor?: string | null
+  ) {
+    const data = await getAuditLog(businessId, {
+      limit: FETCH_LIMIT,
+      cursor: cursor ?? undefined,
+    });
+    const filtered = data.items.filter((item) => SIGNAL_AUDIT_TYPES.has(item.event_type));
+    return { filtered, nextCursor: data.next_cursor ?? null };
+  }
+
+
   const load = useCallback(async () => {
-    if (!businessId) return;
-    setLoading(true);
-    setErr(null);
-    try {
-      const data = await getAuditLog(businessId, { limit: 20 });
-      const filtered = data.items.filter((item) => SIGNAL_AUDIT_TYPES.has(item.event_type));
-      setItems(filtered.slice(0, 10));
-      setNextCursor(data.next_cursor ?? null);
-    } catch (e: any) {
-      setErr(e?.message ?? "Failed to load audit history");
-    } finally {
-      setLoading(false);
-    }
+  if (!businessId) return;
+  setLoading(true);
+  setErr(null);
+
+  try {
+    let collected: AuditLogOut[] = [];
+    let cursor: string | null = null;
+    let next: string | null = null;
+
+    // Keep fetching until we have enough filtered items or no more pages
+    do {
+      const res = await fetchFilteredAuditPage(businessId, cursor);
+      collected = collected.concat(res.filtered);
+      next = res.nextCursor;
+      cursor = next;
+    } while (collected.length < DISPLAY_LIMIT && next);
+
+    setItems(collected.slice(0, DISPLAY_LIMIT));
+    setNextCursor(next);
+  } catch (e: any) {
+    setErr(e?.message ?? "Failed to load audit history");
+  } finally {
+    setLoading(false);
+  }
   }, [businessId]);
 
-  const loadMore = useCallback(async () => {
-    if (!businessId || !nextCursor || loadingMore) return;
-    setLoadingMore(true);
-    setErr(null);
-    try {
-      const data = await getAuditLog(businessId, { limit: 20, cursor: nextCursor });
-      const filtered = data.items.filter((item) => SIGNAL_AUDIT_TYPES.has(item.event_type));
-      setItems((prev) => [...prev, ...filtered]);
-      setNextCursor(data.next_cursor ?? null);
-    } catch (e: any) {
-      setErr(e?.message ?? "Failed to load more audit history");
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [businessId, loadingMore, nextCursor]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+ const loadMore = useCallback(async () => {
+  if (!businessId || !nextCursor || loadingMore) return;
+  setLoadingMore(true);
+  setErr(null);
+
+  try {
+    let collected: AuditLogOut[] = [];
+    let cursor: string | null = nextCursor;
+    let next: string | null = nextCursor;
+
+    do {
+      const res = await fetchFilteredAuditPage(businessId, cursor);
+      collected = collected.concat(res.filtered);
+      next = res.nextCursor;
+      cursor = next;
+    } while (collected.length < DISPLAY_LIMIT && next);
+
+    setItems((prev) => prev.concat(collected.slice(0, DISPLAY_LIMIT)));
+    setNextCursor(next);
+  } catch (e: any) {
+    setErr(e?.message ?? "Failed to load more audit history");
+  } finally {
+    setLoadingMore(false);
+  }
+}, [businessId, loadingMore, nextCursor]);
+
 
   return (
     <div className={styles.auditSection}>
