@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.params import Query as QueryParam
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -181,11 +182,24 @@ def list_txns_to_categorize(
     business_id: str,
     limit: int = Query(50, ge=1, le=200),
     only_uncategorized: bool = True,
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
     db: Session = Depends(get_db),
 ):
+    if isinstance(start_date, QueryParam):
+        start_date = None
+    if isinstance(end_date, QueryParam):
+        end_date = None
     return [
         NormalizedTxnOut(**item)
-        for item in categorize_service.list_txns_to_categorize(db, business_id, limit, only_uncategorized)
+        for item in categorize_service.list_txns_to_categorize(
+            db,
+            business_id,
+            limit,
+            only_uncategorized,
+            start_date=start_date,
+            end_date=end_date,
+        )
     ]
 
 

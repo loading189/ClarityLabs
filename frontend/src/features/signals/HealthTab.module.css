@@ -717,12 +717,13 @@
 
 .signalEvidenceRow {
   display: grid;
-  grid-template-columns: 120px 1fr 120px;
+  grid-template-columns: 120px 1fr 120px auto;
   gap: 10px;
   font-size: 12px;
   padding: 8px;
   border-radius: var(--radius-sm);
   background: var(--surface-muted);
+  align-items: center;
 }
 
 .signalEvidenceDesc {
@@ -734,6 +735,12 @@
 .signalEvidenceSub {
   font-size: 11px;
   color: var(--text-muted);
+}
+
+.signalEvidenceActions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .actionButton {

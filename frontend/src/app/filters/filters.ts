@@ -9,6 +9,7 @@ export type FilterState = {
   vendor?: string;
   q?: string;
   direction?: "inflow" | "outflow";
+  anchor_source_event_id?: string;
 };
 
 export type DemoDateRange = {
@@ -38,6 +39,7 @@ export function parseFilters(params: URLSearchParams): FilterState {
     vendor: params.get("vendor") ?? undefined,
     q: params.get("q") ?? undefined,
     direction,
+    anchor_source_event_id: params.get("anchor_source_event_id") ?? undefined,
   };
 }
 
@@ -51,6 +53,9 @@ export function buildSearchParams(filters: FilterState) {
   if (filters.vendor) params.set("vendor", filters.vendor);
   if (filters.q) params.set("q", filters.q);
   if (filters.direction) params.set("direction", filters.direction);
+  if (filters.anchor_source_event_id) {
+    params.set("anchor_source_event_id", filters.anchor_source_event_id);
+  }
   return params;
 }
 

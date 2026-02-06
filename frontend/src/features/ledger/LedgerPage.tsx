@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import Drawer from "../../components/common/Drawer";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useParams } from "react-router-dom";
 import PageHeader from "../../components/common/PageHeader";
 import { ErrorState } from "../../components/common/DataState";
 import { assertBusinessId } from "../../utils/businessId";
@@ -16,6 +15,7 @@ import {
   type LedgerQueryResponse,
   type LedgerQueryRow,
 } from "../../api/ledger";
+import TransactionDetailDrawer from "../../components/transactions/TransactionDetailDrawer";
 import styles from "./LedgerPage.module.css";
 
 const SIDEBAR_TOP_N = 12;
@@ -119,7 +119,11 @@ export default function LedgerPage() {
   const [vendors, setVendors] = useState<LedgerDimensionVendor[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [selected, setSelected] = useState<LedgerQueryRow | null>(null);
+  const [drawerSourceEventId, setDrawerSourceEventId] = useState<string | null>(null);
+  const [highlightSourceEventId, setHighlightSourceEventId] = useState<string | null>(null);
+  const rowRefs = useRef(new Map<string, HTMLTableRowElement | null>());
+  // Ledger anchor semantics: anchor_source_event_id highlights + scrolls to the row.
+  const anchorSourceEventId = filters.anchor_source_event_id ?? null;
 
   useEffect(() => {
     setSearchDraft(filters.q ?? "");
@@ -145,13 +149,13 @@ export default function LedgerPage() {
   }, [columnVisibility]);
 
   useEffect(() => {
-    if (!selected) return;
+    if (!drawerSourceEventId) return;
     const onEsc = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setSelected(null);
+      if (event.key === "Escape") setDrawerSourceEventId(null);
     };
     window.addEventListener("keydown", onEsc);
     return () => window.removeEventListener("keydown", onEsc);
-  }, [selected]);
+  }, [drawerSourceEventId]);
 
   useEffect(() => {
     const c = new AbortController();
@@ -202,6 +206,17 @@ export default function LedgerPage() {
     }
     return rows;
   }, [filters.category, ledger?.rows]);
+
+  useEffect(() => {
+    if (!anchorSourceEventId) return;
+    const match = visibleRows.find((row) => row.source_event_id === anchorSourceEventId);
+    if (!match) return;
+    setHighlightSourceEventId(anchorSourceEventId);
+    const node = rowRefs.current.get(anchorSourceEventId);
+    if (node && typeof node.scrollIntoView === "function") {
+      node.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [anchorSourceEventId, visibleRows]);
 
   const filteredAccounts = useMemo(() => {
     const q = sidebarSearch.accounts.trim().toLowerCase();
@@ -442,8 +457,16 @@ export default function LedgerPage() {
                   {!loading && visibleRows.map((row) => (
                     <tr
                       key={row.source_event_id}
-                      className={selected?.source_event_id === row.source_event_id ? styles.rowSelected : ""}
-                      onClick={() => setSelected(row)}
+                      ref={(node) => rowRefs.current.set(row.source_event_id, node)}
+                      className={
+                        (drawerSourceEventId ?? highlightSourceEventId) === row.source_event_id
+                          ? styles.rowSelected
+                          : ""
+                      }
+                      onClick={() => {
+                        setHighlightSourceEventId(row.source_event_id);
+                        setDrawerSourceEventId(row.source_event_id);
+                      }}
                     >
                       {columnVisibility.date && <td className={styles.stickyLeft}>{fmtDate(row.occurred_at)}</td>}
                       {columnVisibility.description && <td className={styles.stickySecond}>{row.description}</td>}
@@ -461,27 +484,12 @@ export default function LedgerPage() {
         </section>
       </div>
 
-      <Drawer open={Boolean(selected)} title="Transaction detail" onClose={() => setSelected(null)}>
-        {selected && (
-          <div className={styles.drawerContent}>
-            <div className={styles.drawerTitle}>{selected.description}</div>
-            <div>{selected.vendor || "No vendor"} · {selected.account}</div>
-            <div>Amount: {money(selected.amount)}</div>
-            <div>Balance: {money(selected.balance)}</div>
-            <div>Category: {selected.category || "Uncategorized"}</div>
-            <div className={styles.signalContext}>
-              <div className={styles.signalContextTitle}>Signal context</div>
-              <div>Ledger anchor: <code>{selected.source_event_id}</code></div>
-            </div>
-            <button className={styles.buttonGhost} onClick={() => navigator.clipboard?.writeText(selected.source_event_id)} type="button">
-              Copy ledger anchor
-            </button>
-            <Link className={styles.primaryLink} to={`/app/${businessId}/signals?search=${encodeURIComponent(selected.source_event_id)}&has_ledger_anchors=true`}>
-              Open Signals Center with ledger anchor
-            </Link>
-          </div>
-        )}
-      </Drawer>
+      <TransactionDetailDrawer
+        open={Boolean(drawerSourceEventId)}
+        businessId={businessId}
+        sourceEventId={drawerSourceEventId}
+        onClose={() => setDrawerSourceEventId(null)}
+      />
     </div>
   );
 }

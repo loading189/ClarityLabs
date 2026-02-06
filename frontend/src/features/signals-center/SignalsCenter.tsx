@@ -437,6 +437,20 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
     ];
   }, [detail]);
 
+  const anchorSourceEventId = useMemo(() => {
+    const payload = detail?.payload_json ?? null;
+    if (!payload || typeof payload !== "object") return null;
+    const txnIds = (payload as any).txn_ids;
+    if (Array.isArray(txnIds) && txnIds.length > 0) {
+      return String(txnIds[0]);
+    }
+    const ledgerAnchor = (payload as any).ledger_anchor;
+    if (typeof ledgerAnchor === "string" && ledgerAnchor.trim()) {
+      return ledgerAnchor.trim();
+    }
+    return null;
+  }, [detail?.payload_json]);
+
   return (
     <div className={styles.container}>
       <Panel className={styles.scoreHeader}>
@@ -634,6 +648,14 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
                   to={`/app/${businessId}/assistant?signalId=${detail.id}&createPlanSignalId=${detail.id}`}
                 >
                   Create plan
+                </Link>
+              )}
+              {anchorSourceEventId && (
+                <Link
+                  className={styles.secondaryButton}
+                  to={`/app/${businessId}/ledger?anchor_source_event_id=${encodeURIComponent(anchorSourceEventId)}`}
+                >
+                  View in Ledger
                 </Link>
               )}
             </div>
