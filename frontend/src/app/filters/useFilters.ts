@@ -1,6 +1,11 @@
 import { useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { buildSearchParams, parseFilters, resolveDateRange, type FilterState } from "./filters";
+import {
+  applyFilterSearchParams,
+  parseFilters,
+  resolveDateRange,
+  type FilterState,
+} from "./filters";
 
 export function useFilters(): [
   FilterState,
@@ -14,12 +19,13 @@ export function useFilters(): [
     if (filters.start && filters.end) return;
     const resolved = resolveDateRange(filters);
     setParams(
-      buildSearchParams({
-        ...filters,
-        start: resolved.start,
-        end: resolved.end,
-        window: resolved.window,
-      }),
+      (prev) =>
+        applyFilterSearchParams(prev, {
+          ...filters,
+          start: resolved.start,
+          end: resolved.end,
+          window: resolved.window,
+        }),
       { replace: true }
     );
   }, [filters, setParams]);
@@ -34,7 +40,7 @@ export function useFilters(): [
           ...current,
           ...updates,
         };
-      return buildSearchParams(next);
+      return applyFilterSearchParams(prev, next);
     });
   };
 

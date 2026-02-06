@@ -10,11 +10,15 @@ import { AppStateProvider } from "../../app/state/appState";
 const fetchLedgerQuery = vi.fn();
 const fetchLedgerAccountDimensions = vi.fn();
 const fetchLedgerVendorDimensions = vi.fn();
+const fetchTransactionDetail = vi.fn();
 
 vi.mock("../../api/ledger", () => ({
   fetchLedgerQuery: (...args: unknown[]) => fetchLedgerQuery(...args),
   fetchLedgerAccountDimensions: (...args: unknown[]) => fetchLedgerAccountDimensions(...args),
   fetchLedgerVendorDimensions: (...args: unknown[]) => fetchLedgerVendorDimensions(...args),
+}));
+vi.mock("../../api/transactions", () => ({
+  fetchTransactionDetail: (...args: unknown[]) => fetchTransactionDetail(...args),
 }));
 
 const BIZ_ID = "11111111-1111-4111-8111-111111111111";
@@ -81,6 +85,18 @@ describe("LedgerPage anchor behavior", () => {
     });
     fetchLedgerAccountDimensions.mockResolvedValue([]);
     fetchLedgerVendorDimensions.mockResolvedValue([]);
+    fetchTransactionDetail.mockResolvedValue({
+      business_id: BIZ_ID,
+      source_event_id: "evt-2",
+      raw_event: { source: "bank", source_event_id: "evt-2", payload: {}, occurred_at: "2024-01-02", created_at: "2024-01-02", processed_at: null },
+      normalized_txn: { source_event_id: "evt-2", occurred_at: "2024-01-02", date: "2024-01-02", description: "Rent", amount: -20, direction: "outflow", account: "Operating", category_hint: "Rent" },
+      vendor_normalization: { canonical_name: "Landlord", source: "manual" },
+      categorization: null,
+      processing_assumptions: [],
+      ledger_context: null,
+      audit_history: [],
+      related_signals: [],
+    });
 
     renderPage();
     const rentCells = await screen.findAllByText("Rent");
@@ -108,6 +124,18 @@ describe("LedgerPage anchor behavior", () => {
     });
     fetchLedgerAccountDimensions.mockResolvedValue([]);
     fetchLedgerVendorDimensions.mockResolvedValue([]);
+    fetchTransactionDetail.mockResolvedValue({
+      business_id: BIZ_ID,
+      source_event_id: "evt-1",
+      raw_event: { source: "bank", source_event_id: "evt-1", payload: {}, occurred_at: "2024-01-01", created_at: "2024-01-01", processed_at: null },
+      normalized_txn: { source_event_id: "evt-1", occurred_at: "2024-01-01", date: "2024-01-01", description: "Coffee", amount: -12, direction: "outflow", account: "Operating", category_hint: "Meals" },
+      vendor_normalization: { canonical_name: "Cafe", source: "manual" },
+      categorization: null,
+      processing_assumptions: [],
+      ledger_context: null,
+      audit_history: [],
+      related_signals: [],
+    });
 
     renderPage(`/app/${BIZ_ID}/ledger`);
     const user = userEvent.setup();
@@ -116,5 +144,41 @@ describe("LedgerPage anchor behavior", () => {
 
     const location = screen.getByTestId("location");
     await waitFor(() => expect(location.textContent).toContain("anchor_source_event_id=evt-1"));
+  });
+
+  it("rehydrates the transaction drawer from the anchor param", async () => {
+    fetchLedgerQuery.mockResolvedValue({
+      rows: [
+        {
+          occurred_at: "2024-01-01",
+          date: "2024-01-01",
+          description: "Coffee",
+          vendor: "Cafe",
+          amount: -12,
+          category: "Meals",
+          account: "Operating",
+          balance: 100,
+          source_event_id: "evt-1",
+        },
+      ],
+      summary: { row_count: 1, start_balance: 0, end_balance: 0, total_in: 0, total_out: 0 },
+    });
+    fetchLedgerAccountDimensions.mockResolvedValue([]);
+    fetchLedgerVendorDimensions.mockResolvedValue([]);
+    fetchTransactionDetail.mockResolvedValue({
+      business_id: BIZ_ID,
+      source_event_id: "evt-1",
+      raw_event: { source: "bank", source_event_id: "evt-1", payload: {}, occurred_at: "2024-01-01", created_at: "2024-01-01", processed_at: null },
+      normalized_txn: { source_event_id: "evt-1", occurred_at: "2024-01-01", date: "2024-01-01", description: "Coffee", amount: -12, direction: "outflow", account: "Operating", category_hint: "Meals" },
+      vendor_normalization: { canonical_name: "Cafe", source: "manual" },
+      categorization: null,
+      processing_assumptions: [],
+      ledger_context: null,
+      audit_history: [],
+      related_signals: [],
+    });
+
+    renderPage(`/app/${BIZ_ID}/ledger?anchor_source_event_id=evt-1`);
+    expect(await screen.findByText("Transaction detail")).toBeInTheDocument();
   });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import PageHeader from "../../components/common/PageHeader";
 import { ErrorState } from "../../components/common/DataState";
@@ -95,7 +95,7 @@ export default function LedgerPage() {
   const { businessId: businessIdParam } = useParams();
   const businessId = assertBusinessId(businessIdParam, "LedgerPage");
   const [filters, setFilters] = useFilters();
-  const { setDateRange, activeBusinessId, setActiveBusinessId } = useAppState();
+  const { setDateRange, activeBusinessId, setActiveBusinessId, dataVersion } = useAppState();
   const [sidebarTab, setSidebarTab] = useState<"accounts" | "vendors">("accounts");
   const [sidebarSearch, setSidebarSearch] = useState({ accounts: "", vendors: "" });
   const [expandedList, setExpandedList] = useState({ accounts: false, vendors: false });
@@ -148,14 +148,19 @@ export default function LedgerPage() {
     }
   }, [columnVisibility]);
 
+  const closeDrawer = useCallback(() => {
+    setDrawerSourceEventId(null);
+    setFilters((current) => ({ ...current, anchor_source_event_id: undefined }));
+  }, [setFilters]);
+
   useEffect(() => {
     if (!drawerSourceEventId) return;
     const onEsc = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setDrawerSourceEventId(null);
+      if (event.key === "Escape") closeDrawer();
     };
     window.addEventListener("keydown", onEsc);
     return () => window.removeEventListener("keydown", onEsc);
-  }, [drawerSourceEventId]);
+  }, [closeDrawer, drawerSourceEventId]);
 
   useEffect(() => {
     const c = new AbortController();
@@ -197,7 +202,7 @@ export default function LedgerPage() {
       alive = false;
       c.abort();
     };
-  }, [businessId, filters.q, range.end, range.start, selectedAccounts.join("|"), selectedVendors.join("|")]);
+  }, [businessId, dataVersion, filters.q, range.end, range.start, selectedAccounts.join("|"), selectedVendors.join("|")]);
 
   const visibleRows = useMemo(() => {
     const rows = ledger?.rows ?? [];
@@ -212,6 +217,7 @@ export default function LedgerPage() {
     const match = visibleRows.find((row) => row.source_event_id === anchorSourceEventId);
     if (!match) return;
     setHighlightSourceEventId(anchorSourceEventId);
+    setDrawerSourceEventId(anchorSourceEventId);
     const node = rowRefs.current.get(anchorSourceEventId);
     if (node && typeof node.scrollIntoView === "function") {
       node.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -221,6 +227,7 @@ export default function LedgerPage() {
   useEffect(() => {
     if (!anchorSourceEventId) {
       setHighlightSourceEventId(null);
+      setDrawerSourceEventId(null);
     }
   }, [anchorSourceEventId]);
 
@@ -500,7 +507,7 @@ export default function LedgerPage() {
         open={Boolean(drawerSourceEventId)}
         businessId={businessId}
         sourceEventId={drawerSourceEventId}
-        onClose={() => setDrawerSourceEventId(null)}
+        onClose={closeDrawer}
       />
     </div>
   );

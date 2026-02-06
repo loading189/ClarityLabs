@@ -21,6 +21,10 @@ import styles from "./SignalsCenter.module.css";
 import HealthScoreBreakdownDrawer from "../../components/health-score/HealthScoreBreakdownDrawer";
 import { Button, Chip, Panel } from "../../components/ui";
 import TransactionDetailDrawer from "../../components/transactions/TransactionDetailDrawer";
+import FilterBar from "../../components/common/FilterBar";
+import { useFilters } from "../../app/filters/useFilters";
+import { resolveDateRange } from "../../app/filters/filters";
+import { useAppState } from "../../app/state/appState";
 
 const STATUS_LABELS: Record<string, string> = {
   open: "Open",
@@ -53,17 +57,6 @@ function severityClass(severity: string | null) {
 function formatDomainLabel(domain?: string | null) {
   if (!domain) return "—";
   return domain.charAt(0).toUpperCase() + domain.slice(1);
-}
-
-function toIsoDate(value: Date) {
-  return value.toISOString().slice(0, 10);
-}
-
-function buildLegacyDateRange() {
-  const end = new Date();
-  const start = new Date();
-  start.setDate(end.getDate() - 30);
-  return { start: toIsoDate(start), end: toIsoDate(end) };
 }
 
 function mapLegacySignal(signal: Signal): SignalState {
@@ -214,9 +207,13 @@ function RelatedChanges({
   );
 }
 
+const STALE_THRESHOLD_HOURS = 6;
+
 export default function SignalsCenter({ businessId }: { businessId: string }) {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [filters, setFilters] = useFilters();
+  const { setDateRange } = useAppState();
   const [signals, setSignals] = useState<SignalState[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -239,7 +236,26 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
   const [monitorStatus, setMonitorStatus] = useState<MonitorStatus | null>(null);
   const [monitorLoading, setMonitorLoading] = useState(false);
   const [monitorErr, setMonitorErr] = useState<string | null>(null);
-  const legacyDateRange = useMemo(() => buildLegacyDateRange(), []);
+  const resolvedRange = useMemo(() => resolveDateRange(filters), [filters]);
+  const selectedSignalIdParam = searchParams.get("signal_id") ?? "";
+  const updateSignalParam = useCallback(
+    (signalId: string | null) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        if (signalId) {
+          next.set("signal_id", signalId);
+        } else {
+          next.delete("signal_id");
+        }
+        return next;
+      }, { replace: true });
+    },
+    [setSearchParams]
+  );
+
+  useEffect(() => {
+    setDateRange({ start: resolvedRange.start, end: resolvedRange.end });
+  }, [resolvedRange.end, resolvedRange.start, setDateRange]);
 
   const loadSignals = useCallback(async () => {
     if (!businessId) return;
@@ -248,8 +264,8 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
     try {
       if (useLegacyV1) {
         const data = await fetchSignals(businessId, {
-          start_date: legacyDateRange.start,
-          end_date: legacyDateRange.end,
+          start_date: resolvedRange.start,
+          end_date: resolvedRange.end,
         });
         setSignals((data.signals ?? []).map(mapLegacySignal));
       } else {
@@ -261,7 +277,7 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
     } finally {
       setLoading(false);
     }
-  }, [businessId, legacyDateRange.end, legacyDateRange.start, useLegacyV1]);
+  }, [businessId, resolvedRange.end, resolvedRange.start, useLegacyV1]);
 
   const loadHealthScore = useCallback(async () => {
     if (!businessId) return;
@@ -361,14 +377,31 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
   }, [signals]);
 
   useEffect(() => {
-    const next = new URLSearchParams();
-    if (statusFilter) next.set("status", statusFilter);
-    if (severityFilter) next.set("severity", severityFilter);
-    if (domainFilter) next.set("domain", domainFilter);
-    if (textFilter) next.set("search", textFilter);
-    if (hasLedgerAnchors) next.set("has_ledger_anchors", "true");
-    setSearchParams(next, { replace: true });
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (statusFilter) next.set("status", statusFilter);
+      else next.delete("status");
+      if (severityFilter) next.set("severity", severityFilter);
+      else next.delete("severity");
+      if (domainFilter) next.set("domain", domainFilter);
+      else next.delete("domain");
+      if (textFilter) next.set("search", textFilter);
+      else next.delete("search");
+      if (hasLedgerAnchors) next.set("has_ledger_anchors", "true");
+      else next.delete("has_ledger_anchors");
+      return next;
+    }, { replace: true });
   }, [domainFilter, hasLedgerAnchors, setSearchParams, severityFilter, statusFilter, textFilter]);
+
+  useEffect(() => {
+    if (!selectedSignalIdParam) {
+      setSelected(null);
+      return;
+    }
+    const match = signals.find((signal) => signal.id === selectedSignalIdParam) ?? null;
+    if (!match) return;
+    setSelected(match);
+  }, [selectedSignalIdParam, signals]);
 
   const signalTitleById = useMemo(() => {
     return new Map(signals.map((signal) => [signal.id, signal.title ?? signal.id]));
@@ -482,6 +515,11 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
   }, [detail?.payload_json, detailExplain?.evidence]);
 
   const anchorFromEvidence = useMemo(() => evidenceTxns[0]?.id ?? null, [evidenceTxns]);
+  const isStale =
+    monitorStatus?.stale ??
+    (monitorStatus?.last_pulse_at
+      ? (Date.now() - Date.parse(monitorStatus.last_pulse_at)) / (1000 * 60 * 60) > STALE_THRESHOLD_HOURS
+      : false);
 
   return (
     <div className={styles.container}>
@@ -520,7 +558,10 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
             <div className={styles.monitoringBody}>
               <div className={styles.monitoringRow}>
                 <span>Last pulse</span>
-                <span>{formatDate(monitorStatus.last_pulse_at)}</span>
+                <span className={styles.monitoringValue}>
+                  {formatDate(monitorStatus.last_pulse_at)}
+                  {isStale && <span className={styles.staleBadge}>Stale</span>}
+                </span>
               </div>
               <div className={styles.monitoringRow}>
                 <span>Newest cursor</span>
@@ -550,12 +591,25 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
                 </span>
               </div>
               {monitorStatus.gated && (
-                <div className={styles.monitoringGate}>{monitorStatus.gating_reason}</div>
+                <div className={styles.monitoringGate}>
+                  {monitorStatus.gating_reason}
+                  {monitorStatus.gating_reason_code ? ` (${monitorStatus.gating_reason_code})` : ""}
+                </div>
+              )}
+              {isStale && monitorStatus.stale_reason && (
+                <div className={styles.monitoringGate}>{monitorStatus.stale_reason}</div>
               )}
             </div>
           )}
         </div>
       </Panel>
+      <FilterBar
+        filters={filters}
+        onChange={setFilters}
+        showAccountFilter={false}
+        showCategoryFilter={false}
+        showSearch={false}
+      />
       <div className={styles.filters}>
         <label className={styles.filterField}>
           Status
@@ -644,12 +698,14 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
               onClick={() => {
                 if (useLegacyV1) return;
                 setSelected(signal);
+                updateSignalParam(signal.id);
               }}
               onKeyDown={(event) => {
                 if (useLegacyV1) return;
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
                   setSelected(signal);
+                  updateSignalParam(signal.id);
                 }
               }}
               aria-disabled={useLegacyV1}
@@ -719,7 +775,10 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
       <Drawer
         open={Boolean(selected)}
         title="Signal details"
-        onClose={() => setSelected(null)}
+        onClose={() => {
+          setSelected(null);
+          updateSignalParam(null);
+        }}
       >
         {detailLoading && <LoadingState label="Loading signal details…" />}
         {detailErr && <ErrorState label={detailErr} />}

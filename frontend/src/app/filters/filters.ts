@@ -12,6 +12,18 @@ export type FilterState = {
   anchor_source_event_id?: string;
 };
 
+const FILTER_KEYS = [
+  "start",
+  "end",
+  "window",
+  "account",
+  "category",
+  "vendor",
+  "q",
+  "direction",
+  "anchor_source_event_id",
+] as const;
+
 export type DemoDateRange = {
   start_at?: string | null;
   end_at?: string | null;
@@ -57,6 +69,14 @@ export function buildSearchParams(filters: FilterState) {
     params.set("anchor_source_event_id", filters.anchor_source_event_id);
   }
   return params;
+}
+
+export function applyFilterSearchParams(params: URLSearchParams, filters: FilterState) {
+  const next = new URLSearchParams(params);
+  FILTER_KEYS.forEach((key) => next.delete(key));
+  const built = buildSearchParams(filters);
+  built.forEach((value, key) => next.set(key, value));
+  return next;
 }
 
 function formatDate(date: Date) {

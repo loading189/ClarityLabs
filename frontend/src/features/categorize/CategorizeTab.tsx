@@ -27,7 +27,7 @@ import { isValidIsoDate } from "../../app/filters/filters";
 import { normalizeVendorDisplay } from "../../utils/vendors";
 import { hasValidCategoryMapping } from "../../utils/categories";
 import RecentChangesPanel from "../../components/audit/RecentChangesPanel";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import TransactionDetailDrawer from "../../components/transactions/TransactionDetailDrawer";
 
 export type CategorizeDrilldown = {
@@ -77,8 +77,10 @@ export default function CategorizeTab({
   const [rulesMsg, setRulesMsg] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [toastAuditId, setToastAuditId] = useState<string | null>(null);
+  const [reconciliationHint, setReconciliationHint] = useState<string | null>(null);
   const toastTimeoutRef = useRef<number | null>(null);
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [previewRuleId, setPreviewRuleId] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<CategoryRulePreviewOut | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -91,6 +93,22 @@ export default function CategorizeTab({
   >({});
   const dateRangeStart = dateRange.start;
   const dateRangeEnd = dateRange.end;
+  const urlSourceEventId = searchParams.get("source_event_id");
+
+  const updateDetailParam = useCallback(
+    (sourceEventId: string | null) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        if (sourceEventId) {
+          next.set("source_event_id", sourceEventId);
+        } else {
+          next.delete("source_event_id");
+        }
+        return next;
+      }, { replace: true });
+    },
+    [setSearchParams]
+  );
 
   // Prevent stale-load races when businessId changes quickly
   const loadSeq = useRef(0);
@@ -283,12 +301,21 @@ export default function CategorizeTab({
         setBrainVendors([]);
       }
 
+      const urlTxn = urlSourceEventId
+        ? t.find((txn) => txn.source_event_id === urlSourceEventId) ?? null
+        : null;
       const existingTxn = selectedTxnRef.current
         ? t.find((txn) => txn.source_event_id === selectedTxnRef.current?.source_event_id) ?? null
         : null;
-      const nextTxn = existingTxn ?? t[0] ?? null;
+      const nextTxn = urlTxn ?? existingTxn ?? t[0] ?? null;
       setSelectedTxn(nextTxn);
       setSelectedCategoryId(pickBestCategoryId(nextTxn, c));
+      if (urlTxn) {
+        setDetailSourceEventId(urlTxn.source_event_id);
+      } else if (urlSourceEventId) {
+        setDetailSourceEventId(null);
+        updateDetailParam(null);
+      }
     } catch (e: any) {
       if (seq !== loadSeq.current) return;
       console.error("[categorize] load failed", {
@@ -309,6 +336,7 @@ export default function CategorizeTab({
     invalidBusinessId,
     invalidDateRange,
     pickBestCategoryId,
+    urlSourceEventId,
   ]);
 
   const loadRules = useCallback(async () => {
@@ -337,11 +365,17 @@ export default function CategorizeTab({
       setSelectedTxn(t);
       setSelectedCategoryId(pickBestCategoryId(t, cats));
       setDetailSourceEventId(t.source_event_id);
+      updateDetailParam(t.source_event_id);
       setMsg(null);
       setActionErr(null);
     },
-    [cats, pickBestCategoryId]
+    [cats, pickBestCategoryId, updateDetailParam]
   );
+
+  const handleDrawerClose = useCallback(() => {
+    setDetailSourceEventId(null);
+    updateDetailParam(null);
+  }, [updateDetailParam]);
 
   const activeDrilldown = useMemo(() => {
     if (!drilldown) return null;
@@ -449,6 +483,7 @@ export default function CategorizeTab({
 
       setActionErr(null);
       setMsg(null);
+      setReconciliationHint(null);
 
       try {
         const res: any = await saveCategorization(businessId, {
@@ -465,6 +500,9 @@ export default function CategorizeTab({
         );
         setToastAuditId(res?.audit_id ?? null);
         showToast("Categorization saved.");
+        if (res?.updated === false) {
+          setReconciliationHint("Reconciliation hint: New posted transactions may affect signals.");
+        }
 
         await load(); // ✅ ensures next txn shows updated suggestions
         onCategorizationChange?.();
@@ -494,6 +532,7 @@ export default function CategorizeTab({
 
       setActionErr(null);
       setMsg(null);
+      setReconciliationHint(null);
 
       try {
         const res = await bulkApplyByMerchantKey(businessId, {
@@ -507,6 +546,9 @@ export default function CategorizeTab({
           `Applied to ${res.matched_events} events (${res.created} new, ${res.updated} updated). Reloading…`
         );
         showToast("Vendor categorization applied.");
+        if (res.created > 0) {
+          setReconciliationHint("Reconciliation hint: New posted transactions may affect signals.");
+        }
         await load();
         onCategorizationChange?.();
         bumpDataVersion();
@@ -804,6 +846,15 @@ export default function CategorizeTab({
     }
   }, [cats, filteredTxns, pickBestCategoryId, selectedTxn]);
 
+  useEffect(() => {
+    if (!urlSourceEventId) return;
+    const match = txns.find((txn) => txn.source_event_id === urlSourceEventId) ?? null;
+    if (!match) return;
+    setSelectedTxn(match);
+    setSelectedCategoryId(pickBestCategoryId(match, cats));
+    setDetailSourceEventId(match.source_event_id);
+  }, [cats, pickBestCategoryId, txns, urlSourceEventId]);
+
   const reloadAll = useCallback(() => {
     load();
     loadRules();
@@ -939,6 +990,12 @@ export default function CategorizeTab({
           <h3 className={styles.assignHeader}>Assign category</h3>
 
         {msg && <div className={styles.message}>{msg}</div>}
+        {reconciliationHint && (
+          <div className={styles.hint}>
+            {reconciliationHint}{" "}
+            <Link to={`/app/${businessId}/signals`}>Re-run monitoring</Link>.
+          </div>
+        )}
         {toastMsg && (
           <div className={styles.toast}>
             <span>{toastMsg}</span>
@@ -1261,7 +1318,7 @@ export default function CategorizeTab({
         open={Boolean(detailSourceEventId)}
         businessId={businessId}
         sourceEventId={detailSourceEventId}
-        onClose={() => setDetailSourceEventId(null)}
+        onClose={handleDrawerClose}
       />
     </div>
   );

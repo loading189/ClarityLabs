@@ -30,6 +30,18 @@
 .monitoringBody { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--text); }
 .monitoringRow { display: flex; justify-content: space-between; gap: 12px; color: var(--text-muted); }
 .monitoringRow span:last-child { color: var(--text); text-align: right; }
+.monitoringValue { display: inline-flex; align-items: center; gap: 8px; }
+.staleBadge {
+  background: rgba(255, 90, 31, 0.12);
+  color: #f76b2a;
+  border: 1px solid rgba(247, 107, 42, 0.4);
+  border-radius: var(--radius-pill);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
 .monitoringGate {
   margin-top: 4px;
   font-size: 11px;
