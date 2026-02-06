@@ -1,135 +1,168 @@
-.page {
+.layout {
   display: grid;
-  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 320px;
   gap: 20px;
+  align-items: start;
 }
 
-.contextPanel,
-.mainPanel {
+.chatPane {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 70vh;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+}
+
+.chatHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.chatBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+.chatInput {
+  display: flex;
+  gap: 8px;
+}
+
+.chatInput input {
+  flex: 1;
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  background: var(--input-bg);
+  color: var(--text);
+}
+
+.chatInput button {
+  border: 1px solid var(--btn-border);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+  cursor: pointer;
+}
+
+.chatInput button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.messageAssistant,
+.messageUser {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  background: var(--surface-muted);
+}
+
+.messageUser {
+  background: var(--primary-soft);
+}
+
+.messageMeta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.messageContent {
+  font-size: 13px;
+}
+
+.actionsPane {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-.sectionHeader { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.sectionTitle { font-size: 18px; font-weight: 600; }
-.sectionSubtitle { font-size: 12px; color: var(--text-muted); }
-
-.card {
+.panelCard {
   border: 1px solid var(--border);
   background: var(--card-bg);
   border-radius: var(--radius-lg);
-  padding: 16px;
-  box-shadow: var(--shadow-sm);
-}
-
-.cardTitle { font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
-.cardBody { margin: 0; color: var(--text-muted); }
-.alertCount, .scoreValue { font-size: 32px; font-weight: 700; }
-.alertMeta, .scoreMeta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; font-size: 12px; color: var(--text-muted); }
-
-.alertList, .evidenceList, .auditList { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
-
-.alertRow {
-  border: 1px solid var(--border);
-  background: var(--surface-muted);
-  border-radius: var(--radius-md);
-  padding: 10px 12px;
+  padding: 14px;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  cursor: pointer;
-  text-align: left;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.alertRow:hover { background: var(--surface-2); }
-.alertRowActive { border-color: var(--btn-primary-border); background: var(--primary-soft); }
-.alertTitle { font-size: 13px; font-weight: 600; }
-.alertSubtitle { font-size: 12px; color: var(--text-muted); }
-.alertChevron { font-size: 16px; color: var(--text-soft); }
+.buttonGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 
-.explainHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.explainTitle { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
-.explainMeta { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--text-muted); }
-.explainSection { margin-top: 14px; }
-.sectionLabel { font-size: 12px; font-weight: 600; margin-bottom: 8px; color: var(--text-soft); text-transform: uppercase; letter-spacing: .06em; }
-
-.evidenceItem {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 10px;
-  background: var(--surface-muted);
-}
-.evidenceLabel { font-size: 12px; color: var(--text-muted); }
-.evidenceValue { font-size: 13px; font-weight: 600; }
-.evidenceAnchor { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; font-size: 11px; color: var(--text-soft); }
-.anchorLink,
-.anchorButton {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  padding: 3px 8px;
-  background: var(--surface-muted);
-  color: var(--primary);
-  font-weight: 600;
-  font-size: 11px;
-}
-.anchorButton { cursor: pointer; }
-.evidenceSource { font-size: 10px; color: var(--text-soft); text-transform: uppercase; }
-.auditItem { display: flex; flex-direction: column; gap: 2px; }
-.auditLink { color: var(--primary); font-size: 13px; font-weight: 600; }
-.auditMeta { font-size: 12px; color: var(--text-muted); }
-
-.actionChips { display: flex; flex-wrap: wrap; gap: 8px; }
-.actionChip {
-  border: 1px solid var(--pill-border);
-  background: var(--pill-bg);
-  color: var(--text-muted);
-  border-radius: var(--radius-pill);
-  padding: 6px 12px;
-  font-size: 12px;
-  cursor: pointer;
-}
-.actionChip:hover { border-color: var(--btn-primary-border); background: var(--primary-soft); color: var(--text); }
-
-.actionForm {
-  margin-top: 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 12px;
-  background: var(--surface-muted);
-}
-.actionFormTitle, .field { font-size: 12px; color: var(--text-muted); }
-.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
-.input,
-.textarea {
-  border: 1px solid var(--input-border);
-  border-radius: var(--radius-sm);
-  padding: 8px 10px;
-  font-size: 12px;
-  background: var(--input-bg);
-  color: var(--text);
-}
-.textarea { resize: vertical; }
-.actionButtons { display: flex; gap: 8px; justify-content: flex-end; }
-.primaryButton,
-.secondaryButton {
+.buttonGroup button {
+  border: 1px solid var(--btn-border);
   border-radius: var(--radius-sm);
   padding: 8px 12px;
-  font-size: 12px;
+  background: var(--btn-bg);
+  color: var(--text);
+  text-align: left;
   cursor: pointer;
-  border: 1px solid var(--btn-border);
 }
-.primaryButton { background: var(--btn-primary-bg); color: var(--btn-primary-text); border-color: var(--btn-primary-border); }
-.secondaryButton { background: var(--btn-bg); color: var(--text); }
-.linkButton { color: var(--primary); font-size: 12px; }
 
-.scoreCard, .scoreContributors { display: flex; flex-direction: column; gap: 8px; }
-.scoreContributor { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
-.muted { color: var(--text-muted); font-size: 12px; }
-.error { color: var(--danger); font-size: 12px; }
-.success { color: var(--success); font-size: 12px; }
+.buttonGroup button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 
-@media (max-width: 1024px) {
-  .page { grid-template-columns: 1fr; }
+.statusGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.statusLabel {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.statusValue {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.subtleText {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.emptyState {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.error {
+  color: var(--danger);
+  font-size: 12px;
+}
+
+@media (max-width: 1080px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
 }

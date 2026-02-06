@@ -2,6 +2,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
+import { AppStateProvider } from "../../app/state/appState";
 import SignalsCenter from "./SignalsCenter";
 
 const listSignalStates = vi.fn().mockResolvedValue({
@@ -91,9 +92,11 @@ describe("SignalsCenter", () => {
 
   it("renders signals and filters by status", async () => {
     render(
-      <MemoryRouter>
-        <SignalsCenter businessId="biz-1" />
-      </MemoryRouter>
+      <AppStateProvider>
+        <MemoryRouter>
+          <SignalsCenter businessId="biz-1" />
+        </MemoryRouter>
+      </AppStateProvider>
     );
 
     await waitFor(() => expect(listSignalStates).toHaveBeenCalled());
@@ -111,9 +114,11 @@ describe("SignalsCenter", () => {
 
   it("opens the detail drawer and renders payload JSON", async () => {
     render(
-      <MemoryRouter>
-        <SignalsCenter businessId="biz-1" />
-      </MemoryRouter>
+      <AppStateProvider>
+        <MemoryRouter>
+          <SignalsCenter businessId="biz-1" />
+        </MemoryRouter>
+      </AppStateProvider>
     );
 
     await waitFor(() => expect(listSignalStates).toHaveBeenCalled());
@@ -128,9 +133,11 @@ describe("SignalsCenter", () => {
 
   it("renders health score widget and opens breakdown", async () => {
     render(
-      <MemoryRouter>
-        <SignalsCenter businessId="biz-1" />
-      </MemoryRouter>
+      <AppStateProvider>
+        <MemoryRouter>
+          <SignalsCenter businessId="biz-1" />
+        </MemoryRouter>
+      </AppStateProvider>
     );
 
     await waitFor(() => expect(fetchHealthScore).toHaveBeenCalled());
@@ -144,9 +151,11 @@ describe("SignalsCenter", () => {
 
   it("provides a send to assistant deep link", async () => {
     render(
-      <MemoryRouter>
-        <SignalsCenter businessId="biz-1" />
-      </MemoryRouter>
+      <AppStateProvider>
+        <MemoryRouter>
+          <SignalsCenter businessId="biz-1" />
+        </MemoryRouter>
+      </AppStateProvider>
     );
 
     await waitFor(() => expect(listSignalStates).toHaveBeenCalled());

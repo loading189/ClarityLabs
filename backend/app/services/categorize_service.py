@@ -15,6 +15,7 @@ from backend.app.models import (
     BusinessCategoryMap,
     CategoryRule,
     Account,
+    VendorCategoryMap,
     utcnow,
 )
 from backend.app.norma.from_events import raw_event_to_txn
@@ -27,6 +28,10 @@ from backend.app.services.category_seed import (
 )
 from backend.app.services.category_resolver import resolve_system_key, require_system_key_mapping
 from backend.app.services import audit_service
+from backend.app.services.posted_txn_service import fetch_uncategorized_raw_events
+
+
+VENDOR_MAP_CONFIDENCE_THRESHOLD = 0.9
 
 
 
@@ -433,17 +438,30 @@ def list_txns_to_categorize(
     require_business(db, business_id)
     seed_coa_and_categories_and_mappings(db, business_id)
 
-    stmt = select(RawEvent).where(RawEvent.business_id == business_id)
-    if start_date:
-        stmt = stmt.where(RawEvent.occurred_at >= datetime.combine(start_date, time.min, tzinfo=timezone.utc))
-    if end_date:
-        stmt = stmt.where(RawEvent.occurred_at <= datetime.combine(end_date, time.max, tzinfo=timezone.utc))
-    rows = db.execute(stmt.order_by(RawEvent.occurred_at.desc()).limit(500)).scalars().all()
-
-    existing = db.execute(
-        select(TxnCategorization.source_event_id).where(TxnCategorization.business_id == business_id)
-    ).scalars().all()
-    existing_set = set(existing)
+    if only_uncategorized:
+        rows = fetch_uncategorized_raw_events(
+            db,
+            business_id,
+            start_date=start_date,
+            end_date=end_date,
+            limit=max(500, limit),
+        )
+        existing_set: set[str] = set()
+    else:
+        stmt = select(RawEvent).where(RawEvent.business_id == business_id)
+        if start_date:
+            stmt = stmt.where(
+                RawEvent.occurred_at >= datetime.combine(start_date, time.min, tzinfo=timezone.utc)
+            )
+        if end_date:
+            stmt = stmt.where(
+                RawEvent.occurred_at <= datetime.combine(end_date, time.max, tzinfo=timezone.utc)
+            )
+        rows = db.execute(stmt.order_by(RawEvent.occurred_at.desc()).limit(500)).scalars().all()
+        existing = db.execute(
+            select(TxnCategorization.source_event_id).where(TxnCategorization.business_id == business_id)
+        ).scalars().all()
+        existing_set = set(existing)
 
     out: List[Dict[str, Any]] = []
 
@@ -941,6 +959,15 @@ def apply_category_rule(db: Session, business_id: str, rule_id: str) -> Dict[str
         )
         db.add(row)
         updated += 1
+        if 0.92 >= VENDOR_MAP_CONFIDENCE_THRESHOLD:
+            _update_vendor_category_map(
+                db,
+                business_id=business_id,
+                source_event_id=source_event_id,
+                category_id=rule.category_id,
+                confidence=0.92,
+                source="rule",
+            )
 
     if "last_run_at" in column_names:
         rule.last_run_at = utcnow()
@@ -1043,6 +1070,16 @@ def upsert_categorization(db: Session, business_id: str, req) -> Dict[str, Any]:
         source_event_id=req.source_event_id,
     )
     db.commit()
+
+    if float(req.confidence or 0) >= VENDOR_MAP_CONFIDENCE_THRESHOLD:
+        _update_vendor_category_map(
+            db,
+            business_id=business_id,
+            source_event_id=req.source_event_id,
+            category_id=req.category_id,
+            confidence=float(req.confidence or 0),
+            source=req.source,
+        )
 
     learned = False
     learned_system_key: Optional[str] = None
@@ -1173,6 +1210,139 @@ def bulk_apply_categorization(db: Session, business_id: str, req) -> Dict[str, A
         "created": created,
         "updated": updated,
     }
+
+
+def _update_vendor_category_map(
+    db: Session,
+    *,
+    business_id: str,
+    source_event_id: str,
+    category_id: str,
+    confidence: float,
+    source: str,
+) -> Optional[VendorCategoryMap]:
+    ev = db.execute(
+        select(RawEvent).where(
+            and_(
+                RawEvent.business_id == business_id,
+                RawEvent.source_event_id == source_event_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if not ev:
+        return None
+
+    txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
+    vendor_key_value = merchant_key(txn.description or "")
+    if not vendor_key_value:
+        return None
+
+    existing = db.execute(
+        select(VendorCategoryMap).where(
+            and_(
+                VendorCategoryMap.business_id == business_id,
+                VendorCategoryMap.vendor_key == vendor_key_value,
+            )
+        )
+    ).scalar_one_or_none()
+
+    if existing:
+        existing.category_id = category_id
+        existing.confidence = confidence
+        existing.updated_at = utcnow()
+        db.add(existing)
+        row = existing
+    else:
+        row = VendorCategoryMap(
+            business_id=business_id,
+            vendor_key=vendor_key_value,
+            category_id=category_id,
+            confidence=confidence,
+            updated_at=utcnow(),
+        )
+        db.add(row)
+
+    audit_service.log_audit_event(
+        db,
+        business_id=business_id,
+        event_type="vendor_map_updated",
+        actor=_actor_for_source(source),
+        reason="vendor_category_map",
+        before=None,
+        after={
+            "vendor_key": vendor_key_value,
+            "category_id": category_id,
+            "confidence": confidence,
+        },
+        source_event_id=source_event_id,
+    )
+    db.commit()
+    return row
+
+
+def auto_categorize_from_vendor_map(
+    db: Session,
+    business_id: str,
+    *,
+    confidence_threshold: float = VENDOR_MAP_CONFIDENCE_THRESHOLD,
+    limit: int = 200,
+) -> Dict[str, Any]:
+    require_business(db, business_id)
+    seed_coa_and_categories_and_mappings(db, business_id)
+
+    uncategorized = fetch_uncategorized_raw_events(db, business_id, limit=limit)
+    if not uncategorized:
+        return {"status": "ok", "applied": 0, "audit_id": None}
+
+    vendor_map = {
+        row.vendor_key: row
+        for row in db.execute(
+            select(VendorCategoryMap).where(VendorCategoryMap.business_id == business_id)
+        ).scalars().all()
+        if row.confidence >= confidence_threshold
+    }
+
+    applied: list[dict] = []
+    for ev in uncategorized:
+        txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
+        vendor_key_value = merchant_key(txn.description or "")
+        mapping = vendor_map.get(vendor_key_value)
+        if not mapping:
+            continue
+        db.add(
+            TxnCategorization(
+                business_id=business_id,
+                source_event_id=ev.source_event_id,
+                category_id=mapping.category_id,
+                source="auto_vendor_map",
+                confidence=mapping.confidence,
+                note=f"vendor_key:{vendor_key_value}",
+            )
+        )
+        applied.append(
+            {
+                "source_event_id": ev.source_event_id,
+                "vendor_key": vendor_key_value,
+                "category_id": mapping.category_id,
+                "confidence": mapping.confidence,
+            }
+        )
+
+    if applied:
+        audit_row = audit_service.log_audit_event(
+            db,
+            business_id=business_id,
+            event_type="auto_categorized",
+            actor="system",
+            reason="vendor_map",
+            before=None,
+            after={"applied": applied, "applied_count": len(applied)},
+        )
+        db.commit()
+        return {"status": "ok", "applied": len(applied), "audit_id": audit_row.id}
+
+    db.commit()
+    return {"status": "ok", "applied": 0, "audit_id": None}
 
 
 def categorization_metrics(db: Session, business_id: str) -> Dict[str, Any]:
