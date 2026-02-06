@@ -40,6 +40,8 @@ select,
 textarea {
   font: inherit;
   color: var(--text);
+  background: var(--card-bg);
+  border: none; 
 }
 
 button {
