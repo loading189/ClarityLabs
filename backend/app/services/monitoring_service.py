@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import HTTPException
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
 from backend.app.models import (
@@ -20,6 +20,7 @@ from backend.app.models import (
 from backend.app.norma.from_events import raw_event_to_txn
 from backend.app.norma.normalize import NormalizedTransaction
 from backend.app.services import audit_service
+from backend.app.services.health_signal_service import ALLOWED_STATUSES
 from backend.app.signals.v2 import DetectorRunSummary, DetectedSignal, run_v2_detectors_with_summary
 
 
@@ -162,6 +163,22 @@ def _get_or_create_runtime(db: Session, business_id: str) -> MonitorRuntime:
     return runtime
 
 
+def _fetch_newest_event_cursor(db: Session, business_id: str) -> Tuple[Optional[datetime], Optional[str]]:
+    row = (
+        db.execute(
+            select(RawEvent.occurred_at, RawEvent.source_event_id)
+            .where(RawEvent.business_id == business_id)
+            .order_by(RawEvent.occurred_at.desc(), RawEvent.source_event_id.desc())
+            .limit(1)
+        )
+        .first()
+    )
+    if not row:
+        return None, None
+    occurred_at, source_event_id = row
+    return _normalize_dt(occurred_at), source_event_id
+
+
 def _signal_changed(before: Dict[str, Any], signal: DetectedSignal, new_status: str) -> bool:
     return any(
         [
@@ -226,7 +243,14 @@ def _upsert_signal_states(
             continue
 
         before_state = _serialize_state(state)
-        new_status = "open" if state.status == "resolved" else state.status
+        if state.status not in ALLOWED_STATUSES:
+            state.status = "open"
+        if state.status == "ignored":
+            new_status = "ignored"
+        elif state.status == "resolved":
+            new_status = "open"
+        else:
+            new_status = state.status
         state.last_seen_at = now
         state.signal_type = signal.signal_type
         state.fingerprint = signal.fingerprint
@@ -237,6 +261,8 @@ def _upsert_signal_states(
         if state.status == "resolved":
             state.status = "open"
             state.resolved_at = None
+        if state.status == "ignored":
+            state.status = "ignored"
 
         if _signal_changed(before_state, signal, new_status):
             state.updated_at = now
@@ -255,6 +281,10 @@ def _upsert_signal_states(
         if state.signal_id in detected_ids:
             continue
         if state.status == "resolved":
+            continue
+        if state.status == "ignored":
+            continue
+        if state.status not in {"open", "in_progress"}:
             continue
         before_state = _serialize_state(state)
         state.status = "resolved"
@@ -294,19 +324,17 @@ def pulse(
 ) -> Dict[str, Any]:
     require_business(db, business_id)
     now = _normalize_dt(now) or _now()
-
-    newest_event_at = db.execute(
-        select(func.max(RawEvent.occurred_at)).where(RawEvent.business_id == business_id)
-    ).scalar_one_or_none()
-    newest_event_at = _normalize_dt(newest_event_at)
+    newest_event_at, newest_event_source_event_id = _fetch_newest_event_cursor(db, business_id)
 
     runtime = _get_or_create_runtime(db, business_id)
     runtime_last = _normalize_dt(runtime.last_pulse_at)
     runtime_newest = _normalize_dt(runtime.newest_event_at)
+    runtime_source_event_id = runtime.newest_event_source_event_id
     if (
         not force_run
         and runtime_last
         and runtime_newest == newest_event_at
+        and runtime_source_event_id == newest_event_source_event_id
         and (now - runtime_last) < timedelta(minutes=10)
     ):
         states = (
@@ -318,6 +346,7 @@ def pulse(
             "ran": False,
             "last_pulse_at": runtime.last_pulse_at,
             "newest_event_at": runtime.newest_event_at,
+            "newest_event_source_event_id": runtime.newest_event_source_event_id,
             "counts": _count_states(states),
             "touched_signal_ids": [],
         }
@@ -336,6 +365,7 @@ def pulse(
 
     runtime.last_pulse_at = now
     runtime.newest_event_at = newest_event_at
+    runtime.newest_event_source_event_id = newest_event_source_event_id
     runtime.updated_at = now
     db.commit()
 
@@ -348,6 +378,7 @@ def pulse(
         "ran": True,
         "last_pulse_at": runtime.last_pulse_at,
         "newest_event_at": runtime.newest_event_at,
+        "newest_event_source_event_id": runtime.newest_event_source_event_id,
         "counts": _count_states(states),
         "touched_signal_ids": touched,
     }
@@ -387,6 +418,7 @@ def get_monitor_status(db: Session, business_id: str) -> Dict[str, Any]:
         "business_id": business_id,
         "last_pulse_at": runtime.last_pulse_at if runtime else None,
         "newest_event_at": runtime.newest_event_at if runtime else None,
+        "newest_event_source_event_id": runtime.newest_event_source_event_id if runtime else None,
         "open_count": open_count,
         "counts": counts,
     }

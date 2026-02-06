@@ -1246,6 +1246,9 @@ def list_signal_states(db: Session, business_id: str) -> Tuple[List[Dict[str, An
                 "title": row.title,
                 "summary": row.summary,
                 "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+                "detected_at": row.detected_at.isoformat() if row.detected_at else None,
+                "last_seen_at": row.last_seen_at.isoformat() if row.last_seen_at else None,
+                "resolved_at": row.resolved_at.isoformat() if row.resolved_at else None,
             }
         )
     return signals, {"count": len(signals)}
@@ -1272,6 +1275,7 @@ def get_signal_state_detail(db: Session, business_id: str, signal_id: str) -> Di
         "detected_at": state.detected_at.isoformat() if state.detected_at else None,
         "last_seen_at": state.last_seen_at.isoformat() if state.last_seen_at else None,
         "resolved_at": state.resolved_at.isoformat() if state.resolved_at else None,
+        "resolution_note": state.resolution_note,
         "updated_at": state.updated_at.isoformat() if state.updated_at else None,
     }
 

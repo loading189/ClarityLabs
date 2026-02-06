@@ -259,6 +259,7 @@ class MonitorRuntime(Base):
     )
     last_pulse_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     newest_event_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    newest_event_source_event_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow)
 
     __table_args__ = (

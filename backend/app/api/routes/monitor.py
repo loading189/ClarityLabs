@@ -12,3 +12,8 @@ router = APIRouter(prefix="/monitor", tags=["monitoring"])
 @router.get("/status/{business_id}")
 def get_monitor_status(business_id: str, db: Session = Depends(get_db)):
     return monitoring_service.get_monitor_status(db, business_id)
+
+
+@router.post("/pulse/{business_id}")
+def pulse_monitor(business_id: str, db: Session = Depends(get_db)):
+    return monitoring_service.pulse(db, business_id)
