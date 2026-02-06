@@ -19,6 +19,7 @@ import {
 import styles from "./SignalsCenter.module.css";
 import HealthScoreBreakdownDrawer from "../../components/health-score/HealthScoreBreakdownDrawer";
 import { Button, Chip, Panel } from "../../components/ui";
+import TransactionDetailDrawer from "../../components/transactions/TransactionDetailDrawer";
 
 const STATUS_LABELS: Record<string, string> = {
   open: "Open",
@@ -233,6 +234,7 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
     open: false,
     nextStatus: null,
   });
+  const [detailSourceEventId, setDetailSourceEventId] = useState<string | null>(null);
   const [healthScore, setHealthScore] = useState<HealthScoreOut | null>(null);
   const [healthScoreLoading, setHealthScoreLoading] = useState(false);
   const [healthScoreErr, setHealthScoreErr] = useState<string | null>(null);
@@ -437,19 +439,43 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
     ];
   }, [detail]);
 
-  const anchorSourceEventId = useMemo(() => {
+  const evidenceTxns = useMemo(() => {
+    const entries = new Map<string, { id: string; label?: string; source?: string }>();
+    const add = (value: unknown, label?: string, source?: string) => {
+      if (typeof value !== "string") return;
+      const trimmed = value.trim();
+      if (!trimmed) return;
+      const existing = entries.get(trimmed);
+      if (existing) {
+        entries.set(trimmed, { ...existing, label: existing.label ?? label, source: existing.source ?? source });
+        return;
+      }
+      entries.set(trimmed, { id: trimmed, label, source });
+    };
     const payload = detail?.payload_json ?? null;
-    if (!payload || typeof payload !== "object") return null;
-    const txnIds = (payload as any).txn_ids;
-    if (Array.isArray(txnIds) && txnIds.length > 0) {
-      return String(txnIds[0]);
+    if (payload && typeof payload === "object") {
+      const txnIds = (payload as any).txn_ids;
+      if (Array.isArray(txnIds)) {
+        txnIds.forEach((id) => add(id, "Detector evidence", "payload"));
+      }
+      add((payload as any).ledger_anchor, "Ledger anchor", "payload");
+      add((payload as any).txn_id, "Detector evidence", "payload");
+      add((payload as any).source_event_id, "Detector evidence", "payload");
     }
-    const ledgerAnchor = (payload as any).ledger_anchor;
-    if (typeof ledgerAnchor === "string" && ledgerAnchor.trim()) {
-      return ledgerAnchor.trim();
+    const evidence = detailExplain?.evidence ?? [];
+    if (Array.isArray(evidence)) {
+      evidence.forEach((item: any) => {
+        const anchors = item?.anchors ?? null;
+        const txnIds = anchors?.txn_ids;
+        if (Array.isArray(txnIds)) {
+          txnIds.forEach((id: unknown) => add(id, item?.label ?? "Evidence", item?.source));
+        }
+      });
     }
-    return null;
-  }, [detail?.payload_json]);
+    return Array.from(entries.values());
+  }, [detail?.payload_json, detailExplain?.evidence]);
+
+  const anchorFromEvidence = useMemo(() => evidenceTxns[0]?.id ?? null, [evidenceTxns]);
 
   return (
     <div className={styles.container}>
@@ -650,15 +676,49 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
                   Create plan
                 </Link>
               )}
-              {anchorSourceEventId && (
+              {anchorFromEvidence && (
                 <Link
                   className={styles.secondaryButton}
-                  to={`/app/${businessId}/ledger?anchor_source_event_id=${encodeURIComponent(anchorSourceEventId)}`}
+                  to={`/app/${businessId}/ledger?anchor_source_event_id=${encodeURIComponent(anchorFromEvidence)}`}
                 >
                   View in Ledger
                 </Link>
               )}
             </div>
+
+            {evidenceTxns.length > 0 && (
+              <div>
+                <div className={styles.sectionTitle}>Evidence</div>
+                <div className={styles.detailSummary}>Linked transactions from detector output.</div>
+                <div className={styles.auditList}>
+                  {evidenceTxns.map((item) => (
+                    <div key={item.id} className={styles.auditRow}>
+                      <div>
+                        <div className={styles.auditEvent}>
+                          {item.label ?? "Evidence transaction"} · {item.id.slice(-6)}
+                        </div>
+                        <div className={styles.auditMeta}>{item.source ?? "detector"}</div>
+                      </div>
+                      <div className={styles.statusActions}>
+                        <button
+                          type="button"
+                          className={styles.secondaryButton}
+                          onClick={() => setDetailSourceEventId(item.id)}
+                        >
+                          View details
+                        </button>
+                        <Link
+                          className={styles.secondaryButton}
+                          to={`/app/${businessId}/ledger?anchor_source_event_id=${encodeURIComponent(item.id)}`}
+                        >
+                          View in Ledger
+                        </Link>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div>
               <div className={styles.sectionTitle}>What resolves this</div>
@@ -676,6 +736,13 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
           </div>
         )}
       </Drawer>
+
+      <TransactionDetailDrawer
+        open={Boolean(detailSourceEventId)}
+        businessId={businessId}
+        sourceEventId={detailSourceEventId}
+        onClose={() => setDetailSourceEventId(null)}
+      />
 
       {statusModal.open && (
         <div className={styles.modalOverlay} role="dialog" aria-modal="true">

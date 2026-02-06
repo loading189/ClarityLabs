@@ -218,6 +218,12 @@ export default function LedgerPage() {
     }
   }, [anchorSourceEventId, visibleRows]);
 
+  useEffect(() => {
+    if (!anchorSourceEventId) {
+      setHighlightSourceEventId(null);
+    }
+  }, [anchorSourceEventId]);
+
   const filteredAccounts = useMemo(() => {
     const q = sidebarSearch.accounts.trim().toLowerCase();
     if (!q) return accounts;
@@ -464,6 +470,12 @@ export default function LedgerPage() {
                           : ""
                       }
                       onClick={() => {
+                        setFilters((current) => {
+                          if (current.anchor_source_event_id === row.source_event_id) {
+                            return current;
+                          }
+                          return { ...current, anchor_source_event_id: row.source_event_id };
+                        });
                         setHighlightSourceEventId(row.source_event_id);
                         setDrawerSourceEventId(row.source_event_id);
                       }}

@@ -184,6 +184,18 @@ describe("CategorizeTab", () => {
     await waitFor(() => expect(listCategoryRules).toHaveBeenCalledTimes(1));
   });
 
+  it("renders uncategorized transactions when present in range", async () => {
+    render(
+      <MemoryRouter>
+        <CategorizeTab businessId="11111111-1111-4111-8111-111111111111" />
+      </MemoryRouter>
+    );
+
+    const matches = await screen.findAllByText("Coffee Shop");
+    expect(matches.length).toBeGreaterThan(0);
+    expect(screen.queryByText("No uncategorized transactions.")).not.toBeInTheDocument();
+  });
+
   it("updates selected category when filtered transactions force a new selected txn", async () => {
     getTxnsToCategorize.mockResolvedValue([
       {

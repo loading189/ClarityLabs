@@ -85,12 +85,14 @@ export default function AssistantPage() {
   const [workQueue, setWorkQueue] = useState<WorkQueueItem[]>([]);
   const [planVerification, setPlanVerification] = useState<ResolutionPlanVerify | null>(null);
   const resumedRef = useRef(false);
+  const createPlanHandledRef = useRef<string | null>(null);
   const planStepRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   useEffect(() => setActiveBusinessId(businessId || null), [businessId, setActiveBusinessId]);
 
   useEffect(() => {
     resumedRef.current = false;
+    createPlanHandledRef.current = null;
   }, [businessId]);
 
   const loadAll = useCallback(async (signal?: AbortSignal) => {
@@ -447,14 +449,22 @@ const loadDailyBrief = useCallback(async (signal?: AbortSignal) => {
 
   useEffect(() => {
     if (!createPlanSignalId || !businessId) return;
+    if (createPlanHandledRef.current === createPlanSignalId) return;
     let active = true;
+    createPlanHandledRef.current = createPlanSignalId;
     const run = async () => {
-      const plan = await handleCreatePlan([createPlanSignalId], `Plan · ${createPlanSignalId}`);
-      if (!active || !plan) return;
-      const next = new URLSearchParams(searchParams);
-      next.delete("createPlanSignalId");
-      next.set("planId", plan.plan_id);
-      setSearchParams(next, { replace: true });
+      let plan: ResolutionPlan | undefined;
+      try {
+        plan = await handleCreatePlan([createPlanSignalId], `Plan · ${createPlanSignalId}`);
+      } finally {
+        if (!active) return;
+        const next = new URLSearchParams(searchParams);
+        next.delete("createPlanSignalId");
+        if (plan?.plan_id) {
+          next.set("planId", plan.plan_id);
+        }
+        setSearchParams(next, { replace: true });
+      }
     };
     void run();
     return () => {
@@ -482,6 +492,7 @@ const loadDailyBrief = useCallback(async (signal?: AbortSignal) => {
 
         <div className={styles.card}>
           <div className={styles.cardTitle}>Plans</div>
+          <div className={styles.muted}>Resolution plans track multi-step actions for specific signals.</div>
           {plans.map((plan) => (
             <button key={plan.plan_id} className={styles.alertRow} onClick={() => setSelectedPlanId(plan.plan_id)}>
               {plan.title} · {plan.status}
@@ -654,7 +665,12 @@ const loadDailyBrief = useCallback(async (signal?: AbortSignal) => {
           <div className={styles.card}>
             <div className={styles.cardTitle}>Plan</div>
             <div><strong>{selectedPlan.title}</strong> · {selectedPlan.status}</div>
-            <div className={styles.muted}>Signals: {selectedPlan.signal_ids.join(", ")}</div>
+            <div className={styles.muted}>
+              Applies to signals: {selectedPlan.signal_ids.join(", ")}
+            </div>
+            <div className={styles.muted}>
+              Status: {selectedPlan.status.replace(/_/g, " ")}
+            </div>
             <div className={styles.actionChips} style={{ marginTop: 8 }}>
               {selectedPlan.signal_ids.map((signalId) => (
                 <button key={signalId} className={styles.actionChip} onClick={() => appendExplainMessage(signalId, "priority")}>

@@ -1,14 +1,23 @@
+import { useEffect, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import PageHeader from "../../components/common/PageHeader";
 import { assertBusinessId } from "../../utils/businessId";
 import { CategorizeTab } from "../../features/categorize";
 import { useAppState } from "../state/appState";
+import { useFilters } from "../filters/useFilters";
+import { resolveDateRange } from "../filters/filters";
 import styles from "./CategorizePage.module.css";
 
 export default function CategorizePage() {
   const { businessId: businessIdParam } = useParams();
   const businessId = assertBusinessId(businessIdParam, "CategorizePage");
-  const { dateRange } = useAppState();
+  const [filters] = useFilters();
+  const { dateRange, setDateRange } = useAppState();
+  const resolvedRange = useMemo(() => resolveDateRange(filters), [filters]);
+
+  useEffect(() => {
+    setDateRange({ start: resolvedRange.start, end: resolvedRange.end });
+  }, [resolvedRange.end, resolvedRange.start, setDateRange]);
 
   if (!businessId) {
     return (
