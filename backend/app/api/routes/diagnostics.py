@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 
 from fastapi import APIRouter, Depends
@@ -49,11 +50,50 @@ class DiagnosticsErrorOut(BaseModel):
     details: Optional[Dict[str, Any]] = None
 
 
+class ProcessingErrorOut(BaseModel):
+    source_event_id: str
+    provider: str
+    error_code: Optional[str] = None
+    error_detail: Optional[str] = None
+    updated_at: Optional[datetime] = None
+
+
+class IngestionConnectionOut(BaseModel):
+    provider: str
+    status: str
+    last_sync_at: Optional[datetime] = None
+    last_cursor: Optional[str] = None
+    last_cursor_at: Optional[datetime] = None
+    last_webhook_at: Optional[datetime] = None
+    last_ingest_counts: Optional[dict] = None
+    last_error: Optional[str] = None
+
+
+class IngestionDiagnosticsOut(BaseModel):
+    status_counts: Dict[str, int]
+    errors: List[ProcessingErrorOut]
+    connections: List[IngestionConnectionOut]
+    monitor_status: Dict[str, Any]
+
+
 @router.get("/{business_id}", response_model=Union[DiagnosticsOut, DiagnosticsErrorOut])
 def get_diagnostics(business_id: str, db: Session = Depends(get_db)):
     try:
         payload = diagnostics_service.collect_diagnostics(db, business_id)
         return DiagnosticsOut(**payload)
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        return DiagnosticsErrorOut(
+            status="error",
+            message=str(exc),
+            details={"type": exc.__class__.__name__},
+        )
+
+
+@router.get("/ingestion/{business_id}", response_model=Union[IngestionDiagnosticsOut, DiagnosticsErrorOut])
+def get_ingestion_diagnostics(business_id: str, db: Session = Depends(get_db)):
+    try:
+        payload = diagnostics_service.collect_ingestion_diagnostics(db, business_id)
+        return IngestionDiagnosticsOut(**payload)
     except Exception as exc:  # pragma: no cover - defensive fallback
         return DiagnosticsErrorOut(
             status="error",

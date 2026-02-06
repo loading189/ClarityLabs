@@ -18,6 +18,7 @@ from backend.app.norma.ledger import LedgerIntegrityError, build_cash_ledger, ch
 from backend.app.norma.normalize import NormalizedTransaction
 from backend.app.services.category_resolver import resolve_system_key
 from backend.app.services.posted_txn_service import fetch_posted_transactions
+from backend.app.services import processing_service
 from backend.app.norma.categorize_brain import brain
 
 logger = logging.getLogger(__name__)
@@ -167,3 +168,7 @@ def collect_diagnostics(db: Session, business_id: str) -> Dict[str, Any]:
         "invalid_vendor_defaults": invalid_vendor_defaults,
         "ledger_integrity": ledger_integrity,
     }
+
+
+def collect_ingestion_diagnostics(db: Session, business_id: str) -> Dict[str, Any]:
+    return processing_service.collect_ingestion_diagnostics(db, business_id)

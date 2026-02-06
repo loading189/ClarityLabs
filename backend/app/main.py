@@ -89,6 +89,7 @@ app.include_router(signals_router)
 app.include_router(health_score_router)
 app.include_router(audit_router)
 app.include_router(diagnostics_router)
+app.include_router(diagnostics_router, prefix="/api")
 app.include_router(monitor_router)
 app.include_router(changes_router)
 

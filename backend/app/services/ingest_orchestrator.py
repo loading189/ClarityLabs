@@ -4,7 +4,7 @@ from typing import Optional, Sequence
 
 from sqlalchemy.orm import Session
 
-from backend.app.services import audit_service, categorize_service, monitoring_service
+from backend.app.services import audit_service, categorize_service, monitoring_service, processing_service
 
 
 def process_ingested_events(
@@ -16,6 +16,11 @@ def process_ingested_events(
     categorize_service.seed_coa_and_categories_and_mappings(db, business_id)
 
     inserted_count = len(source_event_ids) if source_event_ids else 0
+    processing_summary = processing_service.process_new_events(
+        db,
+        business_id=business_id,
+        source_event_ids=source_event_ids,
+    )
     pulse_result = monitoring_service.pulse(db, business_id)
     touched = pulse_result.get("touched_signal_ids", []) if pulse_result else []
 
@@ -28,6 +33,7 @@ def process_ingested_events(
         before=None,
         after={
             "events_inserted": inserted_count,
+            "processing_summary": processing_summary,
             "pulse_ran": bool(pulse_result.get("ran")) if pulse_result else False,
             "touched_signals": len(touched),
             "source_event_ids": list(source_event_ids or []),
@@ -37,7 +43,11 @@ def process_ingested_events(
 
     return {
         "events_inserted": inserted_count,
+        "processing": processing_summary,
         "pulse": pulse_result,
         "touched_signal_ids": touched,
-        "audit_id": audit_row.id,
+        "audit_ids": {
+            "ingest_processed": audit_row.id,
+            **(processing_summary.get("audit_ids") or {}),
+        },
     }

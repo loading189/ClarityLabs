@@ -149,6 +149,10 @@ def assistant_action(business_id: str, req: AssistantActionIn, db: Session = Dep
             )
             connection.last_sync_at = utcnow()
             connection.last_error = None
+            connection.last_ingest_counts = {
+                "inserted": pull.inserted_count,
+                "skipped": pull.skipped_count,
+            }
             connection.updated_at = utcnow()
             db.add(connection)
             sync_results.append(

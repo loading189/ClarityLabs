@@ -1,16 +1,24 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.app.db import get_db
 from backend.app.integrations import get_adapter
 from backend.app.integrations.shopify_stub import parse_body as parse_shopify_body
 from backend.app.integrations.stripe_stub import parse_body as parse_stripe_body
+from backend.app.models import IntegrationConnection
 from backend.app.services.ingest_orchestrator import process_ingested_events
 
 
 router = APIRouter(prefix="/api/webhooks", tags=["webhooks"])
+
+
+def utcnow() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 def _extract_business_id(payload: dict) -> str:
@@ -39,6 +47,20 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     business_id = _extract_business_id(payload)
     result = adapter.ingest_webhook_event(business_id=business_id, payload=payload, db=db)
     db.flush()
+    connection = db.execute(
+        select(IntegrationConnection).where(
+            IntegrationConnection.business_id == business_id,
+            IntegrationConnection.provider == "stripe",
+        )
+    ).scalar_one_or_none()
+    if connection:
+        connection.last_webhook_at = utcnow()
+        connection.last_ingest_counts = {
+            "inserted": result.inserted_count,
+            "skipped": result.skipped_count,
+        }
+        connection.updated_at = utcnow()
+        db.add(connection)
     ingest_processed = process_ingested_events(
         db,
         business_id=business_id,
@@ -64,6 +86,20 @@ async def shopify_webhook(request: Request, db: Session = Depends(get_db)):
     business_id = _extract_business_id(payload)
     result = adapter.ingest_webhook_event(business_id=business_id, payload=payload, db=db)
     db.flush()
+    connection = db.execute(
+        select(IntegrationConnection).where(
+            IntegrationConnection.business_id == business_id,
+            IntegrationConnection.provider == "shopify",
+        )
+    ).scalar_one_or_none()
+    if connection:
+        connection.last_webhook_at = utcnow()
+        connection.last_ingest_counts = {
+            "inserted": result.inserted_count,
+            "skipped": result.skipped_count,
+        }
+        connection.updated_at = utcnow()
+        db.add(connection)
     ingest_processed = process_ingested_events(
         db,
         business_id=business_id,

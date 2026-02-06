@@ -2,8 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { fetchAssistantSummary, postAssistantAction, type AssistantSummary } from "../../api/assistantTools";
+import { fetchIngestionDiagnostics, type IngestionDiagnostics } from "../../api/ingestionDiagnostics";
 import { useAppState } from "../../app/state/appState";
 import styles from "./AssistantPage.module.css";
+import IngestionDiagnosticsDrawer from "./IngestionDiagnosticsDrawer";
 
 type ChatMessage = {
   id: string;
@@ -36,6 +38,10 @@ export default function AssistantPage() {
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [summary, setSummary] = useState<AssistantSummary | null>(null);
+  const [ingestionDiagnostics, setIngestionDiagnostics] = useState<IngestionDiagnostics | null>(null);
+  const [ingestionLoading, setIngestionLoading] = useState(false);
+  const [ingestionError, setIngestionError] = useState<string | null>(null);
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,6 +70,51 @@ export default function AssistantPage() {
     void loadSummary(controller.signal);
     return () => controller.abort();
   }, [loadSummary]);
+
+  const loadIngestionDiagnostics = useCallback(
+    async (signal?: AbortSignal) => {
+      if (!businessId) return;
+      setIngestionLoading(true);
+      setIngestionError(null);
+      try {
+        const data = await fetchIngestionDiagnostics(businessId, signal);
+        if (signal?.aborted) return;
+        setIngestionDiagnostics(data);
+      } catch (err: any) {
+        if (signal?.aborted) return;
+        setIngestionError(err?.message ?? "Failed to load ingestion diagnostics.");
+      } finally {
+        if (!signal?.aborted) setIngestionLoading(false);
+      }
+    },
+    [businessId]
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadIngestionDiagnostics(controller.signal);
+    return () => controller.abort();
+  }, [loadIngestionDiagnostics]);
+
+  const processingErrorCount = ingestionDiagnostics?.status_counts?.error;
+  const latestCursor = useMemo(() => {
+    if (!ingestionDiagnostics?.connections?.length) return null;
+    const sorted = [...ingestionDiagnostics.connections].sort((a, b) => {
+      const aTime = a.last_cursor_at ? new Date(a.last_cursor_at).getTime() : 0;
+      const bTime = b.last_cursor_at ? new Date(b.last_cursor_at).getTime() : 0;
+      return bTime - aTime;
+    });
+    return sorted[0];
+  }, [ingestionDiagnostics]);
+  const latestWebhook = useMemo(() => {
+    if (!ingestionDiagnostics?.connections?.length) return null;
+    const sorted = [...ingestionDiagnostics.connections].sort((a, b) => {
+      const aTime = a.last_webhook_at ? new Date(a.last_webhook_at).getTime() : 0;
+      const bTime = b.last_webhook_at ? new Date(b.last_webhook_at).getTime() : 0;
+      return bTime - aTime;
+    });
+    return sorted[0];
+  }, [ingestionDiagnostics]);
 
   const suggestedActions = useMemo(() => {
     if (!summary) return [];
@@ -208,6 +259,31 @@ export default function AssistantPage() {
         </div>
 
         <div className={styles.panelCard}>
+          <h3>Ingestion Health</h3>
+          <div className={styles.statusGrid}>
+            <div>
+              <span className={styles.statusLabel}>Uncategorized</span>
+              <span className={styles.statusValue}>{summary?.uncategorized_count ?? "—"}</span>
+            </div>
+            <div>
+              <span className={styles.statusLabel}>Processing errors</span>
+              <span className={styles.statusValue}>{processingErrorCount ?? "—"}</span>
+            </div>
+            <div>
+              <span className={styles.statusLabel}>Last cursor</span>
+              <span className={styles.statusValue}>{latestCursor?.last_cursor ?? "—"}</span>
+            </div>
+            <div>
+              <span className={styles.statusLabel}>Last webhook</span>
+              <span className={styles.statusValue}>{formatDate(latestWebhook?.last_webhook_at)}</span>
+            </div>
+          </div>
+          <button type="button" onClick={() => setDiagnosticsOpen(true)} className={styles.secondaryButton}>
+            View ingestion diagnostics
+          </button>
+        </div>
+
+        <div className={styles.panelCard}>
           <h3>Integrations</h3>
           {summary?.integrations?.length ? (
             <ul className={styles.list}>
@@ -235,6 +311,14 @@ export default function AssistantPage() {
           )}
         </div>
       </aside>
+
+      <IngestionDiagnosticsDrawer
+        open={diagnosticsOpen}
+        onClose={() => setDiagnosticsOpen(false)}
+        diagnostics={ingestionDiagnostics}
+        loading={ingestionLoading}
+        error={ingestionError}
+      />
     </div>
   );
 }

@@ -119,6 +119,16 @@
   cursor: not-allowed;
 }
 
+.secondaryButton {
+  border: 1px solid var(--btn-border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  background: var(--btn-bg);
+  color: var(--text);
+  cursor: pointer;
+  text-align: center;
+}
+
 .statusGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;

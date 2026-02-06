@@ -40,6 +40,10 @@ class IntegrationConnectionOut(BaseModel):
     status: str
     connected_at: Optional[datetime]
     last_sync_at: Optional[datetime]
+    last_cursor: Optional[str] = None
+    last_cursor_at: Optional[datetime] = None
+    last_webhook_at: Optional[datetime] = None
+    last_ingest_counts: Optional[dict] = None
     last_error: Optional[str]
     config_json: Optional[dict]
 
@@ -186,6 +190,10 @@ def sync_integration(
         if connection:
             connection.last_sync_at = utcnow()
             connection.last_error = None
+            connection.last_ingest_counts = {
+                "inserted": result.inserted_count,
+                "skipped": result.skipped_count,
+            }
             connection.updated_at = utcnow()
             db.add(connection)
         audit_service.log_audit_event(

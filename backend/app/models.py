@@ -336,6 +336,10 @@ class IntegrationConnection(Base):
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="connected")
     connected_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     last_sync_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_cursor: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    last_cursor_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_webhook_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_ingest_counts: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     last_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     config_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
@@ -347,6 +351,35 @@ class IntegrationConnection(Base):
     )
 
     business = relationship("Business", back_populates="integration_connections")
+
+
+class ProcessingEventState(Base):
+    __tablename__ = "processing_event_states"
+    __table_args__ = (
+        Index("ix_processing_event_states_business_status", "business_id", "status"),
+        Index("ix_processing_event_states_business_updated", "business_id", "updated_at"),
+    )
+
+    business_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    source_event_id: Mapped[str] = mapped_column(String(120), primary_key=True)
+    provider: Mapped[str] = mapped_column(String(40), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="ingested")
+    normalized_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    error_code: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    error_detail: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    last_processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utcnow,
+        onupdate=utcnow,
+    )
+    idempotency_key: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
 
 class Category(Base):
     """
