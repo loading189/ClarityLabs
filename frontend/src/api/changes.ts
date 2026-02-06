@@ -1,4 +1,5 @@
 import { apiGet } from "./client";
+import type { SignalSeverity } from "./signals";
 
 export type ChangeEvent = {
   id: string;
@@ -6,8 +7,8 @@ export type ChangeEvent = {
   type: "signal_detected" | "signal_resolved" | "signal_status_updated";
   business_id: string;
   signal_id: string;
-  severity: "info" | "warning" | "critical" | null;
-  domain: "liquidity" | "revenue" | "expense" | "timing" | "concentration" | "hygiene" | null;
+  severity: SignalSeverity | null;
+  domain: "liquidity" | "revenue" | "expense" | "timing" | "concentration" | "hygiene" | "unknown" | null;
   title: string | null;
   actor: string | null;
   reason: string | null;

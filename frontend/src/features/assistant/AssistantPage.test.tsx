@@ -112,7 +112,9 @@ describe("AssistantPage v2", () => {
 
   it("loads server-backed thread on mount", async () => {
     renderAssistant();
-    await waitFor(() => expect(fetchAssistantThread).toHaveBeenCalledWith("biz-1", 200));
+    await waitFor(() =>
+      expect(fetchAssistantThread).toHaveBeenCalledWith("biz-1", 200, expect.any(AbortSignal))
+    );
     expect(getMonitorStatus).not.toHaveBeenCalled();
   });
 
@@ -155,5 +157,17 @@ describe("AssistantPage v2", () => {
         expect.objectContaining({ kind: "changes" })
       )
     );
+  });
+
+  it("shows fallback when changes fail to load", async () => {
+    listChanges.mockRejectedValueOnce(new Error("boom"));
+    renderAssistant();
+    expect(await screen.findByText(/couldn't load changes/i)).toBeInTheDocument();
+  });
+
+  it("shows fallback when score explanation fails to load", async () => {
+    fetchHealthScoreExplainChange.mockRejectedValueOnce(new Error("boom"));
+    renderAssistant();
+    expect(await screen.findByText(/couldn't load explanation/i)).toBeInTheDocument();
   });
 });

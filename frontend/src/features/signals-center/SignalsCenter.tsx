@@ -11,6 +11,7 @@ import {
   listSignalStates,
   updateSignalStatus,
   type Signal,
+  type SignalSeverity,
   type SignalState,
   type SignalStateDetail,
   type SignalStatus,
@@ -259,19 +260,21 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
       setStatusFilter("");
       return;
     }
-    if (!selected?.id) {
+    const selectedId = selected?.id;
+    if (!selectedId) {
       setDetail(null);
       setDetailExplain(null);
       return;
     }
+    const resolvedId = selectedId;
     let active = true;
     async function loadDetail() {
       setDetailLoading(true);
       setDetailErr(null);
       try {
         const [data, explainData] = await Promise.all([
-          getSignalDetail(businessId, selected.id),
-          getSignalExplain(businessId, selected.id),
+          getSignalDetail(businessId, resolvedId),
+          getSignalExplain(businessId, resolvedId),
         ]);
         if (!active) return;
         setDetail(data);
@@ -296,9 +299,19 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
   const [hasLedgerAnchors, setHasLedgerAnchors] = useState(searchParams.get("has_ledger_anchors") === "true");
 
   const filterOptions = useMemo(() => {
-    const domains = Array.from(new Set(signals.map((signal) => signal.domain).filter(Boolean)));
+    const domains = Array.from(
+      new Set(
+        signals
+          .map((signal) => signal.domain)
+          .filter((domain): domain is string => Boolean(domain))
+      )
+    );
     const severities = Array.from(
-      new Set(signals.map((signal) => signal.severity).filter(Boolean))
+      new Set(
+        signals
+          .map((signal) => signal.severity)
+          .filter((severity): severity is SignalSeverity => Boolean(severity))
+      )
     );
     return { domains, severities };
   }, [signals]);
@@ -378,7 +391,7 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
     navigate(`/app/${businessId}/categorize?auditId=${auditId}#recent-changes`);
   };
 
-  const statusButtons = useMemo(() => {
+  const statusButtons = useMemo<Array<{ label: string; status: SignalStatus }>>(() => {
     if (!detail) return [] as Array<{ label: string; status: SignalStatus }>;
     if (detail.status === "resolved" || detail.status === "ignored") {
       return [{ label: "Reopen", status: "open" }];
