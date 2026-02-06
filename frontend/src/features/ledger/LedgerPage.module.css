@@ -157,7 +157,7 @@
 
 .sidebarItem:hover,
 .table tbody tr:hover {
-  background: #f9fafb;
+  background: #f9fafb24;
 }
 
 .sidebarItemActive {
