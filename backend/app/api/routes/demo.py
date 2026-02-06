@@ -38,7 +38,7 @@ from backend.app.services import analytics_service
 from backend.app.norma.ledger import build_cash_ledger
 from backend.app.norma.merchant import merchant_key
 from backend.app.norma.categorize_brain import brain
-from backend.app.services import categorize_service, health_signal_service, signals_service
+from backend.app.services import categorize_service, demo_seed_service, health_signal_service, signals_service
 from backend.app.clarity.health_v1 import build_health_v1_signals
 
 router = APIRouter(prefix="/demo", tags=["demo"])
@@ -138,6 +138,15 @@ class DrilldownResponseOut(BaseModel):
     rows: List[DrilldownRowOut]
 
 
+class DemoSeedOut(BaseModel):
+    organization_id: str
+    business_id: str
+    seeded: bool
+    window: Dict[str, str]
+    stats: Dict[str, int]
+    monitoring: Optional[Dict[str, Any]] = None
+
+
 # ----------------------------
 # Small utilities
 # ----------------------------
@@ -162,6 +171,15 @@ def _parse_id_set(source_event_ids: Optional[str]) -> Optional[set[str]]:
         return None
     s = {x.strip() for x in source_event_ids.split(",") if x.strip()}
     return s or None
+
+
+@router.post("/seed", response_model=DemoSeedOut)
+def seed_demo(db: Session = Depends(get_db)):
+    """
+    Dev-only deterministic seed for the full golden-path workflow:
+    raw events -> categorization -> ledger -> monitoring -> evidence -> audit.
+    """
+    return demo_seed_service.seed_demo(db)
 
 
 # ---------------------------------------

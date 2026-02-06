@@ -68,6 +68,19 @@ export function fetchReviewQueue(businessId: string, minConf = 0.75) {
   return apiGet<any>(`/demo/review_queue?business_id=${businessId}&min_conf=${minConf}`);
 }
 
+export type DemoSeedResponse = {
+  organization_id: string;
+  business_id: string;
+  seeded: boolean;
+  window: { start_date: string; end_date: string; anchor_date: string };
+  stats: { raw_events_inserted: number; categorizations_inserted: number };
+  monitoring?: Record<string, any> | null;
+};
+
+export function seedDemo() {
+  return apiPost<DemoSeedResponse>("/demo/seed", {});
+}
+
 // ✅ FIX: use apiGet so API_BASE is respected
 export function fetchMonthlyTrends(
   businessId: string,
