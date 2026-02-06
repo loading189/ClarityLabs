@@ -272,6 +272,25 @@ def test_pulse_gating_and_resolution(db_session):
     assert "signal_resolved" in event_types
 
 
+def test_force_pulse_overrides_gating(db_session):
+    biz = _create_business(db_session)
+    cat = _create_account_and_category(db_session, biz.id)
+    now = datetime(2024, 7, 2, tzinfo=timezone.utc)
+
+    _add_raw_event(db_session, biz.id, "evt-1", now - timedelta(days=5), 500.0, "outflow", "Acme", "Acme")
+    _categorize(db_session, biz.id, "evt-1", cat.id)
+    db_session.commit()
+
+    first = monitoring_service.pulse(db_session, biz.id)
+    assert first["ran"] is True
+
+    gated = monitoring_service.pulse(db_session, biz.id)
+    assert gated["ran"] is False
+
+    forced = monitoring_service.pulse(db_session, biz.id, force_run=True)
+    assert forced["ran"] is True
+
+
 def test_pulse_gating_same_timestamp_new_source_event_id(db_session):
     biz = _create_business(db_session)
     cat = _create_account_and_category(db_session, biz.id)
@@ -321,7 +340,7 @@ def test_monitor_and_sim_pulse_endpoints(db_session):
     biz = _create_business(db_session)
     db_session.commit()
 
-    monitor_resp = monitor_routes.pulse_monitor(biz.id, db_session)
+    monitor_resp = monitor_routes.pulse_monitor(biz.id, db=db_session)
     assert monitor_resp["ran"] is True
 
     before_count = db_session.execute(select(RawEvent).where(RawEvent.business_id == biz.id)).scalars().all()
