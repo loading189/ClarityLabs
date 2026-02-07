@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from backend.app.db import get_db
 from backend.app.integrations import get_adapter
 from backend.app.models import AuditLog, Business, HealthSignalState, IntegrationConnection
-from backend.app.services import audit_service, monitoring_service
+from backend.app.services import audit_service, monitoring_service, integration_connection_service
 from backend.app.services.ingest_orchestrator import process_ingested_events
 from backend.app.services.posted_txn_service import (
     count_uncategorized_raw_events,
@@ -132,7 +132,8 @@ def assistant_action(business_id: str, req: AssistantActionIn, db: Session = Dep
             db.execute(
                 select(IntegrationConnection).where(
                     IntegrationConnection.business_id == business_id,
-                    IntegrationConnection.status == "connected",
+                    IntegrationConnection.is_enabled == True,  # noqa: E712
+                    IntegrationConnection.status != "disconnected",
                 )
             )
             .scalars()
@@ -147,8 +148,7 @@ def assistant_action(business_id: str, req: AssistantActionIn, db: Session = Dep
                 since=connection.last_sync_at,
                 db=db,
             )
-            connection.last_sync_at = utcnow()
-            connection.last_error = None
+            integration_connection_service.mark_sync_success(connection)
             connection.last_ingest_counts = {
                 "inserted": pull.inserted_count,
                 "skipped": pull.skipped_count,

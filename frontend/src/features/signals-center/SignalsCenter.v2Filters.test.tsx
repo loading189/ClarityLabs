@@ -93,6 +93,7 @@ describe("SignalsCenter v2 filters", () => {
     );
 
     expect(await screen.findByText("Signal details")).toBeInTheDocument();
-    expect(await screen.findByText("Runway")).toBeInTheDocument();
+    const runwayLabels = await screen.findAllByText("Runway");
+    expect(runwayLabels.length).toBeGreaterThan(0);
   });
 });

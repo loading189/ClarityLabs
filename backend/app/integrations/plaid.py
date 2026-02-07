@@ -2,14 +2,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
+import hashlib
+import json
 import os
-from typing import Optional, TYPE_CHECKING, Any
+from typing import Optional, TYPE_CHECKING, Any, Iterable
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.app.integrations.base import IngestResult, WebhookVerificationResult
 from backend.app.integrations.utils import upsert_raw_event, utcnow
-from backend.app.models import IntegrationConnection
+from backend.app.models import IntegrationConnection, RawEvent
+from backend.app.services import integration_connection_service
 from backend.app.services import audit_service
 
 
@@ -60,6 +63,49 @@ def _plaid_direction(amount: float) -> Optional[str]:
     if amount < 0:
         return "inflow"
     return None
+
+
+def _plaid_fingerprint(payload: dict) -> str:
+    serialized = json.dumps(payload, sort_keys=True, default=str)
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def _plaid_base_event_id(txn_id: str) -> str:
+    return f"plaid:{txn_id}"
+
+
+def _parse_plaid_version(source_event_id: str, base_id: str) -> Optional[int]:
+    if source_event_id == base_id:
+        return 1
+    prefix = f"{base_id}:v"
+    if source_event_id.startswith(prefix):
+        suffix = source_event_id[len(prefix):]
+        if suffix.isdigit():
+            return int(suffix)
+    return None
+
+
+def _collect_plaid_versions(
+    rows: Iterable[tuple[str, dict]],
+    base_id: str,
+) -> list[dict]:
+    versions: list[dict] = []
+    for source_event_id, payload in rows:
+        version = _parse_plaid_version(source_event_id, base_id)
+        if version is None:
+            continue
+        meta = payload.get("meta") if isinstance(payload, dict) else None
+        fingerprint = meta.get("event_fingerprint") if isinstance(meta, dict) else None
+        event_kind = meta.get("event_kind") if isinstance(meta, dict) else None
+        versions.append(
+            {
+                "source_event_id": source_event_id,
+                "version": version,
+                "fingerprint": fingerprint,
+                "event_kind": event_kind,
+            }
+        )
+    return versions
 
 
 @dataclass(frozen=True)
@@ -159,6 +205,7 @@ class PlaidAdapter:
         business_id: str,
         db: Session,
         transactions: list[dict],
+        event_kind: str,
     ) -> IngestResult:
         inserted_ids: list[str] = []
         skipped = 0
@@ -167,6 +214,7 @@ class PlaidAdapter:
             if not txn_id:
                 skipped += 1
                 continue
+            base_event_id = _plaid_base_event_id(txn_id)
             occurred_at = (
                 _parse_plaid_datetime(txn.get("datetime"))
                 or _parse_plaid_datetime(txn.get("authorized_datetime"))
@@ -181,7 +229,7 @@ class PlaidAdapter:
             if not category and isinstance(txn.get("category"), list) and txn["category"]:
                 category = txn["category"][0]
 
-            payload = {
+            payload_core = {
                 "type": "plaid.transaction",
                 "transaction": {
                     "transaction_id": txn_id,
@@ -200,15 +248,117 @@ class PlaidAdapter:
                 "direction": direction,
                 "category": category,
                 "provider": "plaid",
-                "ingested_at": utcnow().isoformat(),
             }
-            source_event_id = f"plaid:{txn_id}"
+            fingerprint = _plaid_fingerprint(payload_core)
+            existing_rows = db.execute(
+                select(RawEvent.source_event_id, RawEvent.payload).where(
+                    RawEvent.business_id == business_id,
+                    RawEvent.source == self.provider,
+                    RawEvent.source_event_id.like(f"{base_event_id}%"),
+                )
+            ).all()
+            versions = _collect_plaid_versions(existing_rows, base_event_id)
+            if any(version.get("fingerprint") == fingerprint for version in versions):
+                skipped += 1
+                continue
+            latest_version = max((version["version"] for version in versions), default=0)
+            next_version = latest_version + 1 if latest_version else 1
+            if next_version == 1:
+                source_event_id = base_event_id
+            else:
+                source_event_id = f"{base_event_id}:v{next_version}"
+            supersedes = None
+            if versions:
+                supersedes = max(versions, key=lambda row: row["version"])["source_event_id"]
+            payload = {
+                **payload_core,
+                "ingested_at": utcnow().isoformat(),
+                "meta": {
+                    "event_kind": event_kind,
+                    "event_version": next_version,
+                    "event_fingerprint": fingerprint,
+                    "source_event_base_id": base_event_id,
+                    "supersedes": supersedes,
+                },
+            }
             inserted = upsert_raw_event(
                 db,
                 business_id=business_id,
                 source=self.provider,
                 source_event_id=source_event_id,
                 occurred_at=occurred_at,
+                payload=payload,
+            )
+            if inserted:
+                inserted_ids.append(source_event_id)
+            else:
+                skipped += 1
+        return IngestResult(
+            provider=self.provider,
+            inserted_count=len(inserted_ids),
+            skipped_count=skipped,
+            source_event_ids=inserted_ids,
+        )
+
+    def ingest_removed_transactions(
+        self,
+        *,
+        business_id: str,
+        db: Session,
+        transactions: list[dict],
+    ) -> IngestResult:
+        inserted_ids: list[str] = []
+        skipped = 0
+        for txn in transactions:
+            txn_id = txn.get("transaction_id") or txn.get("id")
+            if not txn_id:
+                skipped += 1
+                continue
+            base_event_id = _plaid_base_event_id(txn_id)
+            tombstone_core = {
+                "type": "plaid.transaction.removed",
+                "transaction": {"transaction_id": txn_id},
+                "provider": "plaid",
+            }
+            fingerprint = _plaid_fingerprint(tombstone_core)
+            existing_rows = db.execute(
+                select(RawEvent.source_event_id, RawEvent.payload).where(
+                    RawEvent.business_id == business_id,
+                    RawEvent.source == self.provider,
+                    RawEvent.source_event_id.like(f"{base_event_id}%"),
+                )
+            ).all()
+            versions = _collect_plaid_versions(existing_rows, base_event_id)
+            if any(version.get("fingerprint") == fingerprint for version in versions):
+                skipped += 1
+                continue
+            latest_version = max((version["version"] for version in versions), default=0)
+            next_version = latest_version + 1 if latest_version else 1
+            if next_version == 1:
+                source_event_id = base_event_id
+            else:
+                source_event_id = f"{base_event_id}:v{next_version}"
+            supersedes = None
+            if versions:
+                supersedes = max(versions, key=lambda row: row["version"])["source_event_id"]
+            payload = {
+                **tombstone_core,
+                "ingested_at": utcnow().isoformat(),
+                "meta": {
+                    "event_kind": "removed",
+                    "event_version": next_version,
+                    "event_fingerprint": fingerprint,
+                    "source_event_base_id": base_event_id,
+                    "supersedes": supersedes,
+                    "is_removed": True,
+                },
+            }
+            inserted = upsert_raw_event(
+                db,
+                business_id=business_id,
+                source=self.provider,
+                source_event_id=source_event_id,
+                occurred_at=utcnow(),
                 payload=payload,
             )
             if inserted:
@@ -240,19 +390,54 @@ class PlaidAdapter:
             raise RuntimeError("Plaid connection missing access_token.")
 
         previous_cursor = connection.last_cursor
+        if since is not None:
+            connection.last_cursor = None
         sync_result = self.sync_transactions(
             access_token=connection.plaid_access_token,
             cursor=connection.last_cursor,
         )
-        ingest_result = self.ingest_transactions(
+        ingest_added = self.ingest_transactions(
             business_id=business_id,
             db=db,
-            transactions=[*sync_result.added, *sync_result.modified],
+            transactions=sync_result.added,
+            event_kind="added",
+        )
+        ingest_modified = self.ingest_transactions(
+            business_id=business_id,
+            db=db,
+            transactions=sync_result.modified,
+            event_kind="modified",
+        )
+        ingest_removed = self.ingest_removed_transactions(
+            business_id=business_id,
+            db=db,
+            transactions=sync_result.removed,
+        )
+        ingest_result = IngestResult(
+            provider=self.provider,
+            inserted_count=ingest_added.inserted_count + ingest_modified.inserted_count + ingest_removed.inserted_count,
+            skipped_count=ingest_added.skipped_count + ingest_modified.skipped_count + ingest_removed.skipped_count,
+            source_event_ids=[
+                *ingest_added.source_event_ids,
+                *ingest_modified.source_event_ids,
+                *ingest_removed.source_event_ids,
+            ],
         )
         connection.last_cursor = sync_result.next_cursor
         connection.last_cursor_at = utcnow()
         connection.updated_at = utcnow()
+        if ingest_result.source_event_ids:
+            latest = db.execute(
+                select(RawEvent.occurred_at, RawEvent.source_event_id)
+                .where(RawEvent.business_id == business_id, RawEvent.source == self.provider)
+                .order_by(RawEvent.occurred_at.desc(), RawEvent.source_event_id.desc())
+                .limit(1)
+            ).first()
+            if latest:
+                connection.last_ingested_at = latest[0]
+                connection.last_ingested_source_event_id = latest[1]
         db.add(connection)
+        integration_connection_service.mark_sync_success(connection)
 
         audit_service.log_audit_event(
             db,
@@ -263,6 +448,26 @@ class PlaidAdapter:
             before={"cursor": previous_cursor},
             after={"cursor": sync_result.next_cursor},
         )
+        if sync_result.modified:
+            audit_service.log_audit_event(
+                db,
+                business_id=business_id,
+                event_type="plaid_transactions_modified",
+                actor="system",
+                reason="plaid_sync",
+                before=None,
+                after={"count": len(sync_result.modified)},
+            )
+        if sync_result.removed:
+            audit_service.log_audit_event(
+                db,
+                business_id=business_id,
+                event_type="plaid_transactions_removed",
+                actor="system",
+                reason="plaid_sync",
+                before=None,
+                after={"count": len(sync_result.removed)},
+            )
 
         return ingest_result
 

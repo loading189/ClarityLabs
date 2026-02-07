@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { listIntegrationConnections, type IntegrationConnection } from "../../api/integrationConnections";
-import { createPlaidLinkToken, exchangePlaidPublicToken, syncPlaid } from "../../api/plaid";
+import {
+  listIntegrationConnections,
+  type IntegrationConnection,
+  syncIntegration,
+  replayIntegration,
+  disableIntegration,
+  enableIntegration,
+  disconnectIntegration,
+} from "../../api/integrationConnections";
+import { createPlaidLinkToken, exchangePlaidPublicToken } from "../../api/plaid";
 import styles from "./IntegrationsPage.module.css";
 
 function formatDate(value?: string | null) {
@@ -9,6 +17,12 @@ function formatDate(value?: string | null) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return "—";
   return parsed.toLocaleString();
+}
+
+function truncate(value?: string | null, max = 12) {
+  if (!value) return "—";
+  if (value.length <= max) return value;
+  return `${value.slice(0, max)}…`;
 }
 
 export default function IntegrationsPage() {
@@ -75,13 +89,89 @@ export default function IntegrationsPage() {
     setStatusMessage(null);
     setError(null);
     try {
-      await syncPlaid(businessId);
+      await syncIntegration(businessId, "plaid");
       setStatusMessage("Sync completed. Monitoring pulse ran.");
       await loadConnections();
     } catch (err: any) {
       setError(err?.message ?? "Failed to sync Plaid transactions.");
     }
   }, [businessId, loadConnections]);
+
+  const handleSyncConnection = useCallback(
+    async (provider: string) => {
+      if (!businessId) return;
+      setStatusMessage(null);
+      setError(null);
+      try {
+        await syncIntegration(businessId, provider);
+        setStatusMessage(`Sync completed for ${provider}.`);
+        await loadConnections();
+      } catch (err: any) {
+        setError(err?.message ?? `Failed to sync ${provider}.`);
+      }
+    },
+    [businessId, loadConnections]
+  );
+
+  const handleReplay = useCallback(
+    async (provider: string) => {
+      if (!businessId) return;
+      setStatusMessage(null);
+      setError(null);
+      try {
+        await replayIntegration(businessId, provider);
+        setStatusMessage(`Replay completed for ${provider}.`);
+        await loadConnections();
+      } catch (err: any) {
+        setError(err?.message ?? `Failed to replay ${provider} ingest.`);
+      }
+    },
+    [businessId, loadConnections]
+  );
+
+  const handleToggle = useCallback(
+    async (connection: IntegrationConnection) => {
+      if (!businessId) return;
+      setStatusMessage(null);
+      setError(null);
+      try {
+        if (connection.is_enabled) {
+          await disableIntegration(businessId, connection.provider);
+        } else {
+          await enableIntegration(businessId, connection.provider);
+        }
+        await loadConnections();
+      } catch (err: any) {
+        setError(err?.message ?? "Failed to toggle integration.");
+      }
+    },
+    [businessId, loadConnections]
+  );
+
+  const handleDisconnect = useCallback(
+    async (provider: string) => {
+      if (!businessId) return;
+      setStatusMessage(null);
+      setError(null);
+      try {
+        await disconnectIntegration(businessId, provider);
+        await loadConnections();
+      } catch (err: any) {
+        setError(err?.message ?? `Failed to disconnect ${provider}.`);
+      }
+    },
+    [businessId, loadConnections]
+  );
+
+  const handleCopy = useCallback(async (value?: string | null) => {
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      setStatusMessage("Copied to clipboard.");
+    } catch {
+      setError("Copy failed.");
+    }
+  }, []);
 
   return (
     <div className={styles.layout}>
@@ -128,20 +218,73 @@ export default function IntegrationsPage() {
       </section>
 
       <aside className={styles.panelCard}>
-        <h3>Connection health</h3>
-        <div className={styles.statusRow}>
-          <span className={styles.statusLabel}>Status</span>
-          <span className={styles.statusValue}>{plaidConnection?.status ?? "disconnected"}</span>
-
-          <span className={styles.statusLabel}>Last sync</span>
-          <span className={styles.statusValue}>{formatDate(plaidConnection?.last_sync_at)}</span>
-
-          <span className={styles.statusLabel}>Cursor</span>
-          <span className={styles.statusValue}>{plaidConnection?.last_cursor ?? "—"}</span>
-
-          <span className={styles.statusLabel}>Last error</span>
-          <span className={styles.statusValue}>{plaidConnection?.last_error ?? "—"}</span>
-        </div>
+        <h3>Connections</h3>
+        {connections.length ? (
+          <div className={styles.connectionList}>
+            {connections.map((connection) => (
+              <div key={connection.provider} className={styles.connectionCard}>
+                <div className={styles.connectionHeader}>
+                  <strong>{connection.provider}</strong>
+                  <span className={styles.statusBadge}>{connection.status}</span>
+                </div>
+                <div className={styles.connectionMeta}>
+                  <div>
+                    <span className={styles.statusLabel}>Last sync</span>
+                    <span className={styles.statusValue}>{formatDate(connection.last_sync_at)}</span>
+                  </div>
+                  <div>
+                    <span className={styles.statusLabel}>Last success</span>
+                    <span className={styles.statusValue}>{formatDate(connection.last_success_at)}</span>
+                  </div>
+                  <div>
+                    <span className={styles.statusLabel}>Last error</span>
+                    <span className={styles.statusValue}>{connection.last_error ?? "—"}</span>
+                  </div>
+                  <div>
+                    <span className={styles.statusLabel}>Provider cursor</span>
+                    <span className={styles.statusValue}>{truncate(connection.last_cursor)}</span>
+                    <button
+                      type="button"
+                      className={styles.copyButton}
+                      onClick={() => handleCopy(connection.last_cursor)}
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <div>
+                    <span className={styles.statusLabel}>Processing cursor</span>
+                    <span className={styles.statusValue}>
+                      {truncate(connection.last_processed_source_event_id)}
+                    </span>
+                    <button
+                      type="button"
+                      className={styles.copyButton}
+                      onClick={() => handleCopy(connection.last_processed_source_event_id)}
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+                <div className={styles.connectionActions}>
+                  <button type="button" onClick={() => handleSyncConnection(connection.provider)}>
+                    Sync now
+                  </button>
+                  <button type="button" onClick={() => handleReplay(connection.provider)}>
+                    Replay
+                  </button>
+                  <button type="button" onClick={() => handleToggle(connection)}>
+                    {connection.is_enabled ? "Disable" : "Enable"}
+                  </button>
+                  <button type="button" onClick={() => handleDisconnect(connection.provider)}>
+                    Disconnect
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className={styles.subtleText}>No integrations connected yet.</div>
+        )}
       </aside>
     </div>
   );

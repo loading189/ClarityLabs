@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Sequence
 
 from fastapi import HTTPException
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from backend.app.models import Business, IntegrationConnection, ProcessingEventState, RawEvent, TxnCategorization
@@ -14,6 +14,7 @@ from backend.app.services import audit_service, monitoring_service
 
 
 PROCESSING_STATUSES = ("ingested", "normalized", "categorized", "posted", "ignored", "error")
+REPROCESS_MODES = ("from_last_cursor", "from_beginning", "from_source_event_id")
 
 
 def utcnow() -> datetime:
@@ -164,6 +165,21 @@ def process_new_events(
             db.add(state)
             states_by_id[event.source_event_id] = state
 
+        payload = event.payload if isinstance(event.payload, dict) else {}
+        meta = payload.get("meta") if isinstance(payload, dict) else None
+        is_removed = False
+        if isinstance(meta, dict) and meta.get("is_removed") is True:
+            is_removed = True
+        if payload.get("type") == "plaid.transaction.removed":
+            is_removed = True
+        if is_removed:
+            state.status = "ignored"
+            state.last_processed_at = now
+            state.updated_at = now
+            db.add(state)
+            counts["skipped"] += 1
+            continue
+
         already_categorized = event.source_event_id in categorized_ids
         if state.status in ("categorized", "posted") and already_categorized:
             counts["skipped"] += 1
@@ -206,8 +222,36 @@ def process_new_events(
             state.status = "categorized"
             counts["categorized"] += 1
         else:
-            state.status = "normalized"
-            counts["normalized"] += 1
+            supersedes = None
+            if isinstance(meta, dict):
+                supersedes = meta.get("supersedes")
+            if supersedes:
+                existing_cat = db.execute(
+                    select(TxnCategorization).where(
+                        TxnCategorization.business_id == business_id,
+                        TxnCategorization.source_event_id == supersedes,
+                    )
+                ).scalar_one_or_none()
+                if existing_cat:
+                    db.add(
+                        TxnCategorization(
+                            business_id=business_id,
+                            source_event_id=event.source_event_id,
+                            category_id=existing_cat.category_id,
+                            confidence=existing_cat.confidence,
+                            source="supersede",
+                            note=f"supersedes {supersedes}",
+                        )
+                    )
+                    categorized_ids.add(event.source_event_id)
+                    state.status = "categorized"
+                    counts["categorized"] += 1
+                else:
+                    state.status = "normalized"
+                    counts["normalized"] += 1
+            else:
+                state.status = "normalized"
+                counts["normalized"] += 1
         state.last_processed_at = now
         state.updated_at = now
         db.add(state)
@@ -223,6 +267,24 @@ def process_new_events(
         after=dict(counts),
     )
     db.flush()
+
+    providers = {event.source for event in events}
+    for provider in providers:
+        latest_event = max(
+            (event for event in events if event.source == provider),
+            key=lambda ev: (ev.occurred_at, ev.source_event_id),
+        )
+        connection = db.execute(
+            select(IntegrationConnection).where(
+                IntegrationConnection.business_id == business_id,
+                IntegrationConnection.provider == provider,
+            )
+        ).scalar_one_or_none()
+        if connection:
+            connection.last_processed_at = latest_event.occurred_at
+            connection.last_processed_source_event_id = latest_event.source_event_id
+            connection.updated_at = now
+            db.add(connection)
 
     return {
         **counts,
@@ -296,4 +358,105 @@ def collect_ingestion_diagnostics(db: Session, business_id: str) -> Dict[str, An
             for row in connections
         ],
         "monitor_status": monitoring_service.get_monitor_status(db, business_id),
+    }
+
+
+def reprocess_pipeline(
+    db: Session,
+    *,
+    business_id: str,
+    mode: str = "from_last_cursor",
+    from_source_event_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    require_business(db, business_id)
+    if mode not in REPROCESS_MODES:
+        raise HTTPException(400, "invalid reprocess mode")
+
+    before_counts = {
+        "raw_events": int(
+            db.execute(
+                select(func.count()).select_from(RawEvent).where(RawEvent.business_id == business_id)
+            ).scalar_one()
+        ),
+        "categorized": int(
+            db.execute(
+                select(func.count())
+                .select_from(TxnCategorization)
+                .where(TxnCategorization.business_id == business_id)
+            ).scalar_one()
+        ),
+    }
+
+    if mode == "from_beginning":
+        db.execute(
+            delete(ProcessingEventState).where(ProcessingEventState.business_id == business_id)
+        )
+        db.execute(
+            delete(TxnCategorization).where(TxnCategorization.business_id == business_id)
+        )
+        db.flush()
+
+    source_event_ids = None
+    if mode == "from_source_event_id":
+        if not from_source_event_id:
+            raise HTTPException(400, "from_source_event_id required")
+        start_event = db.execute(
+            select(RawEvent).where(
+                RawEvent.business_id == business_id,
+                RawEvent.source_event_id == from_source_event_id,
+            )
+        ).scalar_one_or_none()
+        if not start_event:
+            raise HTTPException(404, "source_event_id not found")
+        source_event_ids = db.execute(
+            select(RawEvent.source_event_id)
+            .where(
+                RawEvent.business_id == business_id,
+                RawEvent.occurred_at >= start_event.occurred_at,
+            )
+            .order_by(RawEvent.occurred_at.asc(), RawEvent.source_event_id.asc())
+        ).scalars().all()
+
+    summary = process_new_events(
+        db,
+        business_id=business_id,
+        source_event_ids=source_event_ids,
+        limit=1000,
+    )
+    pulse_result = monitoring_service.pulse(db, business_id)
+
+    after_counts = {
+        "raw_events": before_counts["raw_events"],
+        "categorized": int(
+            db.execute(
+                select(func.count())
+                .select_from(TxnCategorization)
+                .where(TxnCategorization.business_id == business_id)
+            ).scalar_one()
+        ),
+    }
+
+    audit_row = audit_service.log_audit_event(
+        db,
+        business_id=business_id,
+        event_type="processing_reprocess",
+        actor="system",
+        reason="reprocess",
+        before=before_counts,
+        after={
+            "mode": mode,
+            "from_source_event_id": from_source_event_id,
+            "processing": summary,
+            "after_counts": after_counts,
+            "pulse": pulse_result,
+        },
+    )
+    db.commit()
+    return {
+        "mode": mode,
+        "before_counts": before_counts,
+        "after_counts": after_counts,
+        "processing": summary,
+        "pulse": pulse_result,
+        "audit_id": audit_row.id,
     }

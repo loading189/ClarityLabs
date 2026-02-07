@@ -63,16 +63,18 @@ def _mock_plaid_transport():
     sync_cursor2_sequence = [
         {
             "added": [],
-            "modified": [],
-            "removed": [],
-            "next_cursor": "cursor-2",
+            "modified": [
+                _transaction("txn-002", -250.0, "Daily Sales", "2025-01-03"),
+            ],
+            "removed": [{"transaction_id": "txn-001"}],
+            "next_cursor": "cursor-3",
             "has_more": False,
         },
         {
             "added": [_transaction("txn-004", 25.0, "Late Fees", "2025-01-05")],
             "modified": [],
             "removed": [],
-            "next_cursor": "cursor-3",
+            "next_cursor": "cursor-4",
             "has_more": False,
         },
     ]
@@ -182,11 +184,11 @@ def test_plaid_sandbox_sync_ingest_flow(client, db_session, monkeypatch):
     rows = db_session.execute(
         select(RawEvent).where(RawEvent.business_id == biz.id, RawEvent.source == "plaid")
     ).scalars().all()
-    assert len(rows) == 3
+    assert len(rows) == 5
 
     sync_third = client.post(f"/integrations/plaid/sync/{biz.id}")
     assert sync_third.status_code == 200
     rows = db_session.execute(
         select(RawEvent).where(RawEvent.business_id == biz.id, RawEvent.source == "plaid")
     ).scalars().all()
-    assert len(rows) == 4
+    assert len(rows) == 6

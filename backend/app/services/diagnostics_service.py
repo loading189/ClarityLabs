@@ -4,7 +4,7 @@ import logging
 from typing import Any, Dict, List
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from backend.app.models import (
@@ -13,6 +13,9 @@ from backend.app.models import (
     BusinessCategoryMap,
     Category,
     CategoryRule,
+    IntegrationConnection,
+    RawEvent,
+    TxnCategorization,
 )
 from backend.app.norma.ledger import LedgerIntegrityError, build_cash_ledger, check_ledger_integrity
 from backend.app.norma.normalize import NormalizedTransaction
@@ -172,3 +175,70 @@ def collect_diagnostics(db: Session, business_id: str) -> Dict[str, Any]:
 
 def collect_ingestion_diagnostics(db: Session, business_id: str) -> Dict[str, Any]:
     return processing_service.collect_ingestion_diagnostics(db, business_id)
+
+
+def collect_reconcile_report(db: Session, business_id: str) -> Dict[str, Any]:
+    require_business(db, business_id)
+
+    raw_events_total = int(
+        db.execute(
+            select(func.count()).select_from(RawEvent).where(RawEvent.business_id == business_id)
+        ).scalar_one()
+    )
+    categorized_total = int(
+        db.execute(
+            select(func.count())
+            .select_from(TxnCategorization)
+            .where(TxnCategorization.business_id == business_id)
+        ).scalar_one()
+    )
+    posted_total = len(fetch_posted_transactions(db, business_id))
+
+    latest_raw_event = db.execute(
+        select(RawEvent.occurred_at, RawEvent.source_event_id)
+        .where(RawEvent.business_id == business_id)
+        .order_by(RawEvent.occurred_at.desc(), RawEvent.source_event_id.desc())
+        .limit(1)
+    ).first()
+
+    connections = db.execute(
+        select(IntegrationConnection).where(IntegrationConnection.business_id == business_id)
+    ).scalars().all()
+
+    connection_summaries = []
+    for connection in connections:
+        stale_processing = False
+        if connection.last_ingested_at and connection.last_processed_at:
+            stale_processing = connection.last_processed_at < connection.last_ingested_at
+        elif connection.last_ingested_at and not connection.last_processed_at:
+            stale_processing = True
+        cursor_stale = connection.last_cursor and not connection.last_cursor_at
+        connection_summaries.append(
+            {
+                "provider": connection.provider,
+                "status": connection.status,
+                "provider_cursor": connection.last_cursor,
+                "provider_cursor_at": connection.last_cursor_at,
+                "last_ingested_at": connection.last_ingested_at,
+                "last_ingested_source_event_id": connection.last_ingested_source_event_id,
+                "last_processed_at": connection.last_processed_at,
+                "last_processed_source_event_id": connection.last_processed_source_event_id,
+                "mismatch_flags": {
+                    "processing_stale": stale_processing,
+                    "cursor_missing_timestamp": bool(cursor_stale),
+                },
+            }
+        )
+
+    return {
+        "counts": {
+            "raw_events": raw_events_total,
+            "posted_transactions": posted_total,
+            "categorized_transactions": categorized_total,
+        },
+        "latest_markers": {
+            "raw_event_occurred_at": latest_raw_event[0] if latest_raw_event else None,
+            "raw_event_source_event_id": latest_raw_event[1] if latest_raw_event else None,
+            "connections": connection_summaries,
+        },
+    }

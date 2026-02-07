@@ -8,6 +8,9 @@ import AssistantPage from "./AssistantPage";
 const fetchAssistantSummary = vi.fn();
 const postAssistantAction = vi.fn();
 const fetchIngestionDiagnostics = vi.fn();
+const fetchIngestionReconcile = vi.fn();
+const getAuditLog = vi.fn();
+const reprocessPipeline = vi.fn();
 const syncPlaid = vi.fn();
 
 vi.mock("../../api/assistantTools", () => ({
@@ -16,6 +19,15 @@ vi.mock("../../api/assistantTools", () => ({
 }));
 vi.mock("../../api/ingestionDiagnostics", () => ({
   fetchIngestionDiagnostics: (...args: unknown[]) => fetchIngestionDiagnostics(...args),
+}));
+vi.mock("../../api/ingestionReconcile", () => ({
+  fetchIngestionReconcile: (...args: unknown[]) => fetchIngestionReconcile(...args),
+}));
+vi.mock("../../api/audit", () => ({
+  getAuditLog: (...args: unknown[]) => getAuditLog(...args),
+}));
+vi.mock("../../api/processing", () => ({
+  reprocessPipeline: (...args: unknown[]) => reprocessPipeline(...args),
 }));
 vi.mock("../../api/plaid", () => ({
   syncPlaid: (...args: unknown[]) => syncPlaid(...args),
@@ -63,7 +75,13 @@ describe("AssistantPage", () => {
       connections: [],
       monitor_status: { stale: false, last_pulse_at: null, newest_event_at: null },
     });
+    fetchIngestionReconcile.mockResolvedValue({
+      counts: { raw_events: 0, posted_transactions: 0, categorized_transactions: 0 },
+      latest_markers: { raw_event_occurred_at: null, raw_event_source_event_id: null, connections: [] },
+    });
+    getAuditLog.mockResolvedValue({ items: [] });
     postAssistantAction.mockResolvedValue({ ok: true, result: {} });
+    reprocessPipeline.mockResolvedValue({ ok: true });
     syncPlaid.mockResolvedValue({ provider: "plaid", inserted: 0, skipped: 0 });
   });
 
@@ -76,6 +94,8 @@ describe("AssistantPage", () => {
     renderAssistant();
     await waitFor(() => expect(fetchAssistantSummary).toHaveBeenCalled());
     await waitFor(() => expect(fetchIngestionDiagnostics).toHaveBeenCalled());
+    await waitFor(() => expect(fetchIngestionReconcile).toHaveBeenCalled());
+    await waitFor(() => expect(getAuditLog).toHaveBeenCalled());
     expect(screen.getByTestId("location").textContent).toBe("/app/biz-1/assistant");
     expect(postAssistantAction).not.toHaveBeenCalled();
   });
@@ -107,11 +127,48 @@ describe("AssistantPage", () => {
       ],
       monitor_status: { stale: false, last_pulse_at: null, newest_event_at: null, gating_reason: null },
     });
+    fetchIngestionReconcile.mockResolvedValueOnce({
+      counts: { raw_events: 3, posted_transactions: 2, categorized_transactions: 2 },
+      latest_markers: {
+        raw_event_occurred_at: "2025-01-02T00:00:00Z",
+        raw_event_source_event_id: "evt-1",
+        connections: [
+          {
+            provider: "stripe",
+            status: "connected",
+            provider_cursor: "cursor-1",
+            provider_cursor_at: "2025-01-02T00:00:00Z",
+            last_ingested_at: "2025-01-02T00:00:00Z",
+            last_ingested_source_event_id: "evt-1",
+            last_processed_at: "2025-01-02T00:00:00Z",
+            last_processed_source_event_id: "evt-1",
+            mismatch_flags: { processing_stale: false, cursor_missing_timestamp: false },
+          },
+        ],
+      },
+    });
+    getAuditLog.mockResolvedValueOnce({
+      items: [
+        {
+          id: "audit-1",
+          business_id: "biz-1",
+          event_type: "processing_completed",
+          actor: "system",
+          reason: null,
+          source_event_id: null,
+          rule_id: null,
+          before_state: null,
+          after_state: null,
+          created_at: "2025-01-02T00:00:00Z",
+        },
+      ],
+    });
 
     renderAssistant();
 
     expect(await screen.findByText("Ingestion Health")).toBeInTheDocument();
-    expect(await screen.findByText("2")).toBeInTheDocument();
+    expect(await screen.findByText("3")).toBeInTheDocument();
+    expect(await screen.findByText("processing_completed")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /view ingestion diagnostics/i }));
     expect(await screen.findAllByText("Processing errors")).toHaveLength(2);
@@ -165,6 +222,19 @@ describe("AssistantPage", () => {
     await user.click(button);
 
     await waitFor(() => expect(postAssistantAction).toHaveBeenCalledWith("biz-1", "sync_integrations"));
+  });
+
+  it("runs ingestion sync and reprocess from health panel", async () => {
+    const user = userEvent.setup();
+    renderAssistant();
+
+    const syncButton = await screen.findByRole("button", { name: /run sync/i });
+    await user.click(syncButton);
+    await waitFor(() => expect(postAssistantAction).toHaveBeenCalledWith("biz-1", "sync_integrations"));
+
+    const reprocessButton = await screen.findByRole("button", { name: /reprocess/i });
+    await user.click(reprocessButton);
+    await waitFor(() => expect(reprocessPipeline).toHaveBeenCalledWith("biz-1", { mode: "from_last_cursor" }));
   });
 
   it("syncs Plaid from the getting started checklist", async () => {

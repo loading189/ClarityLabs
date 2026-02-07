@@ -76,6 +76,79 @@ def _posted_txn_stmt(
     return stmt
 
 
+def _event_base_id(event: RawEvent) -> str:
+    payload = event.payload if isinstance(event.payload, dict) else {}
+    meta = payload.get("meta") if isinstance(payload, dict) else None
+    if isinstance(meta, dict):
+        base_id = meta.get("source_event_base_id")
+        if isinstance(base_id, str) and base_id.strip():
+            return base_id
+    source_event_id = event.source_event_id
+    if ":v" in source_event_id:
+        return source_event_id.split(":v", 1)[0]
+    return source_event_id
+
+
+def _event_version(event: RawEvent) -> Optional[int]:
+    payload = event.payload if isinstance(event.payload, dict) else {}
+    meta = payload.get("meta") if isinstance(payload, dict) else None
+    if isinstance(meta, dict):
+        version = meta.get("event_version")
+        if isinstance(version, int):
+            return version
+        if isinstance(version, str) and version.isdigit():
+            return int(version)
+    if event.source_event_id and ":v" in event.source_event_id:
+        suffix = event.source_event_id.split(":v", 1)[1]
+        if suffix.isdigit():
+            return int(suffix)
+    return None
+
+
+def _event_is_removed(event: RawEvent) -> bool:
+    payload = event.payload if isinstance(event.payload, dict) else {}
+    meta = payload.get("meta") if isinstance(payload, dict) else None
+    if isinstance(meta, dict) and meta.get("is_removed") is True:
+        return True
+    event_type = payload.get("type") if isinstance(payload, dict) else None
+    return event_type == "plaid.transaction.removed"
+
+
+def _select_current_rows(
+    rows: list[tuple[TxnCategorization, RawEvent, Category, Account]],
+    *,
+    order_desc: bool,
+    removed_base_ids: Optional[set[str]] = None,
+):
+    latest_by_base: dict[str, tuple[TxnCategorization, RawEvent, Category, Account]] = {}
+    for row in rows:
+        _, ev, _, _ = row
+        base_id = _event_base_id(ev)
+        if removed_base_ids and base_id in removed_base_ids:
+            continue
+        if _event_is_removed(ev):
+            continue
+        current = latest_by_base.get(base_id)
+        if not current:
+            latest_by_base[base_id] = row
+            continue
+        _, current_ev, _, _ = current
+        candidate_version = _event_version(ev) or 0
+        current_version = _event_version(current_ev) or 0
+        if candidate_version != current_version:
+            if candidate_version > current_version:
+                latest_by_base[base_id] = row
+            continue
+        if (ev.occurred_at, ev.source_event_id) > (current_ev.occurred_at, current_ev.source_event_id):
+            latest_by_base[base_id] = row
+    ordered = list(latest_by_base.values())
+    ordered.sort(
+        key=lambda row: (row[1].occurred_at, row[1].source_event_id),
+        reverse=order_desc,
+    )
+    return ordered
+
+
 def fetch_posted_transaction_rows(
     db: Session,
     business_id: str,
@@ -94,7 +167,15 @@ def fetch_posted_transaction_rows(
         order_desc=order_desc,
         limit=limit,
     )
-    return db.execute(stmt).all()
+    rows = db.execute(stmt).all()
+    removed_base_ids = None
+    removed_events = db.execute(
+        select(RawEvent).where(RawEvent.business_id == business_id)
+    ).scalars().all()
+    removed_base_ids = {
+        _event_base_id(event) for event in removed_events if _event_is_removed(event)
+    }
+    return _select_current_rows(rows, order_desc=order_desc, removed_base_ids=removed_base_ids)
 
 
 def fetch_posted_transactions(
@@ -207,7 +288,32 @@ def fetch_uncategorized_raw_events(
     stmt = stmt.order_by(RawEvent.occurred_at.desc(), RawEvent.source_event_id.desc())
     if limit:
         stmt = stmt.limit(limit)
-    return db.execute(stmt).scalars().all()
+    rows = db.execute(stmt).scalars().all()
+    removed_base_ids = {
+        _event_base_id(event) for event in rows if _event_is_removed(event)
+    }
+    latest_by_base: dict[str, RawEvent] = {}
+    for event in rows:
+        base_id = _event_base_id(event)
+        if base_id in removed_base_ids:
+            continue
+        current = latest_by_base.get(base_id)
+        if not current:
+            latest_by_base[base_id] = event
+            continue
+        candidate_version = _event_version(event) or 0
+        current_version = _event_version(current) or 0
+        if candidate_version != current_version:
+            if candidate_version > current_version:
+                latest_by_base[base_id] = event
+            continue
+        if (event.occurred_at, event.source_event_id) > (current.occurred_at, current.source_event_id):
+            latest_by_base[base_id] = event
+    return sorted(
+        latest_by_base.values(),
+        key=lambda ev: (ev.occurred_at, ev.source_event_id),
+        reverse=True,
+    )
 
 
 def count_uncategorized_raw_events(
@@ -237,4 +343,25 @@ def count_uncategorized_raw_events(
         stmt = stmt.where(RawEvent.occurred_at >= start_dt)
     if end_dt is not None:
         stmt = stmt.where(RawEvent.occurred_at <= end_dt)
-    return int(db.execute(stmt).scalar_one())
+    rows = db.execute(stmt).scalars().all()
+    removed_base_ids = {
+        _event_base_id(event) for event in rows if _event_is_removed(event)
+    }
+    latest_by_base: dict[str, RawEvent] = {}
+    for event in rows:
+        base_id = _event_base_id(event)
+        if base_id in removed_base_ids:
+            continue
+        current = latest_by_base.get(base_id)
+        if not current:
+            latest_by_base[base_id] = event
+            continue
+        candidate_version = _event_version(event) or 0
+        current_version = _event_version(current) or 0
+        if candidate_version != current_version:
+            if candidate_version > current_version:
+                latest_by_base[base_id] = event
+            continue
+        if (event.occurred_at, event.source_event_id) > (current.occurred_at, current.source_event_id):
+            latest_by_base[base_id] = event
+    return len(latest_by_base)

@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from backend.app.db import get_db
 from backend.app.integrations.plaid import PlaidAdapter, plaid_environment, plaid_is_configured
 from backend.app.models import Business, IntegrationConnection
-from backend.app.services import audit_service
+from backend.app.services import audit_service, integration_connection_service
 from backend.app.services.ingest_orchestrator import process_ingested_events
 
 
@@ -50,10 +50,18 @@ class PlaidConnectionOut(BaseModel):
     business_id: str
     provider: str
     status: str
+    is_enabled: bool
     connected_at: Optional[datetime]
+    disconnected_at: Optional[datetime]
     last_sync_at: Optional[datetime]
+    last_success_at: Optional[datetime]
+    last_error_at: Optional[datetime]
     last_cursor: Optional[str] = None
     last_cursor_at: Optional[datetime] = None
+    last_ingested_at: Optional[datetime] = None
+    last_ingested_source_event_id: Optional[str] = None
+    last_processed_at: Optional[datetime] = None
+    last_processed_source_event_id: Optional[str] = None
     last_ingest_counts: Optional[dict] = None
     last_error: Optional[str] = None
     plaid_item_id: Optional[str] = None
@@ -132,6 +140,8 @@ def exchange_public_token(
             "plaid_environment": existing.plaid_environment,
         }
         existing.status = "connected"
+        existing.is_enabled = True
+        existing.disconnected_at = None
         existing.connected_at = existing.connected_at or utcnow()
         existing.plaid_access_token = access_token
         existing.plaid_item_id = item_id
@@ -139,13 +149,16 @@ def exchange_public_token(
         existing.last_cursor = None
         existing.last_cursor_at = None
         existing.last_error = None
+        existing.last_error_at = None
         existing.updated_at = utcnow()
+        integration_connection_service.refresh_connection_status(existing)
         row = existing
     else:
         row = IntegrationConnection(
             business_id=business_id,
             provider="plaid",
             status="connected",
+            is_enabled=True,
             connected_at=utcnow(),
             plaid_access_token=access_token,
             plaid_item_id=item_id,
@@ -183,6 +196,8 @@ def sync_plaid(business_id: str, db: Session = Depends(get_db)):
     ).scalar_one_or_none()
     if not connection or not connection.plaid_access_token:
         raise HTTPException(404, "Plaid connection not found.")
+    if not connection.is_enabled or connection.status == "disconnected":
+        raise HTTPException(400, "Plaid connection disabled or disconnected.")
 
     before_cursor = connection.last_cursor
     try:
@@ -193,8 +208,7 @@ def sync_plaid(business_id: str, db: Session = Depends(get_db)):
             business_id=business_id,
             source_event_ids=list(result.source_event_ids),
         )
-        connection.last_sync_at = utcnow()
-        connection.last_error = None
+        integration_connection_service.mark_sync_success(connection)
         connection.last_ingest_counts = {
             "inserted": result.inserted_count,
             "skipped": result.skipped_count,
@@ -216,7 +230,7 @@ def sync_plaid(business_id: str, db: Session = Depends(get_db)):
         )
         db.commit()
     except Exception as exc:  # noqa: BLE001
-        connection.last_error = str(exc)
+        integration_connection_service.mark_sync_error(connection, error=str(exc))
         connection.updated_at = utcnow()
         db.add(connection)
         db.commit()

@@ -76,6 +76,35 @@ class IngestionDiagnosticsOut(BaseModel):
     monitor_status: Dict[str, Any]
 
 
+class ReconcileConnectionOut(BaseModel):
+    provider: str
+    status: str
+    provider_cursor: Optional[str] = None
+    provider_cursor_at: Optional[datetime] = None
+    last_ingested_at: Optional[datetime] = None
+    last_ingested_source_event_id: Optional[str] = None
+    last_processed_at: Optional[datetime] = None
+    last_processed_source_event_id: Optional[str] = None
+    mismatch_flags: Dict[str, bool]
+
+
+class ReconcileLatestMarkersOut(BaseModel):
+    raw_event_occurred_at: Optional[datetime] = None
+    raw_event_source_event_id: Optional[str] = None
+    connections: List[ReconcileConnectionOut]
+
+
+class ReconcileCountsOut(BaseModel):
+    raw_events: int
+    posted_transactions: int
+    categorized_transactions: int
+
+
+class ReconcileOut(BaseModel):
+    counts: ReconcileCountsOut
+    latest_markers: ReconcileLatestMarkersOut
+
+
 @router.get("/{business_id}", response_model=Union[DiagnosticsOut, DiagnosticsErrorOut])
 def get_diagnostics(business_id: str, db: Session = Depends(get_db)):
     try:
@@ -94,6 +123,19 @@ def get_ingestion_diagnostics(business_id: str, db: Session = Depends(get_db)):
     try:
         payload = diagnostics_service.collect_ingestion_diagnostics(db, business_id)
         return IngestionDiagnosticsOut(**payload)
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        return DiagnosticsErrorOut(
+            status="error",
+            message=str(exc),
+            details={"type": exc.__class__.__name__},
+        )
+
+
+@router.get("/reconcile/{business_id}", response_model=Union[ReconcileOut, DiagnosticsErrorOut])
+def get_reconcile_report(business_id: str, db: Session = Depends(get_db)):
+    try:
+        payload = diagnostics_service.collect_reconcile_report(db, business_id)
+        return ReconcileOut(**payload)
     except Exception as exc:  # pragma: no cover - defensive fallback
         return DiagnosticsErrorOut(
             status="error",

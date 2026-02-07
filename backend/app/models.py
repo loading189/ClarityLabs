@@ -207,6 +207,9 @@ class RawEvent(Base):
     Immutable vendor event log. This is your replayable truth.
     """
     __tablename__ = "raw_events"
+    __table_args__ = (
+        UniqueConstraint("business_id", "source", "source_event_id", name="uq_raw_events_business_source_event"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
 
@@ -334,10 +337,18 @@ class IntegrationConnection(Base):
     )
     provider: Mapped[str] = mapped_column(String(40), nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="connected")
+    is_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     connected_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    disconnected_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     last_sync_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_success_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     last_cursor: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     last_cursor_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_ingested_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_ingested_source_event_id: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    last_processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_processed_source_event_id: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     last_webhook_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     last_ingest_counts: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     last_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
