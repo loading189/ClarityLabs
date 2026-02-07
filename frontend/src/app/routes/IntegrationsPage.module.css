@@ -1,0 +1,91 @@
+.layout {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+}
+
+.panelCard {
+  background: #101828;
+  border: 1px solid #1d2939;
+  border-radius: 16px;
+  padding: 20px;
+  color: #e4e7ec;
+}
+
+.panelCard h2,
+.panelCard h3 {
+  margin: 0 0 12px 0;
+}
+
+.subtleText {
+  color: #98a2b3;
+  font-size: 0.9rem;
+}
+
+.fieldRow {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.fieldRow input {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #344054;
+  background: #0b111f;
+  color: #f2f4f7;
+}
+
+.button {
+  background: #335cff;
+  border: none;
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.buttonSecondary {
+  background: transparent;
+  border: 1px solid #335cff;
+  color: #d0d5dd;
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.buttonGroup {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.statusRow {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(0, 2fr);
+  gap: 8px 16px;
+  margin-top: 12px;
+  font-size: 0.95rem;
+}
+
+.statusLabel {
+  color: #98a2b3;
+}
+
+.statusValue {
+  color: #f2f4f7;
+  word-break: break-word;
+}
+
+.error {
+  margin-top: 12px;
+  color: #fda29b;
+}
+
+.success {
+  margin-top: 12px;
+  color: #6ce9a6;
+}
