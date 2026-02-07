@@ -8,6 +8,7 @@ import AssistantPage from "./AssistantPage";
 const fetchAssistantSummary = vi.fn();
 const postAssistantAction = vi.fn();
 const fetchIngestionDiagnostics = vi.fn();
+const syncPlaid = vi.fn();
 
 vi.mock("../../api/assistantTools", () => ({
   fetchAssistantSummary: (...args: unknown[]) => fetchAssistantSummary(...args),
@@ -15,6 +16,9 @@ vi.mock("../../api/assistantTools", () => ({
 }));
 vi.mock("../../api/ingestionDiagnostics", () => ({
   fetchIngestionDiagnostics: (...args: unknown[]) => fetchIngestionDiagnostics(...args),
+}));
+vi.mock("../../api/plaid", () => ({
+  syncPlaid: (...args: unknown[]) => syncPlaid(...args),
 }));
 
 function LocationDisplay() {
@@ -60,6 +64,7 @@ describe("AssistantPage", () => {
       monitor_status: { stale: false, last_pulse_at: null, newest_event_at: null },
     });
     postAssistantAction.mockResolvedValue({ ok: true, result: {} });
+    syncPlaid.mockResolvedValue({ provider: "plaid", inserted: 0, skipped: 0 });
   });
 
   afterEach(() => {
@@ -160,5 +165,24 @@ describe("AssistantPage", () => {
     await user.click(button);
 
     await waitFor(() => expect(postAssistantAction).toHaveBeenCalledWith("biz-1", "sync_integrations"));
+  });
+
+  it("syncs Plaid from the getting started checklist", async () => {
+    const user = userEvent.setup();
+    fetchAssistantSummary.mockResolvedValue({
+      business_id: "biz-1",
+      integrations: [{ provider: "plaid", status: "connected" }],
+      monitor_status: { stale: false, gated: false },
+      open_signals: 0,
+      uncategorized_count: 0,
+      audit_events: [],
+      top_vendors: [],
+    });
+
+    renderAssistant();
+    const button = await screen.findByRole("button", { name: /sync now/i });
+    await user.click(button);
+
+    await waitFor(() => expect(syncPlaid).toHaveBeenCalledWith("biz-1"));
   });
 });

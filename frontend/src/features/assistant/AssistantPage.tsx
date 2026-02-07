@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { fetchAssistantSummary, postAssistantAction, type AssistantSummary } from "../../api/assistantTools";
 import { fetchIngestionDiagnostics, type IngestionDiagnostics } from "../../api/ingestionDiagnostics";
+import { syncPlaid } from "../../api/plaid";
 import { useAppState } from "../../app/state/appState";
 import styles from "./AssistantPage.module.css";
 import IngestionDiagnosticsDrawer from "./IngestionDiagnosticsDrawer";
@@ -45,6 +46,7 @@ export default function AssistantPage() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [plaidSyncing, setPlaidSyncing] = useState(false);
 
   useEffect(() => setActiveBusinessId(businessId || null), [businessId, setActiveBusinessId]);
 
@@ -97,6 +99,7 @@ export default function AssistantPage() {
   }, [loadIngestionDiagnostics]);
 
   const processingErrorCount = ingestionDiagnostics?.status_counts?.error;
+  const plaidIntegration = summary?.integrations?.find((row) => row.provider === "plaid");
   const latestCursor = useMemo(() => {
     if (!ingestionDiagnostics?.connections?.length) return null;
     const sorted = [...ingestionDiagnostics.connections].sort((a, b) => {
@@ -176,6 +179,22 @@ export default function AssistantPage() {
     [appendMessage, businessId, loadSummary, navigate]
   );
 
+  const syncPlaidNow = useCallback(async () => {
+    if (!businessId) return;
+    setPlaidSyncing(true);
+    setError(null);
+    try {
+      await syncPlaid(businessId);
+      await loadSummary();
+      await loadIngestionDiagnostics();
+      appendMessage("assistant", "Plaid sync completed.");
+    } catch (err: any) {
+      setError(err?.message ?? "Plaid sync failed.");
+    } finally {
+      setPlaidSyncing(false);
+    }
+  }, [appendMessage, businessId, loadIngestionDiagnostics, loadSummary]);
+
   return (
     <div className={styles.layout}>
       <section className={styles.chatPane}>
@@ -218,6 +237,41 @@ export default function AssistantPage() {
       </section>
 
       <aside className={styles.actionsPane}>
+        <div className={styles.panelCard}>
+          <h3>Getting Started with Live Data</h3>
+          <ul className={styles.checklist}>
+            <li className={styles.checklistItem}>
+              <span>
+                Connect Plaid Sandbox
+                <span className={styles.subtleText}>
+                  {plaidIntegration?.status === "connected" ? " (connected)" : " (not connected)"}
+                </span>
+              </span>
+              <button type="button" onClick={() => navigate(`/app/${businessId}/integrations`)}>
+                Open integrations
+              </button>
+            </li>
+            <li className={styles.checklistItem}>
+              <span>Sync transactions</span>
+              <button type="button" onClick={syncPlaidNow} disabled={!plaidIntegration || plaidSyncing}>
+                {plaidSyncing ? "Syncing..." : "Sync now"}
+              </button>
+            </li>
+            <li className={styles.checklistItem}>
+              <span>Review uncategorized</span>
+              <button type="button" onClick={() => navigate(`/app/${businessId}/categorize`)}>
+                Open categorize
+              </button>
+            </li>
+            <li className={styles.checklistItem}>
+              <span>Run monitoring pulse</span>
+              <button type="button" onClick={() => runAction("run_pulse")} disabled={loading}>
+                Run pulse
+              </button>
+            </li>
+          </ul>
+        </div>
+
         <div className={styles.panelCard}>
           <h3>Actions</h3>
           <div className={styles.buttonGroup}>

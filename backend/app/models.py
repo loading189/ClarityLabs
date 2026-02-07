@@ -342,6 +342,9 @@ class IntegrationConnection(Base):
     last_ingest_counts: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     last_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     config_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    plaid_access_token: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    plaid_item_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    plaid_environment: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
