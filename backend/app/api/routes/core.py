@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.coa_templates import DEFAULT_COA
 from backend.app.db import get_db
+from backend.app.integrations.utils import upsert_raw_event
 from backend.app.models import Account, Business, Organization, RawEvent
 from backend.app.norma.merchant import merchant_key
 from backend.app.services import categorize_service
@@ -181,28 +182,26 @@ def list_accounts(business_id: str, db: Session = Depends(get_db)):
 
 @router.post("/raw_events")
 def ingest_raw_event(req: RawEventIn, db: Session = Depends(get_db)):
-    exists = db.execute(
-        select(RawEvent.id).where(
-            RawEvent.business_id == req.business_id,
-            RawEvent.source == req.source,
-            RawEvent.source_event_id == req.source_event_id,
-        )
-    ).first()
-
-    if exists:
-        return {"status": "duplicate"}
-
-    ev = RawEvent(
+    inserted = upsert_raw_event(
+        db,
         business_id=req.business_id,
         source=req.source,
         source_event_id=req.source_event_id,
         occurred_at=req.occurred_at,
         payload=req.payload,
     )
-    db.add(ev)
     db.commit()
-    db.refresh(ev)
-    return {"status": "ok", "raw_event_id": ev.id}
+    if not inserted:
+        return {"status": "duplicate"}
+
+    row_id = db.execute(
+        select(RawEvent.id).where(
+            RawEvent.business_id == req.business_id,
+            RawEvent.source == req.source,
+            RawEvent.source_event_id == req.source_event_id,
+        )
+    ).scalar_one()
+    return {"status": "ok", "raw_event_id": row_id}
 
 
 # ----------------------------

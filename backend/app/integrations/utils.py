@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from backend.app.models import RawEvent
@@ -32,13 +33,18 @@ def upsert_raw_event(
     if existing:
         return False
 
-    db.add(
-        RawEvent(
-            business_id=business_id,
-            source=source,
-            source_event_id=source_event_id,
-            occurred_at=occurred_at or utcnow(),
-            payload=payload,
-        )
-    )
+    try:
+        with db.begin_nested():
+            db.add(
+                RawEvent(
+                    business_id=business_id,
+                    source=source,
+                    source_event_id=source_event_id,
+                    occurred_at=occurred_at or utcnow(),
+                    payload=payload,
+                )
+            )
+            db.flush()
+    except IntegrityError:
+        return False
     return True

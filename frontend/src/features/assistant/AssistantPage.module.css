@@ -196,6 +196,22 @@
   color: var(--text-muted);
 }
 
+.subsection {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.subsection h4 {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .emptyState {
   font-size: 13px;
   color: var(--text-muted);

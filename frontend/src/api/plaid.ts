@@ -12,10 +12,18 @@ export type PlaidExchangeResponse = {
     business_id: string;
     provider: string;
     status: string;
+    is_enabled: boolean;
     connected_at?: string | null;
+    disconnected_at?: string | null;
     last_sync_at?: string | null;
+    last_success_at?: string | null;
+    last_error_at?: string | null;
     last_cursor?: string | null;
     last_cursor_at?: string | null;
+    last_ingested_at?: string | null;
+    last_ingested_source_event_id?: string | null;
+    last_processed_at?: string | null;
+    last_processed_source_event_id?: string | null;
     last_ingest_counts?: { inserted?: number; skipped?: number } | null;
     last_error?: string | null;
     plaid_item_id?: string | null;

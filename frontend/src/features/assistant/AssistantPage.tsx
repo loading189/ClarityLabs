@@ -2,7 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { fetchAssistantSummary, postAssistantAction, type AssistantSummary } from "../../api/assistantTools";
+import { getAuditLog, type AuditLogOut } from "../../api/audit";
 import { fetchIngestionDiagnostics, type IngestionDiagnostics } from "../../api/ingestionDiagnostics";
+import { fetchIngestionReconcile, type IngestionReconcile } from "../../api/ingestionReconcile";
+import { reprocessPipeline } from "../../api/processing";
 import { syncPlaid } from "../../api/plaid";
 import { useAppState } from "../../app/state/appState";
 import styles from "./AssistantPage.module.css";
@@ -42,6 +45,8 @@ export default function AssistantPage() {
   const [ingestionDiagnostics, setIngestionDiagnostics] = useState<IngestionDiagnostics | null>(null);
   const [ingestionLoading, setIngestionLoading] = useState(false);
   const [ingestionError, setIngestionError] = useState<string | null>(null);
+  const [ingestionReconcile, setIngestionReconcile] = useState<IngestionReconcile | null>(null);
+  const [auditEvents, setAuditEvents] = useState<AuditLogOut[]>([]);
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -98,6 +103,48 @@ export default function AssistantPage() {
     return () => controller.abort();
   }, [loadIngestionDiagnostics]);
 
+  const loadIngestionReconcile = useCallback(
+    async (signal?: AbortSignal) => {
+      if (!businessId) return;
+      try {
+        const data = await fetchIngestionReconcile(businessId, signal);
+        if (signal?.aborted) return;
+        setIngestionReconcile(data);
+      } catch {
+        if (signal?.aborted) return;
+        setIngestionReconcile(null);
+      }
+    },
+    [businessId]
+  );
+
+  const loadAuditEvents = useCallback(
+    async (signal?: AbortSignal) => {
+      if (!businessId) return;
+      try {
+        const data = await getAuditLog(businessId, { limit: 10 });
+        if (signal?.aborted) return;
+        const filtered = data.items.filter((item) =>
+          ["ingest", "processing", "plaid", "integration"].some((token) =>
+            item.event_type.toLowerCase().includes(token)
+          )
+        );
+        setAuditEvents(filtered.slice(0, 5));
+      } catch {
+        if (signal?.aborted) return;
+        setAuditEvents([]);
+      }
+    },
+    [businessId]
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadIngestionReconcile(controller.signal);
+    void loadAuditEvents(controller.signal);
+    return () => controller.abort();
+  }, [loadAuditEvents, loadIngestionReconcile]);
+
   const processingErrorCount = ingestionDiagnostics?.status_counts?.error;
   const plaidIntegration = summary?.integrations?.find((row) => row.provider === "plaid");
   const latestCursor = useMemo(() => {
@@ -118,6 +165,7 @@ export default function AssistantPage() {
     });
     return sorted[0];
   }, [ingestionDiagnostics]);
+  const reconcileConnections = ingestionReconcile?.latest_markers?.connections ?? [];
 
   const suggestedActions = useMemo(() => {
     if (!summary) return [];
@@ -170,14 +218,53 @@ export default function AssistantPage() {
           appendMessage("assistant", `Action "${actionType}" completed.`);
         }
         await loadSummary();
+        await loadIngestionDiagnostics();
+        await loadIngestionReconcile();
+        await loadAuditEvents();
       } catch (err: any) {
         setError(err?.message ?? "Action failed.");
       } finally {
         setLoading(false);
       }
     },
-    [appendMessage, businessId, loadSummary, navigate]
+    [appendMessage, businessId, loadAuditEvents, loadIngestionDiagnostics, loadIngestionReconcile, loadSummary, navigate]
   );
+
+  const runIngestionSync = useCallback(async () => {
+    if (!businessId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await postAssistantAction(businessId, "sync_integrations");
+      await loadSummary();
+      await loadIngestionDiagnostics();
+      await loadIngestionReconcile();
+      await loadAuditEvents();
+      appendMessage("assistant", "Integrations sync completed.");
+    } catch (err: any) {
+      setError(err?.message ?? "Integrations sync failed.");
+    } finally {
+      setLoading(false);
+    }
+  }, [appendMessage, businessId, loadAuditEvents, loadIngestionDiagnostics, loadIngestionReconcile, loadSummary]);
+
+  const runReprocess = useCallback(async () => {
+    if (!businessId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await reprocessPipeline(businessId, { mode: "from_last_cursor" });
+      await loadSummary();
+      await loadIngestionDiagnostics();
+      await loadIngestionReconcile();
+      await loadAuditEvents();
+      appendMessage("assistant", "Reprocess completed.");
+    } catch (err: any) {
+      setError(err?.message ?? "Reprocess failed.");
+    } finally {
+      setLoading(false);
+    }
+  }, [appendMessage, businessId, loadAuditEvents, loadIngestionDiagnostics, loadIngestionReconcile, loadSummary]);
 
   const syncPlaidNow = useCallback(async () => {
     if (!businessId) return;
@@ -187,13 +274,15 @@ export default function AssistantPage() {
       await syncPlaid(businessId);
       await loadSummary();
       await loadIngestionDiagnostics();
+      await loadIngestionReconcile();
+      await loadAuditEvents();
       appendMessage("assistant", "Plaid sync completed.");
     } catch (err: any) {
       setError(err?.message ?? "Plaid sync failed.");
     } finally {
       setPlaidSyncing(false);
     }
-  }, [appendMessage, businessId, loadIngestionDiagnostics, loadSummary]);
+  }, [appendMessage, businessId, loadAuditEvents, loadIngestionDiagnostics, loadIngestionReconcile, loadSummary]);
 
   return (
     <div className={styles.layout}>
@@ -316,8 +405,20 @@ export default function AssistantPage() {
           <h3>Ingestion Health</h3>
           <div className={styles.statusGrid}>
             <div>
-              <span className={styles.statusLabel}>Uncategorized</span>
-              <span className={styles.statusValue}>{summary?.uncategorized_count ?? "—"}</span>
+              <span className={styles.statusLabel}>Raw events</span>
+              <span className={styles.statusValue}>{ingestionReconcile?.counts?.raw_events ?? "—"}</span>
+            </div>
+            <div>
+              <span className={styles.statusLabel}>Posted txns</span>
+              <span className={styles.statusValue}>
+                {ingestionReconcile?.counts?.posted_transactions ?? "—"}
+              </span>
+            </div>
+            <div>
+              <span className={styles.statusLabel}>Categorized</span>
+              <span className={styles.statusValue}>
+                {ingestionReconcile?.counts?.categorized_transactions ?? "—"}
+              </span>
             </div>
             <div>
               <span className={styles.statusLabel}>Processing errors</span>
@@ -332,9 +433,47 @@ export default function AssistantPage() {
               <span className={styles.statusValue}>{formatDate(latestWebhook?.last_webhook_at)}</span>
             </div>
           </div>
-          <button type="button" onClick={() => setDiagnosticsOpen(true)} className={styles.secondaryButton}>
-            View ingestion diagnostics
-          </button>
+          <div className={styles.buttonGroup}>
+            <button type="button" onClick={runIngestionSync} disabled={loading}>
+              Run sync
+            </button>
+            <button type="button" onClick={runReprocess} disabled={loading}>
+              Reprocess
+            </button>
+            <button type="button" onClick={() => setDiagnosticsOpen(true)} className={styles.secondaryButton}>
+              View ingestion diagnostics
+            </button>
+          </div>
+          <div className={styles.subsection}>
+            <h4>Reconcile flags</h4>
+            {reconcileConnections.length ? (
+              <ul className={styles.list}>
+                {reconcileConnections.map((row) => (
+                  <li key={row.provider}>
+                    <strong>{row.provider}</strong> ·{" "}
+                    {row.mismatch_flags.processing_stale ? "Processing stale" : "Processing fresh"} ·{" "}
+                    {row.mismatch_flags.cursor_missing_timestamp ? "Cursor missing timestamp" : "Cursor ok"}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className={styles.subtleText}>No reconcile data yet.</div>
+            )}
+          </div>
+          <div className={styles.subsection}>
+            <h4>Recent ingest/processing audits</h4>
+            {auditEvents.length ? (
+              <ul className={styles.list}>
+                {auditEvents.map((event) => (
+                  <li key={event.id}>
+                    <strong>{event.event_type}</strong> · {formatDate(event.created_at)}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className={styles.subtleText}>No recent ingest audits.</div>
+            )}
+          </div>
         </div>
 
         <div className={styles.panelCard}>

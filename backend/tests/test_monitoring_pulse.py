@@ -96,6 +96,40 @@ def _add_raw_event(
     return event
 
 
+def _add_versioned_plaid_event(
+    db_session,
+    business_id: str,
+    source_event_id: str,
+    occurred_at: datetime,
+    amount: float,
+    base_id: str,
+    version: int,
+    *,
+    removed: bool = False,
+):
+    payload = {
+        "type": "plaid.transaction.removed" if removed else "plaid.transaction",
+        "description": "Acme",
+        "amount": amount,
+        "direction": "outflow",
+        "meta": {
+            "event_kind": "removed" if removed else "modified",
+            "event_version": version,
+            "source_event_base_id": base_id,
+            "is_removed": removed,
+        },
+    }
+    event = RawEvent(
+        business_id=business_id,
+        source="plaid",
+        source_event_id=source_event_id,
+        occurred_at=occurred_at,
+        payload=payload,
+    )
+    db_session.add(event)
+    return event
+
+
 def _categorize(db_session, business_id: str, source_event_id: str, category_id: str):
     row = TxnCategorization(
         business_id=business_id,
@@ -309,6 +343,76 @@ def test_pulse_gating_same_timestamp_new_source_event_id(db_session):
 
     second = monitoring_service.pulse(db_session, biz.id)
     assert second["ran"] is True
+
+
+def test_pulse_updates_for_modified_and_removed(db_session):
+    biz = _create_business(db_session)
+    cat = _create_account_and_category(db_session, biz.id)
+    now = datetime(2024, 9, 1, tzinfo=timezone.utc)
+
+    _add_raw_event(db_session, biz.id, "prior", now - timedelta(days=20), 300.0, "outflow", "Acme", "Acme")
+    base_id = "plaid:txn-100"
+    _add_versioned_plaid_event(
+        db_session,
+        biz.id,
+        "plaid:txn-100",
+        now - timedelta(days=3),
+        600.0,
+        base_id,
+        1,
+    )
+    _categorize(db_session, biz.id, "prior", cat.id)
+    _categorize(db_session, biz.id, "plaid:txn-100", cat.id)
+    db_session.commit()
+
+    first = monitoring_service.pulse(db_session, biz.id)
+    assert first["ran"] is True
+
+    runtime = db_session.get(MonitorRuntime, biz.id)
+    runtime.last_pulse_at = runtime.last_pulse_at - timedelta(minutes=11)
+    db_session.commit()
+
+    _add_versioned_plaid_event(
+        db_session,
+        biz.id,
+        "plaid:txn-100:v2",
+        now - timedelta(days=3),
+        900.0,
+        base_id,
+        2,
+    )
+    _categorize(db_session, biz.id, "plaid:txn-100:v2", cat.id)
+    db_session.commit()
+
+    updated = monitoring_service.pulse(db_session, biz.id)
+    assert updated["ran"] is True
+
+    runtime = db_session.get(MonitorRuntime, biz.id)
+    runtime.last_pulse_at = runtime.last_pulse_at - timedelta(minutes=11)
+    db_session.commit()
+
+    _add_versioned_plaid_event(
+        db_session,
+        biz.id,
+        "plaid:txn-100:v3",
+        now - timedelta(days=3),
+        0.0,
+        base_id,
+        3,
+        removed=True,
+    )
+    db_session.commit()
+
+    resolved = monitoring_service.pulse(db_session, biz.id)
+    assert resolved["ran"] is True
+
+    audit_rows = db_session.execute(
+        select(AuditLog).where(AuditLog.business_id == biz.id)
+    ).scalars().all()
+    event_types = {row.event_type for row in audit_rows}
+    assert "signal_detected" in event_types
+    assert "signal_updated" in event_types
+    assert "signal_resolved" in event_types
 
 
 def test_api_signals_list_matches_pulse(db_session):
