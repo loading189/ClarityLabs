@@ -316,6 +316,8 @@ def fetch_uncategorized_raw_events(
     )
 
 
+from sqlalchemy import select, and_, func
+
 def count_uncategorized_raw_events(
     db: Session,
     business_id: str,
@@ -324,9 +326,11 @@ def count_uncategorized_raw_events(
     end_date: Optional[date] = None,
 ) -> int:
     start_dt, end_dt = _date_to_bounds(start_date, end_date)
+
+    # IMPORTANT: we need RawEvent rows (not COUNT(*)) because the logic below
+    # inspects payload/version/base_id and compares occurred_at/source_event_id.
     stmt = (
-        select(func.count())
-        .select_from(RawEvent)
+        select(RawEvent)
         .outerjoin(
             TxnCategorization,
             and_(
@@ -339,29 +343,39 @@ def count_uncategorized_raw_events(
             TxnCategorization.id.is_(None),
         )
     )
+
     if start_dt is not None:
         stmt = stmt.where(RawEvent.occurred_at >= start_dt)
     if end_dt is not None:
         stmt = stmt.where(RawEvent.occurred_at <= end_dt)
-    rows = db.execute(stmt).scalars().all()
-    removed_base_ids = {
-        _event_base_id(event) for event in rows if _event_is_removed(event)
-    }
+
+    # rows are RawEvent objects now
+    rows: list[RawEvent] = db.execute(stmt).scalars().all()
+
+    removed_base_ids = {_event_base_id(event) for event in rows if _event_is_removed(event)}
+
     latest_by_base: dict[str, RawEvent] = {}
     for event in rows:
         base_id = _event_base_id(event)
         if base_id in removed_base_ids:
             continue
+
         current = latest_by_base.get(base_id)
-        if not current:
+        if current is None:
             latest_by_base[base_id] = event
             continue
+
         candidate_version = _event_version(event) or 0
         current_version = _event_version(current) or 0
+
         if candidate_version != current_version:
             if candidate_version > current_version:
                 latest_by_base[base_id] = event
             continue
+
+        # tie-breaker: deterministic "latest" selection
         if (event.occurred_at, event.source_event_id) > (current.occurred_at, current.source_event_id):
             latest_by_base[base_id] = event
+
     return len(latest_by_base)
+
