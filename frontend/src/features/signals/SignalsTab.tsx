@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { getCategorizeMetrics, type CategorizeMetricsOut } from "../../api/categorize";
+import { getDiagnosticsReconcile, getIntegrationRuns, type IntegrationRun, type ReconcileResponse } from "../../api/diagnostics";
+import { reprocessPipeline } from "../../api/processing";
+import { syncIntegration } from "../../api/integrations";
 import type { BusinessDetail, HealthSignal } from "../../types";
 import SignalGrid from "../../components/DetailPanel/SignalGrid";
 import SignalDetail from "../../components/DetailPanel/SignalDetail";
@@ -68,6 +71,12 @@ export default function SignalsTab({
   const [metrics, setMetrics] = useState<CategorizeMetricsOut | null>(null);
   const [metricsLoading, setMetricsLoading] = useState(false);
   const [metricsErr, setMetricsErr] = useState<string | null>(null);
+  const [reconcile, setReconcile] = useState<ReconcileResponse | null>(null);
+  const [reconcileLoading, setReconcileLoading] = useState(false);
+  const [reconcileErr, setReconcileErr] = useState<string | null>(null);
+  const [runs, setRuns] = useState<IntegrationRun[]>([]);
+  const [runsErr, setRunsErr] = useState<string | null>(null);
+  const [ingestBusy, setIngestBusy] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -89,6 +98,46 @@ export default function SignalsTab({
 
     if (detail.business_id) {
       loadMetrics();
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [detail.business_id, refreshToken]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadReconcile() {
+      setReconcileLoading(true);
+      setReconcileErr(null);
+      try {
+        logRefresh("health", "diagnostics-reconcile");
+        const data = await getDiagnosticsReconcile(detail.business_id);
+        if (!active) return;
+        setReconcile(data);
+      } catch (e: any) {
+        if (!active) return;
+        setReconcileErr(e?.message ?? "Failed to load reconcile data");
+      } finally {
+        if (active) setReconcileLoading(false);
+      }
+    }
+
+    async function loadRuns() {
+      setRunsErr(null);
+      try {
+        const data = await getIntegrationRuns(detail.business_id);
+        if (!active) return;
+        setRuns(data);
+      } catch (e: any) {
+        if (!active) return;
+        setRunsErr(e?.message ?? "Failed to load audit runs");
+      }
+    }
+
+    if (detail.business_id) {
+      loadReconcile();
+      loadRuns();
     }
 
     return () => {
@@ -171,6 +220,43 @@ export default function SignalsTab({
       hint: detail.ledger_preview?.length ? "Ledger preview" : null,
     },
   ];
+
+  const connections = reconcile?.connections ?? [];
+  const primaryProvider = connections[0]?.provider;
+  const anyProcessingStale = connections.some((c) => c.processing_stale);
+
+  async function handleSync() {
+    if (!primaryProvider) return;
+    setIngestBusy(true);
+    setReconcileErr(null);
+    try {
+      await syncIntegration(detail.business_id, primaryProvider);
+      const data = await getDiagnosticsReconcile(detail.business_id);
+      setReconcile(data);
+      const runsData = await getIntegrationRuns(detail.business_id);
+      setRuns(runsData);
+    } catch (e: any) {
+      setReconcileErr(e?.message ?? "Sync failed");
+    } finally {
+      setIngestBusy(false);
+    }
+  }
+
+  async function handleReprocess() {
+    setIngestBusy(true);
+    setReconcileErr(null);
+    try {
+      await reprocessPipeline(detail.business_id, { mode: "from_last_cursor" });
+      const data = await getDiagnosticsReconcile(detail.business_id);
+      setReconcile(data);
+      const runsData = await getIntegrationRuns(detail.business_id);
+      setRuns(runsData);
+    } catch (e: any) {
+      setReconcileErr(e?.message ?? "Reprocess failed");
+    } finally {
+      setIngestBusy(false);
+    }
+  }
 
   return (
     <div className={styles.healthTab}>
@@ -290,6 +376,94 @@ export default function SignalsTab({
             </div>
             <div className={styles.dataQualityHint}>Vendors with memory</div>
           </div>
+        </div>
+      </div>
+
+      <div className={styles.ingestionCard}>
+        <div className={styles.ingestionHeader}>
+          <div>
+            <div className={styles.ingestionTitle}>Ingestion health</div>
+            <div className={styles.ingestionSub}>
+              Reconcile provider cursors, processing state, and audit runs.
+            </div>
+          </div>
+          <div className={styles.ingestionActions}>
+            <button
+              className={styles.actionButton}
+              disabled={!primaryProvider || ingestBusy}
+              onClick={handleSync}
+            >
+              Run sync
+            </button>
+            <button
+              className={styles.actionButton}
+              disabled={ingestBusy}
+              onClick={handleReprocess}
+            >
+              Reprocess
+            </button>
+          </div>
+        </div>
+        {reconcileLoading && <div className={styles.inlineMuted}>Loading reconciliation…</div>}
+        {reconcileErr && <div className={styles.inlineError}>{reconcileErr}</div>}
+        {!reconcileLoading && reconcile && (
+          <div className={styles.ingestionGrid}>
+            <div className={styles.ingestionTile}>
+              <div className={styles.tileLabel}>Raw events</div>
+              <div className={styles.tileValue}>{reconcile.counts.raw_events_total}</div>
+            </div>
+            <div className={styles.ingestionTile}>
+              <div className={styles.tileLabel}>Posted txns</div>
+              <div className={styles.tileValue}>{reconcile.counts.posted_txns_total}</div>
+            </div>
+            <div className={styles.ingestionTile}>
+              <div className={styles.tileLabel}>Categorized txns</div>
+              <div className={styles.tileValue}>{reconcile.counts.categorized_txns_total}</div>
+            </div>
+            <div className={styles.ingestionTile}>
+              <div className={styles.tileLabel}>Processing stale</div>
+              <div className={styles.tileValue}>{anyProcessingStale ? "Yes" : "No"}</div>
+            </div>
+          </div>
+        )}
+        <div className={styles.ingestionList}>
+          {connections.map((conn) => (
+            <div key={conn.provider} className={styles.ingestionRow}>
+              <div className={styles.ingestionProvider}>{conn.provider}</div>
+              <div className={styles.ingestionStatus}>{conn.status}</div>
+              <div className={styles.ingestionMeta}>
+                Provider cursor: {conn.provider_cursor ? conn.provider_cursor.slice(0, 18) : "—"}
+              </div>
+              <div className={styles.ingestionMeta}>
+                Processing cursor: {conn.last_processed_source_event_id ?? "—"}
+              </div>
+              {conn.processing_stale && <div className={styles.ingestionFlag}>Processing stale</div>}
+            </div>
+          ))}
+        </div>
+        <div className={styles.auditSection}>
+          <div className={styles.auditTitle}>Recent ingest & processing runs</div>
+          {runsErr && <div className={styles.inlineError}>{runsErr}</div>}
+          {!runsErr && runs.length === 0 && (
+            <div className={styles.inlineMuted}>No runs recorded yet.</div>
+          )}
+          {runs.map((run) => (
+            <div key={run.id} className={styles.auditRow}>
+              <div className={styles.auditKind}>
+                {run.run_type} {run.provider ? `(${run.provider})` : ""}
+              </div>
+              <div className={styles.auditMeta}>
+                {run.status} · {new Date(run.started_at).toLocaleString()}
+              </div>
+              {run.after_counts && (
+                <div className={styles.auditCounts}>
+                  {run.after_counts.processed != null
+                    ? `${run.after_counts.processed} processed`
+                    : `${run.after_counts.raw_events ?? 0} raw`}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       </div>
 

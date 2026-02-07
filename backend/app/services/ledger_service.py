@@ -8,8 +8,8 @@ from fastapi import HTTPException
 from sqlalchemy import select, and_
 from sqlalchemy.orm import Session
 
-from backend.app.models import Business, RawEvent, TxnCategorization, Category, Account
-from backend.app.norma.from_events import raw_event_to_txn
+from backend.app.models import Business, TxnCategorization, Category, Account
+from backend.app.services.posted_txn_service import posted_txns
 
 Direction = Literal["inflow", "outflow"]
 
@@ -43,6 +43,22 @@ def signed_amount(amount: float, direction: str) -> float:
     return amt if is_inflow(direction) else -amt
 
 
+def _category_maps(db: Session, business_id: str):
+    categorizations = db.execute(
+        select(TxnCategorization).where(TxnCategorization.business_id == business_id)
+    ).scalars().all()
+    cats = {
+        c.id: c
+        for c in db.execute(select(Category).where(Category.business_id == business_id)).scalars().all()
+    }
+    accounts = {
+        a.id: a
+        for a in db.execute(select(Account).where(Account.business_id == business_id)).scalars().all()
+    }
+    cat_map = {c.source_event_id: c for c in categorizations}
+    return cat_map, cats, accounts
+
+
 def _build_cash_series(
     txns: Iterable,
     starting_cash: float,
@@ -67,35 +83,32 @@ def ledger_lines(
     """
     require_business(db, business_id)
 
-    # join: categorizations -> events -> category -> account
-    stmt = (
-        select(TxnCategorization, RawEvent, Category, Account)
-        .join(RawEvent, and_(
-            RawEvent.business_id == TxnCategorization.business_id,
-            RawEvent.source_event_id == TxnCategorization.source_event_id,
-        ))
-        .join(Category, Category.id == TxnCategorization.category_id)
-        .join(Account, Account.id == Category.account_id)
-        .where(TxnCategorization.business_id == business_id)
-        .order_by(RawEvent.occurred_at.desc(), RawEvent.source_event_id.desc())
-        .limit(limit)
-    )
-
-    rows = db.execute(stmt).all()
+    posted = posted_txns(db, business_id, limit=limit)
+    cat_map, cats, accounts = _category_maps(db, business_id)
 
     out: List[Dict[str, Any]] = []
-    for txncat, ev, cat, acct in rows:
-        if not _date_range_filter(ev.occurred_at, start_date, end_date):
+    for item in posted:
+        if not _date_range_filter(item.raw_event.occurred_at, start_date, end_date):
             continue
 
-        txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
+        txncat = cat_map.get(item.canonical_source_event_id)
+        if not txncat:
+            continue
+        cat = cats.get(txncat.category_id)
+        if not cat:
+            continue
+        acct = accounts.get(cat.account_id)
+        if not acct:
+            continue
+
+        txn = item.txn
 
         direction: Direction = txn.direction
 
         out.append(
             {
-                "occurred_at": ev.occurred_at,
-                "source_event_id": ev.source_event_id,
+                "occurred_at": item.raw_event.occurred_at,
+                "source_event_id": item.canonical_source_event_id,
                 "description": txn.description,
                 "direction": direction,
                 "signed_amount": signed_amount(txn.amount or 0.0, direction),
@@ -125,20 +138,8 @@ def income_statement(
     """
     require_business(db, business_id)
 
-    # pull posted lines for range (we reuse same join but no limit)
-    stmt = (
-        select(TxnCategorization, RawEvent, Category, Account)
-        .join(RawEvent, and_(
-            RawEvent.business_id == TxnCategorization.business_id,
-            RawEvent.source_event_id == TxnCategorization.source_event_id,
-        ))
-        .join(Category, Category.id == TxnCategorization.category_id)
-        .join(Account, Account.id == Category.account_id)
-        .where(TxnCategorization.business_id == business_id)
-        .order_by(RawEvent.occurred_at.asc(), RawEvent.source_event_id.asc())
-    )
-
-    rows = db.execute(stmt).all()
+    posted = posted_txns(db, business_id)
+    cat_map, cats, accounts = _category_maps(db, business_id)
 
     rev_by_name: Dict[str, float] = {}
     exp_by_name: Dict[str, float] = {}
@@ -146,11 +147,21 @@ def income_statement(
     rev_total = 0.0
     exp_total = 0.0
 
-    for _, ev, cat, acct in rows:
-        if not _date_range_filter(ev.occurred_at, start_date, end_date):
+    for item in posted:
+        if not _date_range_filter(item.raw_event.occurred_at, start_date, end_date):
             continue
 
-        txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
+        txncat = cat_map.get(item.canonical_source_event_id)
+        if not txncat:
+            continue
+        cat = cats.get(txncat.category_id)
+        if not cat:
+            continue
+        acct = accounts.get(cat.account_id)
+        if not acct:
+            continue
+
+        txn = item.txn
         amt = signed_amount(txn.amount or 0.0, txn.direction)
         t = (acct.type or "").strip().lower()
         st = (acct.subtype or "").strip().lower()
@@ -198,25 +209,18 @@ def cash_flow(
     """
     require_business(db, business_id)
 
-    # reuse ledger_lines join; compute totals
-    stmt = (
-        select(TxnCategorization, RawEvent)
-        .join(RawEvent, and_(
-            RawEvent.business_id == TxnCategorization.business_id,
-            RawEvent.source_event_id == TxnCategorization.source_event_id,
-        ))
-        .where(TxnCategorization.business_id == business_id)
-        .order_by(RawEvent.occurred_at.asc(), RawEvent.source_event_id.asc())
-    )
-    rows = db.execute(stmt).all()
+    posted = posted_txns(db, business_id)
+    cat_map, _cats, _accounts = _category_maps(db, business_id)
 
     cash_in = 0.0
     cash_out = 0.0
 
-    for _, ev in rows:
-        if not _date_range_filter(ev.occurred_at, start_date, end_date):
+    for item in posted:
+        if not _date_range_filter(item.raw_event.occurred_at, start_date, end_date):
             continue
-        txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
+        if item.canonical_source_event_id not in cat_map:
+            continue
+        txn = item.txn
         signed = signed_amount(txn.amount or 0.0, txn.direction)
         if is_inflow(txn.direction):
             cash_in += abs(signed)
@@ -247,23 +251,17 @@ def cash_series(
     """
     require_business(db, business_id)
 
-    stmt = (
-        select(TxnCategorization, RawEvent)
-        .join(RawEvent, and_(
-            RawEvent.business_id == TxnCategorization.business_id,
-            RawEvent.source_event_id == TxnCategorization.source_event_id,
-        ))
-        .where(TxnCategorization.business_id == business_id)
-        .order_by(RawEvent.occurred_at.asc(), RawEvent.source_event_id.asc())
-    )
-    rows = db.execute(stmt).all()
+    posted = posted_txns(db, business_id)
+    cat_map, _cats, _accounts = _category_maps(db, business_id)
 
     txns = []
 
-    for _, ev in rows:
-        if not _date_range_filter(ev.occurred_at, start_date, end_date):
+    for item in posted:
+        if not _date_range_filter(item.raw_event.occurred_at, start_date, end_date):
             continue
-        txns.append(raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id))
+        if item.canonical_source_event_id not in cat_map:
+            continue
+        txns.append(item.txn)
 
     return _build_cash_series(txns, starting_cash)
 
@@ -283,21 +281,15 @@ def balance_sheet_v1(
     """
     require_business(db, business_id)
 
-    stmt = (
-        select(TxnCategorization, RawEvent)
-        .join(RawEvent, and_(
-            RawEvent.business_id == TxnCategorization.business_id,
-            RawEvent.source_event_id == TxnCategorization.source_event_id,
-        ))
-        .where(TxnCategorization.business_id == business_id)
-        .order_by(RawEvent.occurred_at.asc())
-    )
-    rows = db.execute(stmt).all()
+    posted = posted_txns(db, business_id)
+    cat_map, _cats, _accounts = _category_maps(db, business_id)
 
     bal = float(starting_cash or 0.0)
-    for _, ev in rows:
-        if ev.occurred_at.date() <= as_of:
-            txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
+    for item in posted:
+        if item.canonical_source_event_id not in cat_map:
+            continue
+        if item.raw_event.occurred_at.date() <= as_of:
+            txn = item.txn
             bal += signed_amount(txn.amount or 0.0, txn.direction)
 
     assets = bal

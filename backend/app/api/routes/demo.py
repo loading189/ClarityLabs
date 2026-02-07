@@ -12,7 +12,7 @@ Design notes
 - Keep the pipeline deterministic:
     events -> txns -> ledger -> facts -> signals -> score
 - Avoid identity bugs:
-  - ALWAYS use RawEvent.source_event_id as source_event_id
+  - Use canonical source_event_id for downstream joins when available.
 """
 
 from __future__ import annotations
@@ -33,11 +33,11 @@ from backend.app.db import get_db
 from backend.app.models import Business, CategoryRule, RawEvent, TxnCategorization
 from backend.app.norma.category_engine import suggest_category
 from backend.app.norma.facts import compute_facts, facts_to_dict
-from backend.app.norma.from_events import raw_event_to_txn
 from backend.app.norma.ledger import build_cash_ledger
 from backend.app.norma.merchant import merchant_key
 from backend.app.norma.categorize_brain import brain
 from backend.app.services import categorize_service, health_signal_service
+from backend.app.services.posted_txn_service import posted_txns
 from backend.app.clarity.health_v1 import build_health_v1_signals
 
 router = APIRouter(prefix="/demo", tags=["demo"])
@@ -165,36 +165,18 @@ def _load_event_txn_pairs_from_db(
     Returns [(RawEvent, NormalizedTransaction), ...] and newest occurred_at (if any).
 
     IMPORTANT:
-    - The NormalizedTransaction.source_event_id MUST be RawEvent.source_event_id
+    - The NormalizedTransaction.source_event_id MUST be the canonical source_event_id
       so it lines up with TxnCategorization joins.
     """
-    events = (
-        db.execute(
-            select(RawEvent)
-            .where(RawEvent.business_id == biz_db_id)
-            .order_by(RawEvent.occurred_at.desc())
-            .limit(limit_events)
-        )
-        .scalars()
-        .all()
-    )
+    items = posted_txns(db, biz_db_id, limit=limit_events)
 
     pairs: List[Tuple[RawEvent, Any]] = []
-    iterable = reversed(events) if chronological else events
+    iterable = reversed(items) if chronological else items
 
-    for e in iterable:
-        try:
-            txn = raw_event_to_txn(
-                e.payload,
-                e.occurred_at,
-                source_event_id=e.source_event_id,  # ✅ stable vendor/dedupe key
-            )
-            pairs.append((e, txn))
-        except Exception:
-            # keep current behavior: skip normalization failures
-            continue
+    for item in iterable:
+        pairs.append((item.raw_event, item.txn))
 
-    last_event_occurred_at = events[0].occurred_at if events else None
+    last_event_occurred_at = items[-1].raw_event.occurred_at if items else None
     return pairs, last_event_occurred_at
 
 

@@ -10,6 +10,7 @@ from sqlalchemy import select, delete
 from sqlalchemy.orm import Session
 
 from backend.app.models import Business, RawEvent, BusinessIntegrationProfile
+from backend.app.services.raw_event_service import insert_raw_event_idempotent, canonical_source_event_id
 from backend.app.sim.models import SimulatorConfig
 from backend.app.sim.profiles import PROFILES
 from backend.app.sim.generators.plaid import make_plaid_transaction_event
@@ -321,26 +322,16 @@ def _apply_random_shocks(
 
 
 def _insert_raw_event(db: Session, business_id: str, ev: dict) -> int:
-    exists = db.execute(
-        select(RawEvent.id).where(
-            RawEvent.business_id == business_id,
-            RawEvent.source == ev["source"],
-            RawEvent.source_event_id == ev["source_event_id"],
-        )
-    ).first()
-    if exists:
-        return 0
-
-    db.add(
-        RawEvent(
-            business_id=business_id,
-            source=ev["source"],
-            source_event_id=ev["source_event_id"],
-            occurred_at=ev["occurred_at"],
-            payload=ev["payload"],
-        )
+    created = insert_raw_event_idempotent(
+        db,
+        business_id=business_id,
+        source=ev["source"],
+        source_event_id=ev["source_event_id"],
+        canonical_source_event_id=canonical_source_event_id(ev["payload"], ev["source_event_id"]),
+        occurred_at=ev["occurred_at"],
+        payload=ev["payload"],
     )
-    return 1
+    return 1 if created else 0
 
 
 # ============================================================
@@ -1205,4 +1196,3 @@ def pulse(db: Session, business_id: str, n: int) -> Dict[str, Any]:
 
     db.commit()
     return {"status": "ok", "business_id": business_id, "inserted": created, "streams": enabled_streams, "counts": counts}
-

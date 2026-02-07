@@ -9,19 +9,18 @@ from sqlalchemy.orm import Session, load_only
 
 from backend.app.models import (
     Business,
-    RawEvent,
     Category,
     TxnCategorization,
     BusinessCategoryMap,
     CategoryRule,
     utcnow,
 )
-from backend.app.norma.from_events import raw_event_to_txn
 from backend.app.norma.category_engine import suggest_category
 from backend.app.norma.merchant import merchant_key, canonical_merchant_name
 from backend.app.norma.categorize_brain import brain
 from backend.app.services.category_seed import seed_coa_and_categories_and_mappings
 from backend.app.services.category_resolver import resolve_system_key
+from backend.app.services.posted_txn_service import posted_txns
 
 
 def require_business(db: Session, business_id: str) -> Business:
@@ -43,6 +42,13 @@ def require_category(db: Session, business_id: str, category_id: str) -> Categor
     if not cat or not cat.account_id:
         raise HTTPException(404, "category not found for business")
     return cat
+
+
+def _find_posted_txn(db: Session, business_id: str, source_event_id: str):
+    for item in posted_txns(db, business_id, include_removed=True):
+        if item.canonical_source_event_id == source_event_id or item.raw_event.source_event_id == source_event_id:
+            return item
+    return None
 
 
 def system_key_for_category(db: Session, business_id: str, category_id: str) -> Optional[str]:
@@ -125,15 +131,11 @@ def label_vendor(db: Session, business_id: str, req) -> Dict[str, Any]:
 
     seed_coa_and_categories_and_mappings(db, business_id)
 
-    ev = db.execute(
-        select(RawEvent).where(
-            and_(RawEvent.business_id == business_id, RawEvent.source_event_id == req.source_event_id)
-        )
-    ).scalar_one_or_none()
-    if not ev:
+    item = _find_posted_txn(db, business_id, req.source_event_id)
+    if not item:
         raise HTTPException(404, "raw event not found")
 
-    txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
+    txn = item.txn
     mk = merchant_key(txn.description)
 
     system_key = (req.system_key or "").strip().lower()
@@ -265,12 +267,7 @@ def list_txns_to_categorize(
     require_business(db, business_id)
     seed_coa_and_categories_and_mappings(db, business_id)
 
-    rows = db.execute(
-        select(RawEvent)
-        .where(RawEvent.business_id == business_id)
-        .order_by(RawEvent.occurred_at.desc())
-        .limit(500)
-    ).scalars().all()
+    rows = posted_txns(db, business_id, limit=500)
 
     existing = db.execute(
         select(TxnCategorization.source_event_id).where(TxnCategorization.business_id == business_id)
@@ -279,11 +276,11 @@ def list_txns_to_categorize(
 
     out: List[Dict[str, Any]] = []
 
-    for ev in rows:
-        if only_uncategorized and ev.source_event_id in existing_set:
+    for item in rows:
+        if only_uncategorized and item.canonical_source_event_id in existing_set:
             continue
 
-        txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
+        txn = item.txn
         suggested = suggest_category(db, txn, business_id=business_id)
 
         cat_obj = getattr(suggested, "categorization", None)
@@ -316,8 +313,8 @@ def list_txns_to_categorize(
 
         out.append(
             {
-                "source_event_id": txn.source_event_id,
-                "occurred_at": txn.occurred_at,
+                "source_event_id": item.canonical_source_event_id,
+                "occurred_at": item.raw_event.occurred_at,
                 "description": txn.description,
                 "amount": txn.amount,
                 "direction": txn.direction,
@@ -592,24 +589,15 @@ def preview_category_rule(
         ).scalars().all()
     )
 
-    rows = (
-        db.execute(
-            select(RawEvent)
-            .where(RawEvent.business_id == business_id)
-            .order_by(RawEvent.occurred_at.desc(), RawEvent.source_event_id.desc())
-            .limit(max_events)
-        )
-        .scalars()
-        .all()
-    )
+    rows = posted_txns(db, business_id, limit=max_events)
 
     matched = 0
     samples: List[Dict[str, Any]] = []
 
-    for ev in rows:
-        if ev.source_event_id in existing_ids:
+    for item in rows:
+        if item.canonical_source_event_id in existing_ids:
             continue
-        txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
+        txn = item.txn
         winner = _first_matching_rule(rules, txn)
         if not winner or winner.id != rule.id:
             continue
@@ -618,7 +606,7 @@ def preview_category_rule(
             samples.append(
                 {
                     "source_event_id": txn.source_event_id,
-                    "occurred_at": txn.occurred_at,
+                    "occurred_at": item.raw_event.occurred_at,
                     "description": txn.description,
                     "amount": txn.amount,
                     "direction": txn.direction,
@@ -655,25 +643,16 @@ def apply_category_rule(db: Session, business_id: str, rule_id: str) -> Dict[str
         ).scalars().all()
     )
 
-    rows = (
-        db.execute(
-            select(RawEvent)
-            .where(RawEvent.business_id == business_id)
-            .order_by(RawEvent.occurred_at.desc(), RawEvent.source_event_id.desc())
-            .limit(5000)
-        )
-        .scalars()
-        .all()
-    )
+    rows = posted_txns(db, business_id, limit=5000)
 
     matched_ids: List[str] = []
-    for ev in rows:
-        if ev.source_event_id in existing_ids:
+    for item in rows:
+        if item.canonical_source_event_id in existing_ids:
             continue
-        txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
+        txn = item.txn
         winner = _first_matching_rule(rules, txn)
         if winner and winner.id == rule.id:
-            matched_ids.append(ev.source_event_id)
+            matched_ids.append(item.canonical_source_event_id)
 
     updated = 0
     for source_event_id in matched_ids:
@@ -736,14 +715,10 @@ def upsert_categorization(db: Session, business_id: str, req) -> Dict[str, Any]:
     learned = False
     learned_system_key: Optional[str] = None
 
-    ev = db.execute(
-        select(RawEvent).where(
-            and_(RawEvent.business_id == business_id, RawEvent.source_event_id == req.source_event_id)
-        )
-    ).scalar_one_or_none()
+    item = _find_posted_txn(db, business_id, req.source_event_id)
 
-    if ev:
-        txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
+    if item:
+        txn = item.txn
         mk = merchant_key(txn.description)
         system_key = system_key_for_category(db, business_id, req.category_id)
 
@@ -781,18 +756,13 @@ def bulk_apply_categorization(db: Session, business_id: str, req) -> Dict[str, A
     if not target_key:
         raise HTTPException(400, "merchant_key required")
 
-    rows = db.execute(
-        select(RawEvent)
-        .where(RawEvent.business_id == business_id)
-        .order_by(RawEvent.occurred_at.desc())
-        .limit(5000)
-    ).scalars().all()
+    rows = posted_txns(db, business_id, limit=5000)
 
     matching_ids: List[str] = []
-    for ev in rows:
-        txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
+    for item in rows:
+        txn = item.txn
         if merchant_key(txn.description) == target_key:
-            matching_ids.append(ev.source_event_id)
+            matching_ids.append(item.canonical_source_event_id)
 
     if not matching_ids:
         return {
@@ -844,9 +814,7 @@ def categorization_metrics(db: Session, business_id: str) -> Dict[str, Any]:
     require_business(db, business_id)
     seed_coa_and_categories_and_mappings(db, business_id)
 
-    total_events = db.execute(
-        select(RawEvent).where(RawEvent.business_id == business_id)
-    ).scalars().all()
+    total_events = posted_txns(db, business_id)
     total_count = len(total_events)
 
     categorized_ids = set(
@@ -859,10 +827,10 @@ def categorization_metrics(db: Session, business_id: str) -> Dict[str, Any]:
     uncategorized = max(0, total_count - posted)
 
     suggestion_coverage = 0
-    for ev in total_events:
-        if ev.source_event_id in categorized_ids:
+    for item in total_events:
+        if item.canonical_source_event_id in categorized_ids:
             continue
-        txn = raw_event_to_txn(ev.payload, ev.occurred_at, ev.source_event_id)
+        txn = item.txn
         suggested = suggest_category(db, txn, business_id=business_id)
         cat_obj = getattr(suggested, "categorization", None)
         if not cat_obj:

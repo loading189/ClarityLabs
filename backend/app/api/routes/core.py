@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from backend.app.coa_templates import DEFAULT_COA
 from backend.app.db import get_db
 from backend.app.models import Account, Business, Organization, RawEvent
+from backend.app.services.raw_event_service import insert_raw_event_idempotent, canonical_source_event_id
 from backend.app.norma.categorize_brain import brain
 from backend.app.norma.merchant import merchant_key
 from backend.app.models import BusinessIntegrationProfile
@@ -180,27 +181,26 @@ def list_accounts(business_id: str, db: Session = Depends(get_db)):
 
 @router.post("/raw_events")
 def ingest_raw_event(req: RawEventIn, db: Session = Depends(get_db)):
-    exists = db.execute(
-        select(RawEvent.id).where(
+    created = insert_raw_event_idempotent(
+        db,
+        business_id=req.business_id,
+        source=req.source,
+        source_event_id=req.source_event_id,
+        canonical_source_event_id=canonical_source_event_id(req.payload, req.source_event_id),
+        occurred_at=req.occurred_at,
+        payload=req.payload,
+    )
+    if not created:
+        return {"status": "duplicate"}
+
+    db.commit()
+    ev = db.execute(
+        select(RawEvent).where(
             RawEvent.business_id == req.business_id,
             RawEvent.source == req.source,
             RawEvent.source_event_id == req.source_event_id,
         )
-    ).first()
-
-    if exists:
-        return {"status": "duplicate"}
-
-    ev = RawEvent(
-        business_id=req.business_id,
-        source=req.source,
-        source_event_id=req.source_event_id,
-        occurred_at=req.occurred_at,
-        payload=req.payload,
-    )
-    db.add(ev)
-    db.commit()
-    db.refresh(ev)
+    ).scalar_one()
     return {"status": "ok", "raw_event_id": ev.id}
 
 

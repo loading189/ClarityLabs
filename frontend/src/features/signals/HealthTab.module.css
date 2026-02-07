@@ -200,6 +200,138 @@
   text-decoration: underline;
 }
 
+.ingestionCard {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--panel-bg);
+  padding: 14px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ingestionHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.ingestionTitle {
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
+.ingestionSub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.ingestionActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ingestionGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.ingestionTile {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card-bg);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ingestionList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ingestionRow {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card-bg);
+  padding: 10px 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.ingestionProvider {
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.ingestionStatus {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.ingestionMeta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.ingestionFlag {
+  font-size: 12px;
+  color: #b42318;
+  font-weight: 600;
+}
+
+.auditSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.auditTitle {
+  font-weight: 700;
+}
+
+.auditRow {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card-bg);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.auditKind {
+  font-weight: 600;
+}
+
+.auditMeta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.auditCounts {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.inlineMuted {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.inlineError {
+  font-size: 12px;
+  color: #b42318;
+}
+
 .tileAction:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px var(--focus);

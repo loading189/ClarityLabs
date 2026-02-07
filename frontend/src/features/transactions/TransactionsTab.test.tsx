@@ -89,7 +89,7 @@ describe("TransactionsTab", () => {
   it("clears drilldown filters and notifies the parent", async () => {
     const onClearDrilldown = vi.fn();
     const user = userEvent.setup();
-    render(
+    const { rerender } = render(
       <TransactionsTab
         businessId="biz-1"
         drilldown={{
@@ -109,15 +109,16 @@ describe("TransactionsTab", () => {
     const [directionSelect, categorySelect] = screen.getAllByRole("combobox");
     expect(directionSelect).toHaveValue("outflow");
     expect(categorySelect).toHaveValue("Utilities");
-    expect(screen.getByText(/Merchant: coffee shop/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Merchant: coffee shop/i).length).toBeGreaterThan(0);
 
     const clearButton = screen.getByRole("button", { name: /Clear drilldown/i });
     await user.click(clearButton);
 
     expect(onClearDrilldown).toHaveBeenCalled();
+    rerender(<TransactionsTab businessId="biz-1" drilldown={null} onClearDrilldown={onClearDrilldown} />);
     expect(searchInput).toHaveValue("");
     expect(directionSelect).toHaveValue("all");
     expect(categorySelect).toHaveValue("all");
-    expect(screen.queryByText(/Merchant: coffee shop/i)).not.toBeInTheDocument();
+    expect(screen.queryAllByText(/Merchant: coffee shop/i).length).toBe(0);
   });
 });

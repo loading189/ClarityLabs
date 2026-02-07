@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional, Tuple, Dict
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.orm import Session
 
 from backend.app.models import Category, CategoryRule, TxnCategorization, RawEvent
@@ -71,7 +71,10 @@ def suggest_category_for_event(
     ev = db.execute(
         select(RawEvent).where(
             RawEvent.business_id == business_id,
-            RawEvent.source_event_id == source_event_id,
+            or_(
+                RawEvent.source_event_id == source_event_id,
+                RawEvent.canonical_source_event_id == source_event_id,
+            ),
         )
     ).scalar_one_or_none()
 

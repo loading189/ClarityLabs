@@ -202,6 +202,10 @@ class RawEvent(Base):
     Immutable vendor event log. This is your replayable truth.
     """
     __tablename__ = "raw_events"
+    __table_args__ = (
+        UniqueConstraint("business_id", "source", "source_event_id", name="uq_raw_events_business_source_event"),
+        Index("ix_raw_events_canonical_source_event_id", "canonical_source_event_id"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
 
@@ -214,6 +218,7 @@ class RawEvent(Base):
 
     source: Mapped[str] = mapped_column(String(40), nullable=False)  # plaid/shopify/stripe/etc
     source_event_id: Mapped[str] = mapped_column(String(120), nullable=False)  # dedupe key
+    canonical_source_event_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
 
     occurred_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     payload: Mapped[dict] = mapped_column(JSON, nullable=False)
@@ -287,6 +292,64 @@ class BusinessIntegrationProfile(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow)
 
     business = relationship("Business", back_populates="integration_profile")
+
+
+class IntegrationConnection(Base):
+    __tablename__ = "integration_connections"
+    __table_args__ = (
+        UniqueConstraint("business_id", "provider", name="uq_integration_connection_business_provider"),
+        Index("ix_integration_connections_business_id", "business_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    business_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    provider: Mapped[str] = mapped_column(String(40), nullable=False)
+
+    is_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="connected", server_default=text("'connected'"))
+    disconnected_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    provider_cursor: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    last_ingested_source_event_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    last_processed_source_event_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+
+    last_sync_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_success_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
+
+
+class IntegrationRun(Base):
+    __tablename__ = "integration_runs"
+    __table_args__ = (
+        Index("ix_integration_runs_business_id", "business_id"),
+        Index("ix_integration_runs_started_at", "started_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    business_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    provider: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    run_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="ok", server_default=text("'ok'"))
+
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    before_counts: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    after_counts: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    detail: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
 class Category(Base):
     """
