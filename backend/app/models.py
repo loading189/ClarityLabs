@@ -204,7 +204,7 @@ class RawEvent(Base):
     __tablename__ = "raw_events"
     __table_args__ = (
         UniqueConstraint("business_id", "source", "source_event_id", name="uq_raw_events_business_source_event"),
-        Index("ix_raw_events_canonical_source_event_id", "canonical_source_event_id"),
+        # Index("ix_raw_events_canonical_source_event_id", "canonical_source_event_id"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
@@ -218,7 +218,7 @@ class RawEvent(Base):
 
     source: Mapped[str] = mapped_column(String(40), nullable=False)  # plaid/shopify/stripe/etc
     source_event_id: Mapped[str] = mapped_column(String(120), nullable=False)  # dedupe key
-    canonical_source_event_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    # canonical_source_event_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
 
     occurred_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     payload: Mapped[dict] = mapped_column(JSON, nullable=False)
