@@ -140,6 +140,8 @@ def test_explain_endpoint_returns_payload(db_session):
     assert "detector" in explain
     assert "evidence" in explain
     assert "related_audits" in explain
+    assert "explanation" in explain
+    assert "ledger_anchors" in explain
     assert "links" in explain
 
     evidence_keys = [(item["key"], item["label"]) for item in explain["evidence"]]
@@ -149,6 +151,26 @@ def test_explain_endpoint_returns_payload(db_session):
     assert detector["default_severity"] is not None
     assert detector["evidence_schema"]
     assert detector["scoring_profile"]
+    assert explain["explanation"]["observation"]
+    assert explain["explanation"]["implication"]
+
+
+def test_explain_metadata_includes_baseline_window(db_session):
+    biz = _create_business(db_session)
+    _seed_expense_creep(db_session, biz.id)
+
+    signals, _ = signals_service.list_signal_states(db_session, biz.id)
+    signal_id = signals[0]["id"]
+
+    explain = signals_service.get_signal_explain(db_session, biz.id, signal_id)
+    metadata = explain["state"]["metadata"]
+    assert metadata
+    baseline = metadata.get("baseline_window")
+    assert baseline
+    assert baseline.get("start")
+    assert baseline.get("end")
+    assert baseline.get("label")
+    assert baseline.get("value") is not None
 
 
 def test_explain_evidence_order_is_deterministic(db_session):
@@ -161,6 +183,8 @@ def test_explain_evidence_order_is_deterministic(db_session):
     explain = signals_service.get_signal_explain(db_session, biz.id, signal_id)
     evidence_keys = [(item["key"], item["label"]) for item in explain["evidence"]]
     assert evidence_keys == sorted(evidence_keys)
+    rows = explain["explanation"]["evidence"]["rows"]
+    assert rows == sorted(rows)
 
 
 def test_explain_evidence_contains_anchors(db_session):
@@ -179,6 +203,7 @@ def test_explain_evidence_contains_anchors(db_session):
     assert anchors
     assert anchors.get("date_start")
     assert anchors.get("date_end")
+    assert explain["ledger_anchors"]
 
 
 def test_explain_includes_recent_audit_for_status_update(db_session):

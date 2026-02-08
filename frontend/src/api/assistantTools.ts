@@ -19,6 +19,14 @@ export type AssistantSummary = {
   };
   open_signals: number;
   uncategorized_count: number;
+  recent_signal_resolutions: Array<{
+    id: string;
+    signal_id: string;
+    status: string;
+    actor: string;
+    reason?: string | null;
+    created_at: string;
+  }>;
   audit_events: Array<{
     id: string;
     event_type: string;

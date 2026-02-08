@@ -52,3 +52,4 @@ def test_assistant_summary_empty(client, db_session):
     assert payload["open_signals"] == 0
     assert payload["uncategorized_count"] == 0
     assert payload["integrations"] == []
+    assert payload["recent_signal_resolutions"] == []

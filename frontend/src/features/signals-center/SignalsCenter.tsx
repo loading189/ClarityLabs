@@ -14,6 +14,7 @@ import {
   type SignalSeverity,
   type SignalState,
   type SignalStateDetail,
+  type SignalExplainLedgerAnchor,
   type SignalStatus,
 } from "../../api/signals";
 import { getMonitorStatus, type MonitorStatus } from "../../api/monitor";
@@ -23,8 +24,10 @@ import { Button, Chip, Panel } from "../../components/ui";
 import TransactionDetailDrawer from "../../components/transactions/TransactionDetailDrawer";
 import FilterBar from "../../components/common/FilterBar";
 import { useFilters } from "../../app/filters/useFilters";
-import { resolveDateRange } from "../../app/filters/filters";
+import { resolveDateRange, type FilterState } from "../../app/filters/filters";
 import { useAppState } from "../../app/state/appState";
+import { ledgerPath } from "../../app/routes/routeUtils";
+import LedgerTraceDrawer from "../../components/ledger/LedgerTraceDrawer";
 
 const STATUS_LABELS: Record<string, string> = {
   open: "Open",
@@ -57,6 +60,23 @@ function severityClass(severity: string | null) {
 function formatDomainLabel(domain?: string | null) {
   if (!domain) return "—";
   return domain.charAt(0).toUpperCase() + domain.slice(1);
+}
+
+function anchorToLedgerFilters(anchor: SignalExplainLedgerAnchor | null): FilterState | null {
+  if (!anchor || !anchor.query) return null;
+  const query = anchor.query;
+  const filters: FilterState = {};
+  if (query.date_start && query.date_end) {
+    filters.start = query.date_start;
+    filters.end = query.date_end;
+    filters.window = undefined;
+  }
+  if (query.vendor) filters.vendor = query.vendor;
+  if (query.category) filters.category = query.category;
+  if (query.txn_ids && query.txn_ids.length > 0) {
+    filters.anchor_source_event_id = query.txn_ids[0] ?? undefined;
+  }
+  return filters;
 }
 
 function mapLegacySignal(signal: Signal): SignalState {
@@ -226,7 +246,10 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
   const [statusSelections, setStatusSelections] = useState<Record<string, SignalStatus>>({});
   const [statusSaving, setStatusSaving] = useState<Record<string, boolean>>({});
   const [statusErrors, setStatusErrors] = useState<Record<string, string>>({});
+  const [statusReasons, setStatusReasons] = useState<Record<string, string>>({});
   const [detailSourceEventId, setDetailSourceEventId] = useState<string | null>(null);
+  const [ledgerTraceOpen, setLedgerTraceOpen] = useState(false);
+  const [selectedLedgerAnchor, setSelectedLedgerAnchor] = useState<SignalExplainLedgerAnchor | null>(null);
   const [healthScore, setHealthScore] = useState<HealthScoreOut | null>(null);
   const [healthScoreLoading, setHealthScoreLoading] = useState(false);
   const [healthScoreErr, setHealthScoreErr] = useState<string | null>(null);
@@ -418,13 +441,11 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
         if (!haystack.includes(q)) return false;
       }
       if (hasLedgerAnchors) {
-        const payload = (detail?.payload_json as Record<string, unknown> | null) ?? null;
-        const hasAnchor = Boolean(payload && (payload["txn_ids"] || payload["ledger_anchor"]));
-        if (!hasAnchor && selected?.id === signal.id) return false;
+        if (!signal.has_ledger_anchors) return false;
       }
       return true;
     });
-  }, [detail?.payload_json, domainFilter, hasLedgerAnchors, selected?.id, signals, severityFilter, statusFilter, textFilter]);
+  }, [domainFilter, hasLedgerAnchors, signals, severityFilter, statusFilter, textFilter]);
 
   const handleStatusUpdate = async (signalId: string) => {
     if (useLegacyV1) return;
@@ -435,6 +456,7 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
       statusSelections[signalId] ??
       (selectedSignal?.status as SignalStatus) ??
       "open";
+    const reason = statusReasons[signalId]?.trim() || undefined;
     setStatusSaving((prev) => ({ ...prev, [signalId]: true }));
     setStatusErrors((prev) => ({ ...prev, [signalId]: "" }));
     setToastMsg(null);
@@ -442,6 +464,7 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
     try {
       const result = await updateSignalStatus(businessId, signalId, {
         status: nextStatus,
+        reason,
       });
       setToastAuditId(result.audit_id ?? null);
       setToastMsg(`Status updated to ${STATUS_LABELS[result.status] ?? result.status}.`);
@@ -453,6 +476,7 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
         setDetail(detailData);
       }
       setSelected((prev) => (prev && prev.id === signalId ? { ...prev, status: result.status } : prev));
+      setStatusReasons((prev) => ({ ...prev, [signalId]: "" }));
     } catch (e: any) {
       setStatusErrors((prev) => ({
         ...prev,
@@ -515,6 +539,15 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
   }, [detail?.payload_json, detailExplain?.evidence]);
 
   const anchorFromEvidence = useMemo(() => evidenceTxns[0]?.id ?? null, [evidenceTxns]);
+  const ledgerAnchors = useMemo(
+    () => (Array.isArray(detailExplain?.ledger_anchors) ? detailExplain?.ledger_anchors : []) as SignalExplainLedgerAnchor[],
+    [detailExplain?.ledger_anchors]
+  );
+  const primaryLedgerAnchor = ledgerAnchors[0] ?? null;
+  const ledgerFilters = useMemo(
+    () => anchorToLedgerFilters(primaryLedgerAnchor),
+    [primaryLedgerAnchor]
+  );
   const isStale =
     monitorStatus?.stale ??
     (monitorStatus?.last_pulse_at
@@ -811,6 +844,21 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
                 <option value="resolved">Resolved</option>
                 <option value="ignored">Ignored</option>
               </select>
+              <div className={styles.reasonField}>
+                <label className={styles.reasonLabel}>Resolution reason</label>
+                <textarea
+                  className={styles.reasonInput}
+                  placeholder="Add context for this status change…"
+                  rows={2}
+                  value={statusReasons[detail.id] ?? ""}
+                  onChange={(event) =>
+                    setStatusReasons((prev) => ({
+                      ...prev,
+                      [detail.id]: event.target.value,
+                    }))
+                  }
+                />
+              </div>
               <button
                 className={styles.primaryButton}
                 type="button"
@@ -835,15 +883,118 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
                   Create plan
                 </Link>
               )}
+              {ledgerFilters && (
+                <Link
+                  className={styles.secondaryButton}
+                  to={ledgerPath(businessId, ledgerFilters)}
+                >
+                  Open ledger
+                </Link>
+              )}
+              {primaryLedgerAnchor && (
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  onClick={() => {
+                    setSelectedLedgerAnchor(primaryLedgerAnchor);
+                    setLedgerTraceOpen(true);
+                  }}
+                >
+                  View ledger trace
+                </button>
+              )}
               {anchorFromEvidence && (
                 <Link
                   className={styles.secondaryButton}
                   to={`/app/${businessId}/ledger?anchor_source_event_id=${encodeURIComponent(anchorFromEvidence)}`}
                 >
-                  View in Ledger
+                  Highlight evidence
                 </Link>
               )}
             </div>
+
+            {detailExplain?.explanation && (
+              <div>
+                <div className={styles.sectionTitle}>Explanation</div>
+                <div className={styles.detailSummary}>{detailExplain.explanation.observation}</div>
+                <div className={styles.explanationGrid}>
+                  <div>
+                    <div className={styles.explanationLabel}>Evidence counts</div>
+                    <ul className={styles.explanationList}>
+                      {Object.entries(detailExplain.explanation.evidence?.counts ?? {}).map(([key, value]) => (
+                        <li key={key}>
+                          <strong>{key}:</strong> {String(value)}
+                        </li>
+                      ))}
+                      {Object.keys(detailExplain.explanation.evidence?.counts ?? {}).length === 0 && (
+                        <li>—</li>
+                      )}
+                    </ul>
+                  </div>
+                  <div>
+                    <div className={styles.explanationLabel}>Evidence deltas</div>
+                    <ul className={styles.explanationList}>
+                      {Object.entries(detailExplain.explanation.evidence?.deltas ?? {}).map(([key, value]) => (
+                        <li key={key}>
+                          <strong>{key}:</strong> {String(value)}
+                        </li>
+                      ))}
+                      {Object.keys(detailExplain.explanation.evidence?.deltas ?? {}).length === 0 && (
+                        <li>—</li>
+                      )}
+                    </ul>
+                  </div>
+                  <div>
+                    <div className={styles.explanationLabel}>Evidence rows</div>
+                    <div className={styles.detailSummary}>
+                      {(detailExplain.explanation.evidence?.rows ?? []).length} linked rows
+                    </div>
+                  </div>
+                </div>
+                <div className={styles.detailSummary}>{detailExplain.explanation.implication}</div>
+              </div>
+            )}
+
+            {ledgerAnchors.length > 0 && (
+              <div>
+                <div className={styles.sectionTitle}>Ledger anchors</div>
+                <div className={styles.detailSummary}>Click an anchor to inspect the ledger window.</div>
+                <div className={styles.auditList}>
+                  {ledgerAnchors.map((anchor) => (
+                    <div key={anchor.label} className={styles.auditRow}>
+                      <div>
+                        <div className={styles.auditEvent}>{anchor.label}</div>
+                        <div className={styles.auditMeta}>
+                          {anchor.query?.date_start && anchor.query?.date_end
+                            ? `${anchor.query.date_start} → ${anchor.query.date_end}`
+                            : "Transaction set"}
+                        </div>
+                      </div>
+                      <div className={styles.statusActions}>
+                        <button
+                          type="button"
+                          className={styles.secondaryButton}
+                          onClick={() => {
+                            setSelectedLedgerAnchor(anchor);
+                            setLedgerTraceOpen(true);
+                          }}
+                        >
+                          Open trace
+                        </button>
+                        {anchorToLedgerFilters(anchor) && (
+                          <Link
+                            className={styles.secondaryButton}
+                            to={ledgerPath(businessId, anchorToLedgerFilters(anchor) as FilterState)}
+                          >
+                            Open ledger
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {evidenceTxns.length > 0 && (
               <div>
@@ -901,6 +1052,16 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
         businessId={businessId}
         sourceEventId={detailSourceEventId}
         onClose={() => setDetailSourceEventId(null)}
+      />
+
+      <LedgerTraceDrawer
+        open={ledgerTraceOpen}
+        onClose={() => {
+          setLedgerTraceOpen(false);
+          setSelectedLedgerAnchor(null);
+        }}
+        businessId={businessId}
+        anchors={selectedLedgerAnchor?.query ?? null}
       />
 
       <HealthScoreBreakdownDrawer

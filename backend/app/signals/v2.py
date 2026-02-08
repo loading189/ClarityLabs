@@ -121,6 +121,95 @@ def _evidence_source_event_ids(txns: Iterable[NormalizedTransaction]) -> List[st
     return sorted(ids)
 
 
+def _window_meta(
+    start: date,
+    end: date,
+    *,
+    label: str,
+    value: Optional[float] = None,
+    unit: Optional[str] = None,
+) -> Dict[str, object]:
+    meta: Dict[str, object] = {
+        "start": start.isoformat(),
+        "end": end.isoformat(),
+        "label": label,
+    }
+    if value is not None:
+        meta["value"] = round(float(value), 2)
+    if unit is not None:
+        meta["unit"] = unit
+    return meta
+
+
+def _delta_meta(
+    value: float,
+    *,
+    pct: Optional[float] = None,
+    unit: Optional[str] = None,
+) -> Dict[str, object]:
+    delta: Dict[str, object] = {"value": round(float(value), 2)}
+    if pct is not None:
+        delta["pct"] = round(float(pct), 4)
+    if unit is not None:
+        delta["unit"] = unit
+    return delta
+
+
+def _anchor_query(
+    *,
+    txn_ids: Optional[List[str]] = None,
+    date_start: Optional[str] = None,
+    date_end: Optional[str] = None,
+    account_id: Optional[str] = None,
+    vendor: Optional[str] = None,
+    category: Optional[str] = None,
+) -> Dict[str, object]:
+    query: Dict[str, object] = {}
+    if txn_ids:
+        query["txn_ids"] = [str(txn_id) for txn_id in txn_ids]
+    if date_start:
+        query["date_start"] = date_start
+    if date_end:
+        query["date_end"] = date_end
+    if account_id:
+        query["account_id"] = account_id
+    if vendor:
+        query["vendor"] = vendor
+    if category:
+        query["category"] = category
+    return query
+
+
+def _add_ledger_anchor(payload: Dict[str, object], label: str, query: Dict[str, object], evidence_keys: Optional[List[str]] = None) -> None:
+    anchors = payload.setdefault("ledger_anchors", [])
+    if not isinstance(anchors, list):
+        anchors = []
+        payload["ledger_anchors"] = anchors
+    entry: Dict[str, object] = {"label": label, "query": query}
+    if evidence_keys:
+        entry["evidence_keys"] = sorted({str(key) for key in evidence_keys if key})
+    anchors.append(entry)
+
+
+def _explanation_payload(
+    observation: str,
+    implication: str,
+    *,
+    counts: Dict[str, object],
+    deltas: Dict[str, object],
+    rows: Optional[List[str]] = None,
+) -> Dict[str, object]:
+    return {
+        "observation": observation,
+        "implication": implication,
+        "evidence": {
+            "counts": counts,
+            "deltas": deltas,
+            "rows": sorted({str(row) for row in (rows or []) if row}),
+        },
+    }
+
+
 def detect_expense_creep_by_vendor(
     business_id: str,
     txns: List[NormalizedTransaction],
@@ -171,6 +260,21 @@ def detect_expense_creep_by_vendor(
         severity = "high" if increase_pct >= 1.0 or delta >= (min_delta * 3) else "medium"
         vendor_name = vendor_label.get(vendor_key, vendor_key)
         evidence_txns = (current_txns.get(vendor_key) or []) + (prior_txns.get(vendor_key) or [])
+        current_window_meta = _window_meta(
+            current_start,
+            last_date,
+            label=f"last {window_days} days total",
+            value=current_total,
+            unit="USD",
+        )
+        prior_window_meta = _window_meta(
+            prior_start,
+            prior_end,
+            label=f"prior {window_days} days total",
+            value=prior_total,
+            unit="USD",
+        )
+        evidence_rows = _evidence_source_event_ids(evidence_txns)
         payload = {
             "vendor_key": vendor_key,
             "vendor_name": vendor_name,
@@ -181,10 +285,54 @@ def detect_expense_creep_by_vendor(
             "window_days": window_days,
             "threshold_pct": threshold_pct,
             "min_delta": min_delta,
-            "current_window": {"start": current_start.isoformat(), "end": last_date.isoformat()},
-            "prior_window": {"start": prior_start.isoformat(), "end": prior_end.isoformat()},
-            "evidence_source_event_ids": _evidence_source_event_ids(evidence_txns),
+            "current_window": current_window_meta,
+            "prior_window": prior_window_meta,
+            "baseline_window": prior_window_meta,
+            "computed_deltas": _delta_meta(delta, pct=increase_pct, unit="USD"),
+            "contributing_dimensions": [
+                {
+                    "dimension": "vendor",
+                    "key": vendor_name,
+                    "current_total": round(current_total, 2),
+                    "prior_total": round(prior_total, 2),
+                    "delta": round(delta, 2),
+                    "increase_pct": round(increase_pct, 4),
+                }
+            ],
+            "evidence_source_event_ids": evidence_rows,
+            "explanation": _explanation_payload(
+                f"Outflow to {vendor_name} rose {increase_pct:.0%} (${delta:,.0f}) over the prior {window_days} days.",
+                "Vendor spend is accelerating above its baseline and may require review.",
+                counts={
+                    "current_total": round(current_total, 2),
+                    "prior_total": round(prior_total, 2),
+                    "window_days": window_days,
+                },
+                deltas={"delta": round(delta, 2), "increase_pct": round(increase_pct, 4)},
+                rows=evidence_rows,
+            ),
         }
+        _add_ledger_anchor(
+            payload,
+            "Current window vendor spend",
+            _anchor_query(
+                date_start=current_start.isoformat(),
+                date_end=last_date.isoformat(),
+                vendor=vendor_name,
+                txn_ids=evidence_rows,
+            ),
+            evidence_keys=["current_total"],
+        )
+        _add_ledger_anchor(
+            payload,
+            "Baseline window vendor spend",
+            _anchor_query(
+                date_start=prior_start.isoformat(),
+                date_end=prior_end.isoformat(),
+                vendor=vendor_name,
+            ),
+            evidence_keys=["prior_total"],
+        )
         signal_type = "expense_creep_by_vendor"
         fingerprint = _fingerprint([business_id, signal_type, vendor_key])
         signals.append(
@@ -243,6 +391,13 @@ def detect_low_cash_runway(
     if ledger and ledger[-1].source_event_id:
         evidence_ids.append(ledger[-1].source_event_id)
         evidence_ids = sorted(set(evidence_ids))
+    burn_window_meta = _window_meta(
+        burn_start,
+        burn_end,
+        label=f"last {burn_window_days} days burn",
+        value=burn_per_day,
+        unit="USD/day",
+    )
     payload = {
         "current_cash": round(current_cash, 2),
         "burn_window_days": burn_window_days,
@@ -256,7 +411,46 @@ def detect_low_cash_runway(
         "epsilon": epsilon,
         "thresholds": {"high": high_threshold_days, "medium": medium_threshold_days},
         "evidence_source_event_ids": evidence_ids,
+        "current_window": burn_window_meta,
+        "baseline_window": burn_window_meta,
+        "computed_deltas": {
+            "runway_vs_high": round(runway_days - high_threshold_days, 2),
+            "runway_vs_medium": round(runway_days - medium_threshold_days, 2),
+        },
+        "contributing_dimensions": [
+            {
+                "dimension": "burn",
+                "burn_per_day": round(burn_per_day, 4),
+                "net_burn": round(net_burn, 2),
+            }
+        ],
+        "explanation": _explanation_payload(
+            f"Runway is {runway_days:.1f} days based on the last {burn_window_days} days of burn.",
+            "Cash runway is below target thresholds, indicating elevated liquidity risk.",
+            counts={
+                "current_cash": round(current_cash, 2),
+                "total_inflow": round(inflow_total, 2),
+                "total_outflow": round(outflow_total, 2),
+                "burn_window_days": burn_window_days,
+            },
+            deltas={
+                "net_burn": round(net_burn, 2),
+                "burn_per_day": round(burn_per_day, 4),
+                "runway_days": round(runway_days, 2),
+            },
+            rows=evidence_ids,
+        ),
     }
+    _add_ledger_anchor(
+        payload,
+        "Burn window transactions",
+        _anchor_query(
+            date_start=burn_start.isoformat(),
+            date_end=burn_end.isoformat(),
+            txn_ids=evidence_ids,
+        ),
+        evidence_keys=["total_inflow", "total_outflow"],
+    )
     signal_type = "low_cash_runway"
     fingerprint = _fingerprint([business_id, signal_type])
     return [
@@ -324,6 +518,21 @@ def detect_unusual_outflow_spike(
         for txn in txns
         if txn.direction == "outflow" and txn.date == last_date
     ]
+    spike_rows = _evidence_source_event_ids(spike_txns)
+    baseline_meta = _window_meta(
+        start_date,
+        last_date,
+        label=f"last {window_days} days mean",
+        value=avg,
+        unit="USD",
+    )
+    current_meta = _window_meta(
+        last_date,
+        last_date,
+        label="latest day total",
+        value=latest_total,
+        unit="USD",
+    )
     payload = {
         "latest_date": last_date.isoformat(),
         "latest_total": round(latest_total, 2),
@@ -336,8 +545,39 @@ def detect_unusual_outflow_spike(
         "window_days": window_days,
         "spike_sigma": spike_sigma,
         "spike_mult": spike_mult,
-        "evidence_source_event_ids": _evidence_source_event_ids(spike_txns),
+        "evidence_source_event_ids": spike_rows,
+        "current_window": current_meta,
+        "baseline_window": baseline_meta,
+        "computed_deltas": _delta_meta(latest_total - avg, pct=(latest_total / avg - 1) if avg else None, unit="USD"),
+        "contributing_dimensions": [
+            {
+                "dimension": "day",
+                "key": last_date.isoformat(),
+                "latest_total": round(latest_total, 2),
+                "baseline_mean": round(avg, 2),
+            }
+        ],
+        "explanation": _explanation_payload(
+            f"Outflows on {last_date.isoformat()} spiked to ${latest_total:,.0f}.",
+            "Spending volatility exceeds the recent baseline and warrants ledger review.",
+            counts={
+                "latest_total": round(latest_total, 2),
+                "mean_30d": round(avg, 2),
+                "trailing_mean": round(trailing_mean, 2),
+            },
+            deltas={
+                "spike_sigma": round(latest_total - threshold_sigma, 2),
+                "spike_mult": round(latest_total - threshold_mult, 2) if math.isfinite(threshold_mult) else None,
+            },
+            rows=spike_rows,
+        ),
     }
+    _add_ledger_anchor(
+        payload,
+        "Spike day outflows",
+        _anchor_query(date_start=last_date.isoformat(), date_end=last_date.isoformat(), txn_ids=spike_rows),
+        evidence_keys=["latest_total"],
+    )
     signal_type = "unusual_outflow_spike"
     fingerprint = _fingerprint([business_id, signal_type, last_date.isoformat()])
     return [
@@ -387,6 +627,14 @@ def detect_liquidity_runway_low(
     if not severity:
         return []
 
+    burn_window_meta = _window_meta(
+        burn_start,
+        burn_end,
+        label=f"last {burn_window_days} days burn",
+        value=burn_per_day,
+        unit="USD/day",
+    )
+    burn_txn_ids = _txn_ids(burn_txns)
     payload = {
         "current_cash": round(current_cash, 2),
         "burn_window_days": burn_window_days,
@@ -398,8 +646,42 @@ def detect_liquidity_runway_low(
         "burn_per_day": round(burn_per_day, 4),
         "runway_days": round(runway_days, 2),
         "thresholds": {"high": high_threshold_days, "medium": medium_threshold_days},
-        "txn_ids": _txn_ids(burn_txns),
+        "txn_ids": burn_txn_ids,
+        "current_window": burn_window_meta,
+        "baseline_window": burn_window_meta,
+        "computed_deltas": {
+            "runway_vs_high": round(runway_days - high_threshold_days, 2),
+            "runway_vs_medium": round(runway_days - medium_threshold_days, 2),
+        },
+        "contributing_dimensions": [
+            {
+                "dimension": "burn",
+                "burn_per_day": round(burn_per_day, 4),
+                "net_burn": round(net_burn, 2),
+            }
+        ],
+        "explanation": _explanation_payload(
+            f"Runway is {runway_days:.1f} days based on the last {burn_window_days} days.",
+            "Liquidity runway is below target and requires attention to inflows and outflows.",
+            counts={
+                "current_cash": round(current_cash, 2),
+                "total_inflow": round(inflow_total, 2),
+                "total_outflow": round(outflow_total, 2),
+            },
+            deltas={
+                "net_burn": round(net_burn, 2),
+                "burn_per_day": round(burn_per_day, 4),
+                "runway_days": round(runway_days, 2),
+            },
+            rows=burn_txn_ids,
+        ),
     }
+    _add_ledger_anchor(
+        payload,
+        "Burn window transactions",
+        _anchor_query(date_start=burn_start.isoformat(), date_end=burn_end.isoformat(), txn_ids=burn_txn_ids),
+        evidence_keys=["total_inflow", "total_outflow"],
+    )
     signal_type = "liquidity.runway_low"
     fingerprint = _fingerprint([business_id, signal_type])
     return [
@@ -454,16 +736,56 @@ def detect_liquidity_cash_trend_down(
         return []
 
     severity = "warning" if decline < 0.3 else "critical"
+    current_window_meta = _window_meta(
+        current_start,
+        current_end,
+        label=f"last {window_days} days avg balance",
+        value=current_avg,
+        unit="USD",
+    )
+    prior_window_meta = _window_meta(
+        prior_start,
+        prior_end,
+        label=f"prior {window_days} days avg balance",
+        value=prior_avg,
+        unit="USD",
+    )
+    current_txn_ids = _txn_ids(_txns_in_window(txns, current_start, current_end))
     payload = {
-        "current_window": {"start": current_start.isoformat(), "end": current_end.isoformat()},
-        "prior_window": {"start": prior_start.isoformat(), "end": prior_end.isoformat()},
+        "current_window": current_window_meta,
+        "prior_window": prior_window_meta,
+        "baseline_window": prior_window_meta,
         "current_avg_balance": round(current_avg, 2),
         "prior_avg_balance": round(prior_avg, 2),
         "delta": round(delta, 2),
         "decline_pct": round(decline, 4),
         "sample_days": {"current": current_days, "prior": prior_days},
-        "txn_ids": _txn_ids(_txns_in_window(txns, current_start, current_end)),
+        "txn_ids": current_txn_ids,
+        "computed_deltas": _delta_meta(delta, pct=decline, unit="USD"),
+        "contributing_dimensions": [
+            {
+                "dimension": "balance",
+                "current_avg_balance": round(current_avg, 2),
+                "prior_avg_balance": round(prior_avg, 2),
+            }
+        ],
+        "explanation": _explanation_payload(
+            f"Average cash balance declined {decline:.0%} vs the prior period.",
+            "A sustained decline in cash balance suggests liquidity pressure.",
+            counts={
+                "current_avg_balance": round(current_avg, 2),
+                "prior_avg_balance": round(prior_avg, 2),
+            },
+            deltas={"delta": round(delta, 2), "decline_pct": round(decline, 4)},
+            rows=current_txn_ids,
+        ),
     }
+    _add_ledger_anchor(
+        payload,
+        "Current window cash activity",
+        _anchor_query(date_start=current_start.isoformat(), date_end=current_end.isoformat(), txn_ids=current_txn_ids),
+        evidence_keys=["current_avg_balance"],
+    )
     signal_type = "liquidity.cash_trend_down"
     fingerprint = _fingerprint([business_id, signal_type, current_end.isoformat()])
     return [
@@ -507,15 +829,56 @@ def detect_revenue_decline_vs_baseline(
         return []
 
     severity = "critical" if decline >= 0.4 else "warning"
+    current_window_meta = _window_meta(
+        current_start,
+        current_end,
+        label=f"last {window_days} days inflow",
+        value=current_total,
+        unit="USD",
+    )
+    prior_window_meta = _window_meta(
+        prior_start,
+        prior_end,
+        label=f"prior {window_days} days inflow",
+        value=prior_total,
+        unit="USD",
+    )
+    inflow_txn_ids = _txn_ids([txn for txn in current_txns if txn.direction == "inflow"])
     payload = {
-        "current_window": {"start": current_start.isoformat(), "end": current_end.isoformat()},
-        "prior_window": {"start": prior_start.isoformat(), "end": prior_end.isoformat()},
+        "current_window": current_window_meta,
+        "prior_window": prior_window_meta,
+        "baseline_window": prior_window_meta,
         "current_total": round(current_total, 2),
         "prior_total": round(prior_total, 2),
         "delta": round(delta, 2),
         "decline_pct": round(decline, 4),
-        "txn_ids": _txn_ids([txn for txn in current_txns if txn.direction == "inflow"]),
+        "txn_ids": inflow_txn_ids,
+        "computed_deltas": _delta_meta(delta, pct=decline, unit="USD"),
+        "contributing_dimensions": [
+            {
+                "dimension": "revenue",
+                "current_total": round(current_total, 2),
+                "prior_total": round(prior_total, 2),
+            }
+        ],
+        "explanation": _explanation_payload(
+            f"Revenue declined {decline:.0%} vs the prior {window_days} days.",
+            "Revenue softening can signal churn or slower demand and should be investigated.",
+            counts={
+                "current_total": round(current_total, 2),
+                "prior_total": round(prior_total, 2),
+                "window_days": window_days,
+            },
+            deltas={"delta": round(delta, 2), "decline_pct": round(decline, 4)},
+            rows=inflow_txn_ids,
+        ),
     }
+    _add_ledger_anchor(
+        payload,
+        "Current window inflows",
+        _anchor_query(date_start=current_start.isoformat(), date_end=current_end.isoformat(), txn_ids=inflow_txn_ids),
+        evidence_keys=["current_total"],
+    )
     signal_type = "revenue.decline_vs_baseline"
     fingerprint = _fingerprint([business_id, signal_type, current_end.isoformat()])
     return [
@@ -564,15 +927,52 @@ def detect_revenue_volatility_spike(
         return []
 
     severity = "critical" if ratio >= 2.2 else "warning"
+    current_window_meta = _window_meta(
+        current_start,
+        current_end,
+        label=f"last {window_days} days std dev",
+        value=current_std,
+        unit="USD",
+    )
+    prior_window_meta = _window_meta(
+        prior_start,
+        prior_end,
+        label=f"prior {window_days} days std dev",
+        value=prior_std,
+        unit="USD",
+    )
+    inflow_txn_ids = _txn_ids([txn for txn in current_txns if txn.direction == "inflow"])
     payload = {
-        "current_window": {"start": current_start.isoformat(), "end": current_end.isoformat()},
-        "prior_window": {"start": prior_start.isoformat(), "end": prior_end.isoformat()},
+        "current_window": current_window_meta,
+        "prior_window": prior_window_meta,
+        "baseline_window": prior_window_meta,
         "current_std": round(current_std, 2),
         "prior_std": round(prior_std, 2),
         "ratio": round(ratio, 4),
         "window_days": window_days,
-        "txn_ids": _txn_ids([txn for txn in current_txns if txn.direction == "inflow"]),
+        "txn_ids": inflow_txn_ids,
+        "computed_deltas": _delta_meta(current_std - prior_std, pct=ratio, unit="USD"),
+        "contributing_dimensions": [
+            {
+                "dimension": "volatility",
+                "current_std": round(current_std, 2),
+                "prior_std": round(prior_std, 2),
+            }
+        ],
+        "explanation": _explanation_payload(
+            "Revenue volatility is elevated compared to the prior period.",
+            "Higher volatility can indicate uneven cash timing and forecasting risk.",
+            counts={"current_std": round(current_std, 2), "prior_std": round(prior_std, 2)},
+            deltas={"ratio": round(ratio, 4)},
+            rows=inflow_txn_ids,
+        ),
     }
+    _add_ledger_anchor(
+        payload,
+        "Current window inflows",
+        _anchor_query(date_start=current_start.isoformat(), date_end=current_end.isoformat(), txn_ids=inflow_txn_ids),
+        evidence_keys=["current_std"],
+    )
     signal_type = "revenue.volatility_spike"
     fingerprint = _fingerprint([business_id, signal_type, current_end.isoformat()])
     return [
@@ -618,15 +1018,52 @@ def detect_expense_spike_vs_baseline(
         return []
 
     severity = "critical" if ratio >= 2.5 else "warning"
+    current_window_meta = _window_meta(
+        current_start,
+        current_end,
+        label=f"last {current_days} days outflow",
+        value=current_total,
+        unit="USD",
+    )
+    baseline_window_meta = _window_meta(
+        baseline_start,
+        baseline_end,
+        label=f"baseline {baseline_days} days avg (scaled to {current_days}d)",
+        value=baseline_avg,
+        unit="USD",
+    )
+    outflow_txn_ids = _txn_ids([txn for txn in current_txns if txn.direction == "outflow"])
     payload = {
-        "current_window": {"start": current_start.isoformat(), "end": current_end.isoformat()},
-        "prior_window": {"start": baseline_start.isoformat(), "end": baseline_end.isoformat()},
+        "current_window": current_window_meta,
+        "prior_window": baseline_window_meta,
+        "baseline_window": baseline_window_meta,
         "current_total": round(current_total, 2),
         "baseline_avg": round(baseline_avg, 2),
         "ratio": round(ratio, 4),
         "delta": round(delta, 2),
-        "txn_ids": _txn_ids([txn for txn in current_txns if txn.direction == "outflow"]),
+        "txn_ids": outflow_txn_ids,
+        "computed_deltas": _delta_meta(delta, pct=ratio, unit="USD"),
+        "contributing_dimensions": [
+            {
+                "dimension": "expense",
+                "current_total": round(current_total, 2),
+                "baseline_avg": round(baseline_avg, 2),
+            }
+        ],
+        "explanation": _explanation_payload(
+            "Recent outflows spiked above the baseline trend.",
+            "Expense spikes can strain liquidity if sustained.",
+            counts={"current_total": round(current_total, 2), "baseline_avg": round(baseline_avg, 2)},
+            deltas={"ratio": round(ratio, 4), "delta": round(delta, 2)},
+            rows=outflow_txn_ids,
+        ),
     }
+    _add_ledger_anchor(
+        payload,
+        "Current window outflows",
+        _anchor_query(date_start=current_start.isoformat(), date_end=current_end.isoformat(), txn_ids=outflow_txn_ids),
+        evidence_keys=["current_total"],
+    )
     signal_type = "expense.spike_vs_baseline"
     fingerprint = _fingerprint([business_id, signal_type, current_end.isoformat()])
     return [
@@ -679,6 +1116,21 @@ def detect_expense_new_recurring(
             continue
         vendor_name = vendor_txns[0].counterparty_hint or vendor_txns[0].description or vendor_key
         total_amount = _sum_total(vendor_txns, "outflow")
+        current_window_meta = _window_meta(
+            current_start,
+            current_end,
+            label=f"last {current_days} days outflow",
+            value=total_amount,
+            unit="USD",
+        )
+        prior_window_meta = _window_meta(
+            prior_start,
+            prior_end,
+            label=f"prior {prior_days} days outflow",
+            value=0.0,
+            unit="USD",
+        )
+        vendor_txn_ids = _txn_ids(vendor_txns)
         payload = {
             "vendor_key": vendor_key,
             "vendor_name": vendor_name,
@@ -687,8 +1139,33 @@ def detect_expense_new_recurring(
             "first_seen": min(txn.date for txn in vendor_txns).isoformat(),
             "last_seen": max(txn.date for txn in vendor_txns).isoformat(),
             "window_days": current_days,
-            "txn_ids": _txn_ids(vendor_txns),
+            "txn_ids": vendor_txn_ids,
+            "current_window": current_window_meta,
+            "prior_window": prior_window_meta,
+            "baseline_window": prior_window_meta,
+            "computed_deltas": _delta_meta(total_amount, unit="USD"),
+            "contributing_dimensions": [
+                {
+                    "dimension": "vendor",
+                    "key": vendor_name,
+                    "txn_count": len(vendor_txns),
+                    "total_amount": round(total_amount, 2),
+                }
+            ],
+            "explanation": _explanation_payload(
+                f"Detected {len(vendor_txns)} new recurring outflows to {vendor_name}.",
+                "New recurring spend can create ongoing cost obligations.",
+                counts={"txn_count": len(vendor_txns), "total_amount": round(total_amount, 2)},
+                deltas={"total_amount": round(total_amount, 2)},
+                rows=vendor_txn_ids,
+            ),
         }
+        _add_ledger_anchor(
+            payload,
+            "Current window vendor outflows",
+            _anchor_query(date_start=current_start.isoformat(), date_end=current_end.isoformat(), vendor=vendor_name, txn_ids=vendor_txn_ids),
+            evidence_keys=["txn_count"],
+        )
         signal_type = "expense.new_recurring"
         fingerprint = _fingerprint([business_id, signal_type, vendor_key])
         signals.append(
@@ -742,6 +1219,14 @@ def detect_timing_inflow_outflow_mismatch(
     if gap < gap_days:
         return []
 
+    window_meta = _window_meta(
+        window_start,
+        window_end,
+        label=f"last {window_days} days cash timing",
+        value=gap,
+        unit="days",
+    )
+    outflow_txn_ids = _txn_ids(outflows)
     payload = {
         "window_start": window_start.isoformat(),
         "window_end": window_end.isoformat(),
@@ -750,8 +1235,34 @@ def detect_timing_inflow_outflow_mismatch(
         "centroid_gap_days": round(gap, 2),
         "inflow_total": round(inflow_total, 2),
         "outflow_total": round(outflow_total, 2),
-        "txn_ids": _txn_ids(outflows),
+        "txn_ids": outflow_txn_ids,
+        "current_window": window_meta,
+        "baseline_window": window_meta,
+        "computed_deltas": _delta_meta(gap, unit="days"),
+        "contributing_dimensions": [
+            {
+                "dimension": "timing",
+                "inflow_centroid": round(inflow_centroid, 2),
+                "outflow_centroid": round(outflow_centroid, 2),
+            }
+        ],
+        "explanation": _explanation_payload(
+            "Outflows cluster earlier than inflows in the recent window.",
+            "Timing mismatches can create cash strain between inflow and outflow cycles.",
+            counts={
+                "inflow_total": round(inflow_total, 2),
+                "outflow_total": round(outflow_total, 2),
+            },
+            deltas={"centroid_gap_days": round(gap, 2)},
+            rows=outflow_txn_ids,
+        ),
     }
+    _add_ledger_anchor(
+        payload,
+        "Window outflows",
+        _anchor_query(date_start=window_start.isoformat(), date_end=window_end.isoformat(), txn_ids=outflow_txn_ids),
+        evidence_keys=["outflow_total"],
+    )
     signal_type = "timing.inflow_outflow_mismatch"
     fingerprint = _fingerprint([business_id, signal_type, window_end.isoformat()])
     return [
@@ -807,6 +1318,14 @@ def detect_timing_payroll_rent_cliff(
     if ratio < ratio_threshold or cliff_total < min_total:
         return []
 
+    window_meta = _window_meta(
+        window_start,
+        window_end,
+        label=f"last {window_days} days outflow",
+        value=total_outflow,
+        unit="USD",
+    )
+    cliff_txn_ids = _txn_ids([txn for txn in target_txns if txn.date == cliff_date])
     payload = {
         "window_start": window_start.isoformat(),
         "window_end": window_end.isoformat(),
@@ -814,8 +1333,31 @@ def detect_timing_payroll_rent_cliff(
         "cliff_total": round(cliff_total, 2),
         "outflow_total": round(total_outflow, 2),
         "cliff_ratio": round(ratio, 4),
-        "txn_ids": _txn_ids([txn for txn in target_txns if txn.date == cliff_date]),
+        "txn_ids": cliff_txn_ids,
+        "current_window": window_meta,
+        "baseline_window": window_meta,
+        "computed_deltas": _delta_meta(cliff_total, pct=ratio, unit="USD"),
+        "contributing_dimensions": [
+            {
+                "dimension": "timing",
+                "cliff_date": cliff_date.isoformat(),
+                "cliff_total": round(cliff_total, 2),
+            }
+        ],
+        "explanation": _explanation_payload(
+            "Payroll or rent outflows are concentrated into a single day.",
+            "Concentrated outflows can create short-term cash cliffs.",
+            counts={"cliff_total": round(cliff_total, 2), "outflow_total": round(total_outflow, 2)},
+            deltas={"cliff_ratio": round(ratio, 4)},
+            rows=cliff_txn_ids,
+        ),
     }
+    _add_ledger_anchor(
+        payload,
+        "Cliff day payroll/rent transactions",
+        _anchor_query(date_start=cliff_date.isoformat(), date_end=cliff_date.isoformat(), txn_ids=cliff_txn_ids),
+        evidence_keys=["cliff_total"],
+    )
     signal_type = "timing.payroll_rent_cliff"
     fingerprint = _fingerprint([business_id, signal_type, cliff_date.isoformat()])
     return [
@@ -872,6 +1414,14 @@ def _detect_concentration(
         return []
 
     label = txn_map[top_name][0].counterparty_hint or txn_map[top_name][0].description or top_name
+    window_meta = _window_meta(
+        window_start,
+        window_end,
+        label="last 30 days volume",
+        value=total,
+        unit="USD",
+    )
+    top_txn_ids = _txn_ids(txn_map[top_name])
     payload = {
         "window_start": window_start.isoformat(),
         "window_end": window_end.isoformat(),
@@ -879,8 +1429,32 @@ def _detect_concentration(
         "counterparty_total": round(top_total, 2),
         "total_amount": round(total, 2),
         "share": round(share, 4),
-        "txn_ids": _txn_ids(txn_map[top_name]),
+        "txn_ids": top_txn_ids,
+        "current_window": window_meta,
+        "baseline_window": window_meta,
+        "computed_deltas": _delta_meta(top_total, pct=share, unit="USD"),
+        "contributing_dimensions": [
+            {
+                "dimension": "counterparty",
+                "key": label,
+                "counterparty_total": round(top_total, 2),
+                "share": round(share, 4),
+            }
+        ],
+        "explanation": _explanation_payload(
+            f"{title_prefix} accounts for {share:.0%} of recent volume.",
+            "Concentration increases exposure to a single counterparty.",
+            counts={"counterparty_total": round(top_total, 2), "total_amount": round(total, 2)},
+            deltas={"share": round(share, 4)},
+            rows=top_txn_ids,
+        ),
     }
+    _add_ledger_anchor(
+        payload,
+        "Top counterparty transactions",
+        _anchor_query(date_start=window_start.isoformat(), date_end=window_end.isoformat(), vendor=label, txn_ids=top_txn_ids),
+        evidence_keys=["counterparty_total"],
+    )
     fingerprint = _fingerprint([business_id, signal_type, top_name])
     return [
         DetectedSignal(
@@ -946,14 +1520,45 @@ def detect_hygiene_uncategorized_high(
     if ratio < ratio_threshold or len(uncategorized) < min_count:
         return []
 
+    window_meta = _window_meta(
+        window_start,
+        window_end,
+        label=f"last {window_days} days volume",
+        value=len(window_txns),
+        unit="count",
+    )
+    uncategorized_txn_ids = _txn_ids(uncategorized)
     payload = {
         "window_start": window_start.isoformat(),
         "window_end": window_end.isoformat(),
         "uncategorized_count": len(uncategorized),
         "total_count": len(window_txns),
         "uncategorized_ratio": round(ratio, 4),
-        "txn_ids": _txn_ids(uncategorized),
+        "txn_ids": uncategorized_txn_ids,
+        "current_window": window_meta,
+        "baseline_window": window_meta,
+        "computed_deltas": _delta_meta(len(uncategorized), pct=ratio, unit="count"),
+        "contributing_dimensions": [
+            {
+                "dimension": "categorization",
+                "uncategorized_count": len(uncategorized),
+                "uncategorized_ratio": round(ratio, 4),
+            }
+        ],
+        "explanation": _explanation_payload(
+            "A large share of recent transactions are uncategorized.",
+            "Uncategorized volume reduces signal accuracy and ledger clarity.",
+            counts={"uncategorized_count": len(uncategorized), "total_count": len(window_txns)},
+            deltas={"uncategorized_ratio": round(ratio, 4)},
+            rows=uncategorized_txn_ids,
+        ),
     }
+    _add_ledger_anchor(
+        payload,
+        "Uncategorized transactions",
+        _anchor_query(date_start=window_start.isoformat(), date_end=window_end.isoformat(), txn_ids=uncategorized_txn_ids),
+        evidence_keys=["uncategorized_count"],
+    )
     signal_type = "hygiene.uncategorized_high"
     fingerprint = _fingerprint([business_id, signal_type, window_end.isoformat()])
     return [
@@ -1000,12 +1605,36 @@ def detect_hygiene_signal_flapping(
         dates_sorted = sorted(dates)
         window_start = dates_sorted[0]
         window_end = dates_sorted[-1]
+        window_meta = _window_meta(
+            window_start,
+            window_end,
+            label=f"last {window_days} days status changes",
+            value=len(dates_sorted),
+            unit="count",
+        )
         payload = {
             "signal_id": signal_id,
             "change_count": len(dates_sorted),
             "window_days": window_days,
             "window_start": window_start.isoformat(),
             "window_end": window_end.isoformat(),
+            "current_window": window_meta,
+            "baseline_window": window_meta,
+            "computed_deltas": _delta_meta(len(dates_sorted), unit="count"),
+            "contributing_dimensions": [
+                {
+                    "dimension": "signal",
+                    "signal_id": signal_id,
+                    "change_count": len(dates_sorted),
+                }
+            ],
+            "explanation": _explanation_payload(
+                f"Signal {signal_id} changed status {len(dates_sorted)} times recently.",
+                "Frequent status changes can indicate unstable thresholds or noisy data.",
+                counts={"change_count": len(dates_sorted), "window_days": window_days},
+                deltas={},
+                rows=[],
+            ),
         }
         signal_type = "hygiene.signal_flapping"
         fingerprint = _fingerprint([business_id, signal_type, signal_id])

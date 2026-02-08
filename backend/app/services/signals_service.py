@@ -1271,6 +1271,8 @@ def list_signal_states(db: Session, business_id: str) -> Tuple[List[Dict[str, An
         domain = None
         if row.signal_type:
             domain = SIGNAL_CATALOG.get(row.signal_type, {}).get("domain")
+        payload = row.payload_json if isinstance(row.payload_json, dict) else {}
+        has_ledger_anchors = bool(_payload_ledger_anchors(payload))
         signals.append(
             {
                 "id": row.signal_id,
@@ -1284,6 +1286,7 @@ def list_signal_states(db: Session, business_id: str) -> Tuple[List[Dict[str, An
                 "detected_at": row.detected_at.isoformat() if row.detected_at else None,
                 "last_seen_at": row.last_seen_at.isoformat() if row.last_seen_at else None,
                 "resolved_at": row.resolved_at.isoformat() if row.resolved_at else None,
+                "has_ledger_anchors": has_ledger_anchors,
             }
         )
     return signals, {"count": len(signals)}
@@ -1377,6 +1380,97 @@ def _read_payload_value(payload: Dict[str, Any], path: str) -> Any:
             return None
         current = current[part]
     return current
+
+
+def _normalize_anchor_query(anchor: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    if not isinstance(anchor, dict):
+        return None
+    normalized: Dict[str, Any] = {}
+    if anchor.get("txn_ids"):
+        txn_ids = anchor.get("txn_ids")
+        if isinstance(txn_ids, list):
+            normalized["txn_ids"] = [str(txn_id) for txn_id in txn_ids if txn_id]
+    for key in ("date_start", "date_end", "account_id", "vendor", "category"):
+        value = anchor.get(key)
+        if value is not None:
+            normalized[key] = value
+    return normalized or None
+
+
+def _payload_ledger_anchors(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
+    anchors = payload.get("ledger_anchors")
+    if not isinstance(anchors, list):
+        return []
+    normalized: List[Dict[str, Any]] = []
+    for entry in anchors:
+        if not isinstance(entry, dict):
+            continue
+        label = str(entry.get("label") or "Ledger anchor")
+        query = entry.get("query") if isinstance(entry.get("query"), dict) else entry
+        query = _normalize_anchor_query(query)
+        if not query:
+            continue
+        evidence_keys = entry.get("evidence_keys")
+        normalized.append(
+            {
+                "label": label,
+                "query": query,
+                "evidence_keys": sorted({str(key) for key in (evidence_keys or []) if key}),
+            }
+        )
+    return sorted(normalized, key=lambda item: (item["label"], str(item["query"])))
+
+
+def _evidence_ledger_anchors(evidence: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    anchors: List[Dict[str, Any]] = []
+    for item in evidence:
+        anchor_query = _normalize_anchor_query(item.get("anchors") or {})
+        if not anchor_query:
+            continue
+        label = f"Evidence: {item.get('label') or item.get('key') or 'Ledger'}"
+        anchors.append(
+            {
+                "label": label,
+                "query": anchor_query,
+                "evidence_keys": [str(item.get("key") or "")],
+            }
+        )
+    deduped: Dict[str, Dict[str, Any]] = {}
+    for entry in anchors:
+        key = f"{entry['label']}|{entry['query']}"
+        deduped[key] = entry
+    return sorted(deduped.values(), key=lambda item: (item["label"], str(item["query"])))
+
+
+def _build_explanation(
+    payload: Dict[str, Any],
+    state: HealthSignalState,
+    detector: Dict[str, Any],
+    evidence: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    if isinstance(payload.get("explanation"), dict):
+        explanation = payload["explanation"]
+        observation = str(explanation.get("observation") or state.summary or detector.get("title") or "Signal detected")
+        implication = str(explanation.get("implication") or detector.get("description") or "")
+        evidence_payload = explanation.get("evidence") if isinstance(explanation.get("evidence"), dict) else {}
+        counts = evidence_payload.get("counts") if isinstance(evidence_payload.get("counts"), dict) else {}
+        deltas = evidence_payload.get("deltas") if isinstance(evidence_payload.get("deltas"), dict) else {}
+        rows_raw = evidence_payload.get("rows") if isinstance(evidence_payload.get("rows"), list) else []
+        rows = sorted({str(row) for row in rows_raw if row})
+        return {"observation": observation, "implication": implication, "evidence": {"counts": counts, "deltas": deltas, "rows": rows}}
+
+    observation = state.summary or detector.get("title") or "Signal detected"
+    implication = detector.get("description") or "Review the supporting evidence."
+    evidence_sorted = sorted(evidence, key=lambda item: (item.get("key") or "", item.get("label") or ""))
+    counts = {item["key"]: item["value"] for item in evidence_sorted[:4] if "key" in item}
+    deltas = {
+        item["key"]: item["value"]
+        for item in evidence_sorted
+        if isinstance(item.get("key"), str) and ("delta" in item["key"] or "pct" in item["key"] or "ratio" in item["key"])
+    }
+    rows = payload.get("evidence_source_event_ids") or payload.get("txn_ids") or []
+    rows = sorted({str(row) for row in rows if row})
+    return {"observation": observation, "implication": implication, "evidence": {"counts": counts, "deltas": deltas, "rows": rows}}
 
 
 def _build_anchors(payload: Dict[str, Any], field: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -1640,6 +1734,11 @@ def get_signal_explain(db: Session, business_id: str, signal_id: str) -> Dict[st
     related_audits = _list_related_audits(db, business_id, signal_id)
     next_actions = _next_actions(state, detector, related_audits)
     verification = _build_verification(detector, state, evidence)
+    payload = state.payload_json if isinstance(state.payload_json, dict) else {}
+    explanation = _build_explanation(payload, state, detector, evidence)
+    ledger_anchors = _payload_ledger_anchors(payload)
+    if not ledger_anchors:
+        ledger_anchors = _evidence_ledger_anchors(evidence)
 
     return {
         "business_id": business_id,
@@ -1661,6 +1760,8 @@ def get_signal_explain(db: Session, business_id: str, signal_id: str) -> Dict[st
         "clear_condition": detector.get("clear_condition"),
         "verification": verification,
         "playbooks": sorted(detector.get("playbooks") or [], key=lambda item: str(item.get("id", ""))),
+        "explanation": explanation,
+        "ledger_anchors": ledger_anchors,
         "links": [
             "/signals",
             f"/app/{business_id}/signals",

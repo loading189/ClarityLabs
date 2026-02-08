@@ -59,6 +59,44 @@ def _open_signals_count(db: Session, business_id: str) -> int:
     )
 
 
+def _recent_signal_resolutions(db: Session, business_id: str, limit: int = 5) -> list[dict]:
+    rows = (
+        db.execute(
+            select(AuditLog)
+            .where(
+                AuditLog.business_id == business_id,
+                AuditLog.event_type == "signal_status_changed",
+            )
+            .order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
+            .limit(limit * 3)
+        )
+        .scalars()
+        .all()
+    )
+    results: list[dict] = []
+    for row in rows:
+        after_state = row.after_state if isinstance(row.after_state, dict) else {}
+        status = after_state.get("status")
+        if status not in {"resolved", "ignored"}:
+            continue
+        signal_id = after_state.get("signal_id")
+        if not signal_id:
+            continue
+        results.append(
+            {
+                "id": row.id,
+                "signal_id": signal_id,
+                "status": status,
+                "actor": row.actor,
+                "reason": row.reason,
+                "created_at": row.created_at,
+            }
+        )
+        if len(results) >= limit:
+            break
+    return results
+
+
 class AssistantActionIn(BaseModel):
     action_type: str
     payload: Optional[dict] = None
@@ -98,6 +136,7 @@ def assistant_summary(business_id: str, db: Session = Depends(get_db)):
         "monitor_status": monitoring_service.get_monitor_status(db, business_id),
         "open_signals": _open_signals_count(db, business_id),
         "uncategorized_count": count_uncategorized_raw_events(db, business_id),
+        "recent_signal_resolutions": _recent_signal_resolutions(db, business_id),
         "audit_events": [
             {
                 "id": row.id,

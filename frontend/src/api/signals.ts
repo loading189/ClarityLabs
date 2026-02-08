@@ -52,6 +52,7 @@ export type SignalState = {
   title: string | null;
   summary: string | null;
   updated_at: string | null;
+  has_ledger_anchors?: boolean;
 };
 
 export type SignalStateDetail = SignalState & {
@@ -112,6 +113,24 @@ export type SignalExplainEvidence = {
     vendor?: string | null;
     category?: string | null;
   } | null;
+};
+
+export type SignalExplainEvidenceSummary = {
+  counts: Record<string, unknown>;
+  deltas: Record<string, unknown>;
+  rows: string[];
+};
+
+export type SignalExplainExplanation = {
+  observation: string;
+  evidence: SignalExplainEvidenceSummary;
+  implication: string;
+};
+
+export type SignalExplainLedgerAnchor = {
+  label: string;
+  query: SignalExplainEvidence["anchors"];
+  evidence_keys: string[];
 };
 
 
@@ -196,6 +215,8 @@ export type SignalExplainOut = {
   clear_condition: SignalExplainClearCondition | null;
   verification: SignalExplainVerification;
   playbooks: SignalExplainPlaybook[];
+  explanation?: SignalExplainExplanation;
+  ledger_anchors?: SignalExplainLedgerAnchor[];
   links: string[];
 };
 
