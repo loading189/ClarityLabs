@@ -8,9 +8,10 @@ from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
+from backend.app.api.deps import get_current_user, require_membership
 from backend.app.db import get_db
 from backend.app.integrations import get_adapter
-from backend.app.models import ActionItem, AuditLog, Business, HealthSignalState, IntegrationConnection
+from backend.app.models import ActionItem, AuditLog, HealthSignalState, IntegrationConnection, User
 from backend.app.services import audit_service, monitoring_service, integration_connection_service
 from backend.app.services.ingest_orchestrator import process_ingested_events
 from backend.app.services.posted_txn_service import (
@@ -24,13 +25,6 @@ router = APIRouter(prefix="/api/assistant", tags=["assistant"])
 
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
-
-
-def require_business(db: Session, business_id: str) -> Business:
-    biz = db.get(Business, business_id)
-    if not biz:
-        raise HTTPException(404, "business not found")
-    return biz
 
 
 def _top_vendors(db: Session, business_id: str, limit: int = 5):
@@ -132,8 +126,12 @@ class AssistantActionIn(BaseModel):
 
 
 @router.get("/summary/{business_id}")
-def assistant_summary(business_id: str, db: Session = Depends(get_db)):
-    require_business(db, business_id)
+def assistant_summary(
+    business_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    require_membership(db, business_id, user)
     integrations = (
         db.execute(
             select(IntegrationConnection).where(IntegrationConnection.business_id == business_id)
@@ -191,8 +189,13 @@ def assistant_summary(business_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/action/{business_id}")
-def assistant_action(business_id: str, req: AssistantActionIn, db: Session = Depends(get_db)):
-    require_business(db, business_id)
+def assistant_action(
+    business_id: str,
+    req: AssistantActionIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    require_membership(db, business_id, user, min_role="staff")
     action = (req.action_type or "").strip().lower()
     before = {
         "open_signals": _open_signals_count(db, business_id),

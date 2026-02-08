@@ -7,7 +7,9 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from backend.app.api.deps import get_current_user, require_membership
 from backend.app.db import get_db
+from backend.app.models import User
 from backend.app.services import signals_service
 from backend.app.services.assistant_thread_service import append_receipt
 
@@ -178,7 +180,9 @@ class SignalExplainOut(BaseModel):
 def list_signals(
     business_id: str = Query(...),
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
+    require_membership(db, business_id, user)
     signals, meta = signals_service.list_signal_states(db, business_id)
     return SignalsResponse(signals=signals, meta=meta)
 
@@ -199,7 +203,9 @@ def list_v1_signals(
     start_date: date = Query(...),
     end_date: date = Query(...),
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
+    require_membership(db, business_id, user)
     signals, meta = signals_service.fetch_signals(db, business_id, start_date, end_date)
     return SignalsResponse(signals=signals, meta=meta)
 
@@ -210,14 +216,16 @@ def update_signal_status(
     signal_id: str,
     req: SignalStatusUpdateIn,
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
+    require_membership(db, business_id, user, min_role="staff")
     result = signals_service.update_signal_status(
         db,
         business_id,
         signal_id,
         status=req.status,
         reason=req.reason,
-        actor=req.actor,
+        actor=req.actor or user.email,
     )
     append_receipt(
         db,
@@ -243,7 +251,9 @@ def get_signal_detail(
     business_id: str,
     signal_id: str,
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
+    require_membership(db, business_id, user)
     return signals_service.get_signal_state_detail(db, business_id, signal_id)
 
 
@@ -252,5 +262,7 @@ def get_signal_explain(
     business_id: str,
     signal_id: str,
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
+    require_membership(db, business_id, user)
     return signals_service.get_signal_explain(db, business_id, signal_id)

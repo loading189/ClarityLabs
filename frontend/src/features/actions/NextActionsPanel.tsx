@@ -1,45 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import Drawer from "../../components/common/Drawer";
 import { refreshActions, resolveAction, snoozeAction } from "../../api/actions";
-import type {ActionItem} from "../../api/actions"
-import type { FilterState } from "../../app/filters/filters";
-import { ledgerPath } from "../../app/routes/routeUtils";
+import type { ActionItem } from "../../api/actions";
+import ActionDetailDrawer from "./ActionDetailDrawer";
 import styles from "./NextActionsPanel.module.css";
 
 const SNOOZE_DAYS = 7;
-
-function joinListParam(values?: string[] | null) {
-  if (!values || values.length === 0) return undefined;
-  return values.slice().sort((a, b) => a.localeCompare(b)).join(",");
-}
-
-function anchorToLedgerFilters(anchor: { query?: Record<string, any> } | null): FilterState | null {
-  if (!anchor || !anchor.query) return null;
-  const query = anchor.query;
-  const filters: FilterState = {};
-  if (query.start_date && query.end_date) {
-    filters.start = query.start_date;
-    filters.end = query.end_date;
-    filters.window = undefined;
-  }
-  const accountParam = joinListParam(query.accounts ?? undefined);
-  if (accountParam) filters.account = accountParam;
-  const vendorParam = joinListParam(query.vendors ?? undefined);
-  if (vendorParam) filters.vendor = vendorParam;
-  const categoryParam = joinListParam(query.categories ?? undefined);
-  if (categoryParam) filters.category = categoryParam;
-  if (query.search) filters.q = query.search;
-  if (query.direction) filters.direction = query.direction;
-  const highlightParam = joinListParam(query.source_event_ids ?? undefined);
-  if (highlightParam) {
-    filters.highlight_source_event_ids = highlightParam;
-    if (query.source_event_ids && query.source_event_ids.length === 1) {
-      filters.anchor_source_event_id = query.source_event_ids[0] ?? undefined;
-    }
-  }
-  return filters;
-}
 
 function formatDate(value?: string | null) {
   if (!value) return "—";
@@ -53,10 +18,6 @@ function formatPriority(value: number) {
   return "Low";
 }
 
-function formatJson(value: unknown) {
-  if (!value) return "—";
-  return JSON.stringify(value, null, 2);
-}
 
 export default function NextActionsPanel({ businessId }: { businessId: string }) {
   const [actions, setActions] = useState<ActionItem[]>([]);
@@ -114,17 +75,6 @@ export default function NextActionsPanel({ businessId }: { businessId: string })
     }
   };
 
-  const ledgerLink = useMemo(() => {
-    if (!selected?.evidence_json) return null;
-    const anchors = Array.isArray(selected.evidence_json.ledger_anchors)
-      ? selected.evidence_json.ledger_anchors
-      : [];
-    const firstAnchor = anchors[0] ?? null;
-    const filters = anchorToLedgerFilters(firstAnchor);
-    if (!filters) return null;
-    return ledgerPath(businessId, filters);
-  }, [businessId, selected]);
-
   return (
     <section className={styles.card}>
       <div className={styles.header}>
@@ -175,43 +125,12 @@ export default function NextActionsPanel({ businessId }: { businessId: string })
         ))}
       </div>
 
-      <Drawer
+      <ActionDetailDrawer
         open={Boolean(selected)}
-        title={selected?.title ?? "Action detail"}
+        action={selected}
         onClose={() => setSelected(null)}
-      >
-        {selected && (
-          <div className={styles.drawerContent}>
-            <div className={styles.drawerSection}>
-              <div className={styles.drawerLabel}>Summary</div>
-              <div className={styles.drawerText}>{selected.summary}</div>
-            </div>
-            <div className={styles.drawerSection}>
-              <div className={styles.drawerLabel}>Rationale</div>
-              <pre className={styles.drawerPre}>{formatJson(selected.rationale_json)}</pre>
-            </div>
-            <div className={styles.drawerSection}>
-              <div className={styles.drawerLabel}>Evidence</div>
-              <pre className={styles.drawerPre}>{formatJson(selected.evidence_json)}</pre>
-            </div>
-            <div className={styles.drawerLinks}>
-              {ledgerLink && (
-                <Link className={styles.drawerLink} to={ledgerLink}>
-                  View in Ledger →
-                </Link>
-              )}
-              {selected.source_signal_id && (
-                <Link
-                  className={styles.drawerLink}
-                  to={`/app/${businessId}/signals?signal_id=${selected.source_signal_id}`}
-                >
-                  Open Signal →
-                </Link>
-              )}
-            </div>
-          </div>
-        )}
-      </Drawer>
+        onUpdated={loadActions}
+      />
     </section>
   );
 }

@@ -7,7 +7,15 @@ from typing import Optional
 from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
-from backend.app.models import ActionItem, HealthSignalState, IntegrationConnection, RawEvent, TxnCategorization
+from backend.app.models import (
+    ActionItem,
+    ActionStateEvent,
+    BusinessMembership,
+    HealthSignalState,
+    IntegrationConnection,
+    RawEvent,
+    TxnCategorization,
+)
 from backend.app.services.posted_txn_service import count_uncategorized_raw_events, fetch_posted_transactions
 from backend.app.services.signals_service import SIGNAL_CATALOG, _payload_ledger_anchors
 
@@ -499,17 +507,37 @@ def resolve_action(
     *,
     status: str,
     resolution_reason: Optional[str],
+    resolution_note: Optional[str] = None,
+    resolution_meta_json: Optional[dict] = None,
+    actor_user_id: Optional[str] = None,
 ) -> ActionItem:
     row = db.get(ActionItem, action_id)
     if not row or row.business_id != business_id:
         raise ValueError("action not found")
     if status not in {"done", "ignored"}:
         raise ValueError("invalid status")
+    from_status = row.status
     row.status = status
     row.resolution_reason = resolution_reason
+    row.resolution_note = resolution_note
+    row.resolution_meta_json = resolution_meta_json
     row.resolved_at = utcnow()
+    row.snoozed_until = None
     row.updated_at = utcnow()
+    if actor_user_id:
+        row.resolved_by_user_id = actor_user_id
     db.add(row)
+    if actor_user_id:
+        db.add(
+            ActionStateEvent(
+                action_id=row.id,
+                actor_user_id=actor_user_id,
+                from_status=from_status,
+                to_status=status,
+                reason=resolution_reason,
+                note=resolution_note,
+            )
+        )
     return row
 
 
@@ -520,13 +548,58 @@ def snooze_action(
     *,
     until: datetime,
     reason: Optional[str],
+    note: Optional[str] = None,
+    actor_user_id: Optional[str] = None,
 ) -> ActionItem:
     row = db.get(ActionItem, action_id)
     if not row or row.business_id != business_id:
         raise ValueError("action not found")
+    from_status = row.status
     row.status = "snoozed"
     row.snoozed_until = until
     row.resolution_reason = reason
+    row.resolution_note = note
+    row.updated_at = utcnow()
+    db.add(row)
+    if actor_user_id:
+        db.add(
+            ActionStateEvent(
+                action_id=row.id,
+                actor_user_id=actor_user_id,
+                from_status=from_status,
+                to_status="snoozed",
+                reason=reason,
+                note=note,
+            )
+        )
+    return row
+
+
+def assign_action(
+    db: Session,
+    business_id: str,
+    action_id: str,
+    *,
+    assigned_to_user_id: Optional[str],
+) -> ActionItem:
+    row = db.get(ActionItem, action_id)
+    if not row or row.business_id != business_id:
+        raise ValueError("action not found")
+    if assigned_to_user_id:
+        membership = (
+            db.execute(
+                select(BusinessMembership)
+                .where(
+                    BusinessMembership.business_id == business_id,
+                    BusinessMembership.user_id == assigned_to_user_id,
+                )
+            )
+            .scalars()
+            .first()
+        )
+        if not membership:
+            raise ValueError("assignee is not a business member")
+    row.assigned_to_user_id = assigned_to_user_id
     row.updated_at = utcnow()
     db.add(row)
     return row

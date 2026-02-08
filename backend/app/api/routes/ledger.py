@@ -8,7 +8,9 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from backend.app.api.deps import get_current_user, require_membership
 from backend.app.db import get_db
+from backend.app.models import User
 from backend.app.services import ledger_service
 
 router = APIRouter(prefix="/ledger", tags=["ledger"])
@@ -137,8 +139,10 @@ def ledger_lines(
     end_date: date = Query(..., description="Inclusive end date (YYYY-MM-DD)"),
     limit: int = Query(2000, ge=1, le=2000),
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
     # NOTE: limit defaults to 2000 for UI convenience.
+    require_membership(db, business_id, user)
     return ledger_service.ledger_lines(db, business_id, start_date, end_date, limit)
 
 
@@ -150,7 +154,9 @@ def ledger_transactions(
     date_end: Optional[date] = Query(None, description="Inclusive end date (YYYY-MM-DD)"),
     limit: int = Query(200, ge=1, le=500),
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
+    require_membership(db, business_id, user)
     ids_list = [item.strip() for item in txn_ids.split(",")] if txn_ids else None
     ids_list = [item for item in ids_list or [] if item]
     return ledger_service.ledger_trace_transactions(
@@ -169,7 +175,9 @@ def income_statement(
     start_date: date = Query(...),
     end_date: date = Query(...),
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
+    require_membership(db, business_id, user)
     return ledger_service.income_statement(db, business_id, start_date, end_date)
 
 
@@ -179,7 +187,9 @@ def cash_flow(
     start_date: date = Query(...),
     end_date: date = Query(...),
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
+    require_membership(db, business_id, user)
     return ledger_service.cash_flow(db, business_id, start_date, end_date)
 
 
@@ -190,7 +200,9 @@ def cash_series(
     end_date: Optional[date] = Query(None),
     starting_cash: float = Query(0.0),
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
+    require_membership(db, business_id, user)
     return ledger_service.cash_series(db, business_id, start_date, end_date, starting_cash)
 
 
@@ -200,7 +212,9 @@ def balance_sheet_v1(
     as_of: date = Query(...),
     starting_cash: float = Query(0.0),
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
+    require_membership(db, business_id, user)
     return ledger_service.balance_sheet_v1(db, business_id, as_of, starting_cash)
 
 
@@ -219,7 +233,9 @@ def ledger_query(
     limit: int = Query(200, ge=1, le=2000),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
+    require_membership(db, business_id, user)
     payload = ledger_service.ledger_query(
         db,
         business_id,
@@ -244,7 +260,9 @@ def ledger_dimensions_accounts(
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
+    require_membership(db, business_id, user)
     return ledger_service.ledger_dimensions(
         db,
         business_id,
@@ -260,7 +278,9 @@ def ledger_dimensions_vendors(
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
     db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
 ):
+    require_membership(db, business_id, user)
     return ledger_service.ledger_dimensions(
         db,
         business_id,

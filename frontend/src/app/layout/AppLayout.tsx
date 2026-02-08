@@ -7,11 +7,13 @@ import { useAppState } from "../state/appState";
 import ErrorBoundary from "../../components/common/ErrorBoundary";
 import { useFilters } from "../filters/useFilters";
 import { buildSearchParams, resolveDateRange } from "../filters/filters";
+import BusinessSwitcher from "../../components/business/BusinessSwitcher";
 
 type NavItem = { label: string; path: string };
 
 const primaryNav: NavItem[] = [
   { label: "Assistant", path: "assistant" },
+  { label: "Advisor Inbox", path: "advisor" },
   { label: "Signals", path: "signals" },
   { label: "Ledger", path: "ledger" },
 ];
@@ -104,12 +106,10 @@ export default function AppLayout() {
           <img src="/logo.svg" alt="Clarity Labs" className={styles.logo} />
           <div>
             <div className={styles.brandName}>Clarity Labs</div>
-            <div className={styles.brandMeta}>Business {businessId}</div>
-            <a href="/app/select" className={styles.switchLink}>
-              Switch business
-            </a>
+            <div className={styles.brandMeta}>Workspace</div>
           </div>
         </div>
+        <BusinessSwitcher />
 
         <NavSection title="Workspace" items={primaryNav} businessId={businessId} search={navSearch} />
         <details className={styles.toolsDropdown} open>

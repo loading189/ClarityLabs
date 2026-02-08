@@ -16,6 +16,7 @@ import BusinessSelectPage from "./BusinessSelectPage";
 import OnboardingWizardPage from "./OnboardingWizardPage";
 import ErrorBoundary from "../../components/common/ErrorBoundary";
 import AssistantPage from "./AssistantPage";
+import AdvisorInboxPage from "../../pages/AdvisorInboxPage";
 
 
 function AssistantCompatRedirect() {
@@ -49,6 +50,7 @@ export default function AppRoutes() {
           <Route path="home" element={<Navigate to="../assistant" replace />} />
           <Route path="health" element={<Navigate to="../assistant" replace />} />
           <Route path="assistant" element={<AssistantPage />} />
+          <Route path="advisor" element={<AdvisorInboxPage />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="signals" element={<SignalsCenterPage />} />
           <Route path="ledger" element={<LedgerPage />} />

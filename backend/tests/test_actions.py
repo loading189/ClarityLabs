@@ -7,6 +7,7 @@ pytest.importorskip("httpx")
 from backend.app.models import (
     Account,
     ActionItem,
+    BusinessMembership,
     Business,
     Category,
     HealthSignalState,
@@ -14,6 +15,7 @@ from backend.app.models import (
     Organization,
     RawEvent,
     TxnCategorization,
+    User,
 )
 
 
@@ -73,10 +75,25 @@ def _seed_posted_txn(
         )
     )
 
+def _create_user(session, email: str) -> User:
+    user = User(email=email, name=email.split("@")[0])
+    session.add(user)
+    session.flush()
+    return user
+
+
+def _add_membership(session, business_id: str, user_id: str, role: str = "owner"):
+    membership = BusinessMembership(business_id=business_id, user_id=user_id, role=role)
+    session.add(membership)
+    session.flush()
+    return membership
+
 
 def test_refresh_creates_actions(api_client, sqlite_session):
     now = datetime.now(timezone.utc)
     biz = _create_business(sqlite_session)
+    user = _create_user(sqlite_session, "owner@example.com")
+    _add_membership(sqlite_session, biz.id, user.id, role="owner")
     category = _seed_account_and_category(sqlite_session, biz.id)
 
     sqlite_session.add(
@@ -146,7 +163,10 @@ def test_refresh_creates_actions(api_client, sqlite_session):
 
     sqlite_session.commit()
 
-    resp = api_client.post(f"/api/actions/{biz.id}/refresh")
+    resp = api_client.post(
+        f"/api/actions/{biz.id}/refresh",
+        headers={"X-User-Email": user.email},
+    )
     assert resp.status_code == 200
     payload = resp.json()
     action_types = {item["action_type"] for item in payload["actions"]}
@@ -159,6 +179,8 @@ def test_refresh_creates_actions(api_client, sqlite_session):
 def test_refresh_is_idempotent(api_client, sqlite_session):
     now = datetime.now(timezone.utc)
     biz = _create_business(sqlite_session)
+    user = _create_user(sqlite_session, "owner@example.com")
+    _add_membership(sqlite_session, biz.id, user.id, role="owner")
     sqlite_session.add(
         RawEvent(
             business_id=biz.id,
@@ -170,9 +192,15 @@ def test_refresh_is_idempotent(api_client, sqlite_session):
     )
     sqlite_session.commit()
 
-    resp = api_client.post(f"/api/actions/{biz.id}/refresh")
+    resp = api_client.post(
+        f"/api/actions/{biz.id}/refresh",
+        headers={"X-User-Email": user.email},
+    )
     assert resp.status_code == 200
-    resp = api_client.post(f"/api/actions/{biz.id}/refresh")
+    resp = api_client.post(
+        f"/api/actions/{biz.id}/refresh",
+        headers={"X-User-Email": user.email},
+    )
     assert resp.status_code == 200
 
     count = sqlite_session.query(ActionItem).filter(ActionItem.business_id == biz.id).count()
@@ -182,6 +210,8 @@ def test_refresh_is_idempotent(api_client, sqlite_session):
 def test_resolve_updates_status(api_client, sqlite_session):
     now = datetime.now(timezone.utc)
     biz = _create_business(sqlite_session)
+    user = _create_user(sqlite_session, "advisor@example.com")
+    _add_membership(sqlite_session, biz.id, user.id, role="advisor")
     sqlite_session.add(
         ActionItem(
             business_id=biz.id,
@@ -201,6 +231,7 @@ def test_resolve_updates_status(api_client, sqlite_session):
     resp = api_client.post(
         f"/api/actions/{biz.id}/{action.id}/resolve",
         json={"status": "done", "resolution_reason": "Reviewed"},
+        headers={"X-User-Email": user.email},
     )
     assert resp.status_code == 200
     payload = resp.json()
