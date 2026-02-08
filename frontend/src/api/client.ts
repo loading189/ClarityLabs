@@ -48,12 +48,23 @@ async function parseJson<T>(res: Response): Promise<T> {
 
 function buildAuthHeaders(extra?: HeadersInit) {
   const email = getDevUserEmail();
-  const authHeader = email ? { "X-User-Email": email } : {};
+
+  // DEV safety rail: never silently omit auth
+  if (import.meta.env.DEV && !email) {
+    throw new ApiError(
+      "Missing dev auth email. Please log in via the Dev Auth gate.",
+      401,
+      "client",
+      null
+    );
+  }
+
   return {
-    ...authHeader,
+    ...(email ? { "X-User-Email": email } : {}),
     ...extra,
   };
 }
+
 
 export async function apiGet<T>(path: string, options?: { signal?: AbortSignal }): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {

@@ -1,5 +1,5 @@
 // frontend/src/api/ledger.ts
-import { API_BASE } from "./client";
+import { apiGet } from "./client";
 import { isValidIsoDate } from "../app/filters/filters";
 
 export type LedgerCategorization = {
@@ -25,7 +25,6 @@ export type LedgerLine = {
   account_type?: string | null;
   account_subtype?: string | null;
 
-  // these may not exist from backend yet; keep optional for UI
   counterparty_hint?: string | null;
   payload?: Record<string, unknown> | null;
   categorization?: LedgerCategorization | null;
@@ -128,6 +127,16 @@ function normalizeLedgerLine(row: any): LedgerLine {
   };
 }
 
+function buildSearchParams(base?: Record<string, unknown>): URLSearchParams {
+  const params = new URLSearchParams();
+  if (!base) return params;
+  for (const [k, v] of Object.entries(base)) {
+    if (v === undefined || v === null) continue;
+    params.set(k, String(v));
+  }
+  return params;
+}
+
 export async function fetchLedgerLines(
   businessId: string,
   query: LedgerLinesQuery,
@@ -142,31 +151,18 @@ export async function fetchLedgerLines(
     throw new Error(`Ledger lines request has invalid date range: ${start} → ${end}`);
   }
 
-  // ✅ IMPORTANT: backend enforces le=2000
+  // backend enforces le=2000
   const limit = Math.min(Math.max(query.limit ?? 2000, 1), 2000);
 
-  const params = new URLSearchParams();
-  params.set("start_date", start);
-  params.set("end_date", end);
-  params.set("limit", String(limit));
+  const params = buildSearchParams({
+    start_date: start,
+    end_date: end,
+    limit,
+  });
 
-  const url = `/ledger/business/${businessId}/lines?${params.toString()}`;
-  const fullUrl = `${API_BASE}${url}`;
+  const path = `/ledger/business/${businessId}/lines?${params.toString()}`;
 
-  if (import.meta.env.DEV) console.info("[ledger] lines url", url);
-
-  const res = await fetch(fullUrl, { signal });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    if (res.status === 422 || res.status >= 500) {
-      const responseNote = body ? ` Response: ${body}` : "";
-      throw new Error(
-        `Ledger lines request failed (${res.status}). URL: ${fullUrl}. Params: ${params.toString()}.${responseNote}`
-      );
-    }
-    throw new Error(body || `Ledger lines request failed (${res.status})`);
-  }
-  const payload = await res.json();
+  const payload = await apiGet<any>(path, { signal });
   const rows: any[] = Array.isArray(payload)
     ? payload
     : Array.isArray(payload?.rows)
@@ -186,14 +182,8 @@ export async function fetchLedgerTransactions(
   if (params.date_end) search.set("date_end", params.date_end);
   if (params.limit) search.set("limit", String(params.limit));
 
-  const url = `/ledger/business/${businessId}/transactions?${search.toString()}`;
-  const fullUrl = `${API_BASE}${url}`;
-  const res = await fetch(fullUrl, { signal });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(body || `Ledger transactions request failed (${res.status})`);
-  }
-  const payload = await res.json();
+  const path = `/ledger/business/${businessId}/transactions?${search.toString()}`;
+  const payload = await apiGet<any>(path, { signal });
   return Array.isArray(payload) ? payload : [];
 }
 
@@ -224,16 +214,13 @@ export async function fetchLedgerQuery(
   if (query.search) params.set("search", query.search);
   if (query.direction) params.set("direction", query.direction);
   (query.source_event_id ?? []).forEach((value) => params.append("source_event_id", value));
-  (query.highlight_source_event_id ?? []).forEach((value) => params.append("highlight_source_event_id", value));
+  (query.highlight_source_event_id ?? []).forEach((value) =>
+    params.append("highlight_source_event_id", value)
+  );
   if (query.limit != null) params.set("limit", String(query.limit));
   if (query.offset != null) params.set("offset", String(query.offset));
 
-  const res = await fetch(`${API_BASE}/api/ledger?${params.toString()}`, { signal });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(body || `Ledger query failed (${res.status})`);
-  }
-  return res.json();
+  return apiGet<LedgerQueryResponse>(`/api/ledger?${params.toString()}`, { signal });
 }
 
 export async function fetchLedgerAccountDimensions(
@@ -244,9 +231,11 @@ export async function fetchLedgerAccountDimensions(
   const params = new URLSearchParams({ business_id: businessId });
   if (query.start_date) params.set("start_date", query.start_date);
   if (query.end_date) params.set("end_date", query.end_date);
-  const res = await fetch(`${API_BASE}/api/ledger/dimensions/accounts?${params.toString()}`, { signal });
-  if (!res.ok) throw new Error(`Ledger account dimensions failed (${res.status})`);
-  return res.json();
+
+  return apiGet<LedgerDimensionAccount[]>(
+    `/api/ledger/dimensions/accounts?${params.toString()}`,
+    { signal }
+  );
 }
 
 export async function fetchLedgerVendorDimensions(
@@ -257,7 +246,9 @@ export async function fetchLedgerVendorDimensions(
   const params = new URLSearchParams({ business_id: businessId });
   if (query.start_date) params.set("start_date", query.start_date);
   if (query.end_date) params.set("end_date", query.end_date);
-  const res = await fetch(`${API_BASE}/api/ledger/dimensions/vendors?${params.toString()}`, { signal });
-  if (!res.ok) throw new Error(`Ledger vendor dimensions failed (${res.status})`);
-  return res.json();
+
+  return apiGet<LedgerDimensionVendor[]>(
+    `/api/ledger/dimensions/vendors?${params.toString()}`,
+    { signal }
+  );
 }
