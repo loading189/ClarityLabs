@@ -50,6 +50,8 @@ def test_assistant_summary_empty(client, db_session):
     payload = resp.json()
     assert payload["business_id"] == biz.id
     assert payload["open_signals"] == 0
+    assert payload["open_action_count"] == 0
+    assert payload["top_open_actions"] == []
     assert payload["uncategorized_count"] == 0
     assert payload["integrations"] == []
     assert payload["recent_signal_resolutions"] == []

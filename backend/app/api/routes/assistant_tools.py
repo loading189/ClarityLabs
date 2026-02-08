@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.db import get_db
 from backend.app.integrations import get_adapter
-from backend.app.models import AuditLog, Business, HealthSignalState, IntegrationConnection
+from backend.app.models import ActionItem, AuditLog, Business, HealthSignalState, IntegrationConnection
 from backend.app.services import audit_service, monitoring_service, integration_connection_service
 from backend.app.services.ingest_orchestrator import process_ingested_events
 from backend.app.services.posted_txn_service import (
@@ -54,6 +54,35 @@ def _open_signals_count(db: Session, business_id: str) -> int:
             .where(
                 HealthSignalState.business_id == business_id,
                 HealthSignalState.status == "open",
+            )
+        ).scalar_one()
+    )
+
+
+def _open_actions(db: Session, business_id: str, limit: int = 3) -> list[ActionItem]:
+    return (
+        db.execute(
+            select(ActionItem)
+            .where(
+                ActionItem.business_id == business_id,
+                ActionItem.status == "open",
+            )
+            .order_by(ActionItem.priority.desc(), ActionItem.created_at.desc())
+            .limit(limit)
+        )
+        .scalars()
+        .all()
+    )
+
+
+def _open_actions_count(db: Session, business_id: str) -> int:
+    return int(
+        db.execute(
+            select(func.count())
+            .select_from(ActionItem)
+            .where(
+                ActionItem.business_id == business_id,
+                ActionItem.status == "open",
             )
         ).scalar_one()
     )
@@ -135,6 +164,16 @@ def assistant_summary(business_id: str, db: Session = Depends(get_db)):
         ],
         "monitor_status": monitoring_service.get_monitor_status(db, business_id),
         "open_signals": _open_signals_count(db, business_id),
+        "open_action_count": _open_actions_count(db, business_id),
+        "top_open_actions": [
+            {
+                "id": row.id,
+                "type": row.action_type,
+                "title": row.title,
+                "priority": row.priority,
+            }
+            for row in _open_actions(db, business_id)
+        ],
         "uncategorized_count": count_uncategorized_raw_events(db, business_id),
         "recent_signal_resolutions": _recent_signal_resolutions(db, business_id),
         "audit_events": [
