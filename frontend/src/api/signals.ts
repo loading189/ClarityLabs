@@ -98,6 +98,17 @@ export function getSignalDetail(
   return apiGet<SignalStateDetail>(`/api/signals/${businessId}/${signalId}`, { signal });
 }
 
+export type LedgerAnchorQuery = {
+  source_event_ids?: string[] | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  accounts?: string[] | null;
+  vendors?: string[] | null;
+  categories?: string[] | null;
+  search?: string | null;
+  direction?: "inflow" | "outflow" | null;
+};
+
 export type SignalExplainEvidence = {
   key: string;
   label: string;
@@ -105,14 +116,7 @@ export type SignalExplainEvidence = {
   unit?: string | null;
   as_of?: string | null;
   source: "ledger" | "state" | "derived" | "detector";
-  anchors?: {
-    txn_ids?: string[] | null;
-    date_start?: string | null;
-    date_end?: string | null;
-    account_id?: string | null;
-    vendor?: string | null;
-    category?: string | null;
-  } | null;
+  anchors?: LedgerAnchorQuery | null;
 };
 
 export type SignalExplainEvidenceSummary = {
@@ -129,7 +133,7 @@ export type SignalExplainExplanation = {
 
 export type SignalExplainLedgerAnchor = {
   label: string;
-  query: SignalExplainEvidence["anchors"];
+  query: LedgerAnchorQuery;
   evidence_keys: string[];
 };
 

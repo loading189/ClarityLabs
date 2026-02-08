@@ -82,7 +82,11 @@ def ledger_query(
     end_date: Optional[date],
     accounts: Optional[List[str]] = None,
     vendors: Optional[List[str]] = None,
+    categories: Optional[List[str]] = None,
     search: Optional[str] = None,
+    direction: Optional[Direction] = None,
+    source_event_ids: Optional[List[str]] = None,
+    highlight_source_event_ids: Optional[List[str]] = None,
     limit: int = 200,
     offset: int = 0,
 ) -> Dict[str, Any]:
@@ -94,6 +98,9 @@ def ledger_query(
     q = (search or "").strip().lower()
     filtered: List[Dict[str, Any]] = []
     start_balance = 0.0
+    source_id_set = {str(item) for item in source_event_ids or [] if item}
+    highlight_set = {str(item) for item in highlight_source_event_ids or [] if item}
+    highlight_enabled = highlight_source_event_ids is not None
 
     for detail in details:
         txn = detail.txn
@@ -108,29 +115,37 @@ def ledger_query(
             continue
         if txn.occurred_at.date() > end_date:
             continue
+        if source_id_set and str(txn.source_event_id) not in source_id_set:
+            continue
         if not (_matches_any(account, accounts) or _matches_any(account_id, accounts)):
             continue
         if not _matches_any(vendor, vendors):
+            continue
+        if not _matches_any(category, categories):
+            continue
+        if direction and txn.direction != direction:
             continue
         if q:
             haystack = f"{txn.description} {vendor} {account} {category}".lower()
             if q not in haystack:
                 continue
 
-        filtered.append(
-            {
-                "occurred_at": txn.occurred_at,
-                "date": txn.occurred_at.date(),
-                "description": txn.description,
-                "vendor": vendor,
-                "amount": round(amount, 2),
-                "category": category,
-                "account": account,
-                "balance": 0.0,
-                "source_event_id": txn.source_event_id,
-            }
-        )
+        row = {
+            "occurred_at": txn.occurred_at,
+            "date": txn.occurred_at.date(),
+            "description": txn.description,
+            "vendor": vendor,
+            "amount": round(amount, 2),
+            "category": category,
+            "account": account,
+            "balance": 0.0,
+            "source_event_id": txn.source_event_id,
+        }
+        if highlight_enabled:
+            row["is_highlighted"] = str(txn.source_event_id) in highlight_set
+        filtered.append(row)
 
+    filtered.sort(key=lambda row: (row["occurred_at"], row["source_event_id"]))
     balance = start_balance
     total_in = 0.0
     total_out = 0.0

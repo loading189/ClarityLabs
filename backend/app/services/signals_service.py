@@ -597,7 +597,7 @@ EVIDENCE_FIELDS: Dict[str, List[Dict[str, Any]]] = {
             "path": "current_cash",
             "source": "ledger",
             "unit": "USD",
-            "anchors": {"date_end_path": "burn_end"},
+            "anchors": {"date_start_path": "burn_start", "date_end_path": "burn_end"},
         },
         {
             "key": "runway_days",
@@ -680,7 +680,7 @@ EVIDENCE_FIELDS: Dict[str, List[Dict[str, Any]]] = {
             "path": "current_cash",
             "source": "ledger",
             "unit": "USD",
-            "anchors": {"date_end_path": "burn_end"},
+            "anchors": {"date_start_path": "burn_start", "date_end_path": "burn_end"},
         },
         {
             "key": "runway_days",
@@ -1386,14 +1386,73 @@ def _normalize_anchor_query(anchor: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     if not isinstance(anchor, dict):
         return None
     normalized: Dict[str, Any] = {}
-    if anchor.get("txn_ids"):
-        txn_ids = anchor.get("txn_ids")
-        if isinstance(txn_ids, list):
-            normalized["txn_ids"] = [str(txn_id) for txn_id in txn_ids if txn_id]
-    for key in ("date_start", "date_end", "account_id", "vendor", "category"):
-        value = anchor.get(key)
-        if value is not None:
-            normalized[key] = value
+
+    source_event_ids = anchor.get("source_event_ids")
+    if source_event_ids is None:
+        source_event_ids = anchor.get("txn_ids")
+    if isinstance(source_event_ids, list):
+        ids = [str(txn_id) for txn_id in source_event_ids if txn_id]
+        if ids:
+            normalized["source_event_ids"] = sorted(set(ids))
+
+    start_date = anchor.get("start_date") or anchor.get("date_start")
+    end_date = anchor.get("end_date") or anchor.get("date_end")
+    if start_date or end_date:
+        if not (start_date and end_date):
+            return None
+        try:
+            start = date.fromisoformat(str(start_date))
+            end = date.fromisoformat(str(end_date))
+        except ValueError:
+            return None
+        if start > end:
+            return None
+        normalized["start_date"] = start.isoformat()
+        normalized["end_date"] = end.isoformat()
+
+    accounts = anchor.get("accounts")
+    if accounts is None:
+        account_id = anchor.get("account_id")
+        if account_id is not None:
+            accounts = [account_id]
+    if isinstance(accounts, list):
+        values = [str(item) for item in accounts if item]
+        if values:
+            normalized["accounts"] = sorted(set(values))
+
+    vendors = anchor.get("vendors")
+    if vendors is None:
+        vendor = anchor.get("vendor")
+        if vendor is not None:
+            vendors = [vendor]
+    if isinstance(vendors, list):
+        values = [str(item) for item in vendors if item]
+        if values:
+            normalized["vendors"] = sorted(set(values))
+
+    categories = anchor.get("categories")
+    if categories is None:
+        category = anchor.get("category")
+        if category is not None:
+            categories = [category]
+    if isinstance(categories, list):
+        values = [str(item) for item in categories if item]
+        if values:
+            normalized["categories"] = sorted(set(values))
+
+    search = anchor.get("search")
+    if isinstance(search, str) and search.strip():
+        normalized["search"] = search.strip()
+
+    direction = anchor.get("direction")
+    if isinstance(direction, str) and direction in {"inflow", "outflow"}:
+        normalized["direction"] = direction
+
+    if "source_event_ids" not in normalized and not (
+        normalized.get("start_date") and normalized.get("end_date")
+    ):
+        return None
+
     return normalized or None
 
 
@@ -1482,13 +1541,10 @@ def _build_anchors(payload: Dict[str, Any], field: Dict[str, Any]) -> Optional[D
     if "txn_ids_path" in anchor_cfg:
         txn_ids = _read_payload_value(payload, anchor_cfg["txn_ids_path"])
         if isinstance(txn_ids, list):
-            anchors["txn_ids"] = [str(txn_id) for txn_id in txn_ids]
+            anchors["source_event_ids"] = [str(txn_id) for txn_id in txn_ids if txn_id]
     for key, target in (
-        ("date_start", "date_start_path"),
-        ("date_end", "date_end_path"),
-        ("account_id", "account_id_path"),
-        ("vendor", "vendor_path"),
-        ("category", "category_path"),
+        ("start_date", "date_start_path"),
+        ("end_date", "date_end_path"),
     ):
         path = anchor_cfg.get(target)
         if not path:
@@ -1496,6 +1552,18 @@ def _build_anchors(payload: Dict[str, Any], field: Dict[str, Any]) -> Optional[D
         value = _read_payload_value(payload, path)
         if value is not None:
             anchors[key] = value
+
+    for key, target in (
+        ("accounts", "account_id_path"),
+        ("vendors", "vendor_path"),
+        ("categories", "category_path"),
+    ):
+        path = anchor_cfg.get(target)
+        if not path:
+            continue
+        value = _read_payload_value(payload, path)
+        if value is not None:
+            anchors[key] = [value] if not isinstance(value, list) else value
 
     return anchors or None
 

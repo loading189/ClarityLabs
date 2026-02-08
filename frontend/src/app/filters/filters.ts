@@ -10,6 +10,7 @@ export type FilterState = {
   q?: string;
   direction?: "inflow" | "outflow";
   anchor_source_event_id?: string;
+  highlight_source_event_ids?: string;
 };
 
 const FILTER_KEYS = [
@@ -22,6 +23,7 @@ const FILTER_KEYS = [
   "q",
   "direction",
   "anchor_source_event_id",
+  "highlight_source_event_ids",
 ] as const;
 
 export type DemoDateRange = {
@@ -52,6 +54,7 @@ export function parseFilters(params: URLSearchParams): FilterState {
     q: params.get("q") ?? undefined,
     direction,
     anchor_source_event_id: params.get("anchor_source_event_id") ?? undefined,
+    highlight_source_event_ids: params.get("highlight_source_event_ids") ?? undefined,
   };
 }
 
@@ -67,6 +70,9 @@ export function buildSearchParams(filters: FilterState) {
   if (filters.direction) params.set("direction", filters.direction);
   if (filters.anchor_source_event_id) {
     params.set("anchor_source_event_id", filters.anchor_source_event_id);
+  }
+  if (filters.highlight_source_event_ids) {
+    params.set("highlight_source_event_ids", filters.highlight_source_event_ids);
   }
   return params;
 }

@@ -201,8 +201,8 @@ def test_explain_evidence_contains_anchors(db_session):
     assert current_total
     anchors = current_total.get("anchors")
     assert anchors
-    assert anchors.get("date_start")
-    assert anchors.get("date_end")
+    assert anchors.get("start_date")
+    assert anchors.get("end_date")
     assert explain["ledger_anchors"]
 
 

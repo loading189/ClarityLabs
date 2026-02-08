@@ -84,13 +84,19 @@ class SignalExplainDetectorOut(BaseModel):
     scoring_profile: Dict[str, Any]
 
 
-class SignalExplainEvidenceAnchorOut(BaseModel):
-    txn_ids: Optional[List[str]] = None
-    date_start: Optional[str] = None
-    date_end: Optional[str] = None
-    account_id: Optional[str] = None
-    vendor: Optional[str] = None
-    category: Optional[str] = None
+class LedgerAnchorQueryOut(BaseModel):
+    source_event_ids: Optional[List[str]] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    accounts: Optional[List[str]] = None
+    vendors: Optional[List[str]] = None
+    categories: Optional[List[str]] = None
+    search: Optional[str] = None
+    direction: Optional[Literal["inflow", "outflow"]] = None
+
+
+class SignalExplainEvidenceAnchorOut(LedgerAnchorQueryOut):
+    pass
 
 
 class SignalExplainEvidenceOut(BaseModel):
@@ -117,7 +123,7 @@ class SignalExplainExplanationOut(BaseModel):
 
 class SignalExplainLedgerAnchorOut(BaseModel):
     label: str
-    query: SignalExplainEvidenceAnchorOut
+    query: LedgerAnchorQueryOut
     evidence_keys: List[str] = Field(default_factory=list)
 
 

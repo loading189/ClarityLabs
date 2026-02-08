@@ -97,6 +97,7 @@ class LedgerQueryRowOut(BaseModel):
     account: str
     balance: float
     source_event_id: str
+    is_highlighted: Optional[bool] = None
 
 
 class LedgerSummaryOut(BaseModel):
@@ -210,7 +211,11 @@ def ledger_query(
     end_date: Optional[date] = Query(None),
     account: Optional[List[str]] = Query(None),
     vendor: Optional[List[str]] = Query(None),
+    category: Optional[List[str]] = Query(None),
     search: Optional[str] = Query(None),
+    direction: Optional[Direction] = Query(None),
+    source_event_id: Optional[List[str]] = Query(None),
+    highlight_source_event_id: Optional[List[str]] = Query(None),
     limit: int = Query(200, ge=1, le=2000),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
@@ -222,7 +227,11 @@ def ledger_query(
         end_date=end_date,
         accounts=account,
         vendors=vendor,
+        categories=category,
         search=search,
+        direction=direction,
+        source_event_ids=source_event_id,
+        highlight_source_event_ids=highlight_source_event_id,
         limit=limit,
         offset=offset,
     )

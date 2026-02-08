@@ -113,6 +113,11 @@ export default function LedgerPage() {
 
   const selectedAccounts = useMemo(() => parseListParam(filters.account), [filters.account]);
   const selectedVendors = useMemo(() => parseListParam((filters as any).vendor), [filters]);
+  const selectedCategories = useMemo(() => parseListParam(filters.category), [filters.category]);
+  const highlightSourceEventIds = useMemo(
+    () => parseListParam(filters.highlight_source_event_ids),
+    [filters.highlight_source_event_ids]
+  );
 
   const [ledger, setLedger] = useState<LedgerQueryResponse | null>(null);
   const [accounts, setAccounts] = useState<LedgerDimensionAccount[]>([]);
@@ -175,7 +180,14 @@ export default function LedgerPage() {
           end_date: range.end,
           account: selectedAccounts,
           vendor: selectedVendors,
+          category: selectedCategories,
           search: filters.q,
+          direction: filters.direction,
+          highlight_source_event_id: highlightSourceEventIds.length
+            ? highlightSourceEventIds
+            : anchorSourceEventId
+              ? [anchorSourceEventId]
+              : undefined,
           limit: 500,
           offset: 0,
         },
@@ -202,7 +214,19 @@ export default function LedgerPage() {
       alive = false;
       c.abort();
     };
-  }, [businessId, dataVersion, filters.q, range.end, range.start, selectedAccounts.join("|"), selectedVendors.join("|")]);
+  }, [
+    businessId,
+    dataVersion,
+    filters.direction,
+    filters.q,
+    range.end,
+    range.start,
+    selectedAccounts.join("|"),
+    selectedCategories.join("|"),
+    selectedVendors.join("|"),
+    highlightSourceEventIds.join("|"),
+    anchorSourceEventId,
+  ]);
 
   const visibleRows = useMemo(() => {
     const rows = ledger?.rows ?? [];
@@ -223,6 +247,16 @@ export default function LedgerPage() {
       node.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   }, [anchorSourceEventId, visibleRows]);
+
+  useEffect(() => {
+    if (anchorSourceEventId || highlightSourceEventIds.length === 0) return;
+    const match = visibleRows.find((row) => row.is_highlighted);
+    if (!match) return;
+    const node = rowRefs.current.get(match.source_event_id);
+    if (node && typeof node.scrollIntoView === "function") {
+      node.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [anchorSourceEventId, highlightSourceEventIds.length, visibleRows]);
 
   useEffect(() => {
     if (!anchorSourceEventId) {
@@ -471,11 +505,12 @@ export default function LedgerPage() {
                     <tr
                       key={row.source_event_id}
                       ref={(node) => rowRefs.current.set(row.source_event_id, node)}
-                      className={
-                        (drawerSourceEventId ?? highlightSourceEventId) === row.source_event_id
-                          ? styles.rowSelected
-                          : ""
-                      }
+                      className={[
+                        row.is_highlighted ? styles.rowHighlighted : "",
+                        (drawerSourceEventId ?? highlightSourceEventId) === row.source_event_id ? styles.rowSelected : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
                       onClick={() => {
                         setFilters((current) => {
                           if (current.anchor_source_event_id === row.source_event_id) {

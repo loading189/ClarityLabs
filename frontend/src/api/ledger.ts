@@ -59,6 +59,7 @@ export type LedgerQueryRow = {
   account: string;
   balance: number;
   source_event_id: string;
+  is_highlighted?: boolean;
 };
 
 export type LedgerQuerySummary = {
@@ -203,7 +204,11 @@ export async function fetchLedgerQuery(
     end_date?: string;
     account?: string[];
     vendor?: string[];
+    category?: string[];
     search?: string;
+    direction?: "inflow" | "outflow";
+    source_event_id?: string[];
+    highlight_source_event_id?: string[];
     limit?: number;
     offset?: number;
   },
@@ -215,7 +220,11 @@ export async function fetchLedgerQuery(
   if (query.end_date) params.set("end_date", query.end_date);
   (query.account ?? []).forEach((value) => params.append("account", value));
   (query.vendor ?? []).forEach((value) => params.append("vendor", value));
+  (query.category ?? []).forEach((value) => params.append("category", value));
   if (query.search) params.set("search", query.search);
+  if (query.direction) params.set("direction", query.direction);
+  (query.source_event_id ?? []).forEach((value) => params.append("source_event_id", value));
+  (query.highlight_source_event_id ?? []).forEach((value) => params.append("highlight_source_event_id", value));
   if (query.limit != null) params.set("limit", String(query.limit));
   if (query.offset != null) params.set("offset", String(query.offset));
 
