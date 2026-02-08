@@ -11,6 +11,7 @@ import { useDemoDateRange } from "../filters/useDemoDateRange";
 import { assertBusinessId } from "../../utils/businessId";
 import styles from "./DashboardPage.module.css";
 import { useAppState } from "../state/appState";
+import NextActionsPanel from "../../features/actions/NextActionsPanel";
 
 function formatMoney(value?: number | null) {
   if (value == null) return "—";
@@ -45,6 +46,8 @@ export default function DashboardPage() {
       />
 
       <FilterBar filters={filters} onChange={setFilters} />
+
+      <NextActionsPanel businessId={businessId} />
 
       <div className={styles.tableCard} style={{ marginBottom: 12 }}>
         Assistant is now the primary workspace view. <Link to={`/app/${businessId}/assistant`}>Open Assistant</Link> for live signal triage and explain workflows.

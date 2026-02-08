@@ -367,6 +367,49 @@ class IntegrationConnection(Base):
     business = relationship("Business", back_populates="integration_connections")
 
 
+class ActionItem(Base):
+    __tablename__ = "action_items"
+    __table_args__ = (
+        UniqueConstraint("business_id", "idempotency_key", name="uq_action_items_business_idempotency"),
+        Index("ix_action_items_business_status", "business_id", "status"),
+        Index("ix_action_items_business_priority", "business_id", "priority"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    business_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    action_type: Mapped[str] = mapped_column(String(60), nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    summary: Mapped[str] = mapped_column(Text, nullable=False)
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
+    status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="open",
+        server_default=text("'open'"),
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utcnow,
+        onupdate=utcnow,
+    )
+    due_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    source_signal_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    evidence_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    rationale_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    resolution_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    snoozed_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    idempotency_key: Mapped[str] = mapped_column(String(220), nullable=False)
+
+    business = relationship("Business")
+
+
 class ProcessingEventState(Base):
     __tablename__ = "processing_event_states"
     __table_args__ = (

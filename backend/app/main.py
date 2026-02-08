@@ -35,6 +35,7 @@ from backend.app.api.routes.assistant_tools import router as assistant_tools_rou
 from backend.app.api.routes.categorize_auto import router as categorize_auto_router
 from backend.app.api.routes.plaid import router as plaid_router
 from backend.app.api.routes.processing import router as processing_router
+from backend.app.api.routes.actions import router as actions_router
 
 
 logger = logging.getLogger(__name__)
@@ -107,6 +108,7 @@ app.include_router(transactions_router)
 app.include_router(integration_connections_router)
 app.include_router(webhooks_router)
 app.include_router(assistant_tools_router)
+app.include_router(actions_router)
 app.include_router(categorize_auto_router)
 app.include_router(plaid_router)
 app.include_router(processing_router)

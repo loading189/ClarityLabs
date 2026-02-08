@@ -1,0 +1,208 @@
+from datetime import datetime, timedelta, timezone
+
+import pytest
+
+pytest.importorskip("httpx")
+
+from backend.app.models import (
+    Account,
+    ActionItem,
+    Business,
+    Category,
+    HealthSignalState,
+    IntegrationConnection,
+    Organization,
+    RawEvent,
+    TxnCategorization,
+)
+
+
+def _create_business(session) -> Business:
+    org = Organization(name="Action Org")
+    session.add(org)
+    session.flush()
+    biz = Business(org_id=org.id, name="Action Biz")
+    session.add(biz)
+    session.flush()
+    return biz
+
+
+def _seed_account_and_category(session, business_id: str) -> Category:
+    account = Account(
+        business_id=business_id,
+        name="Operating Cash",
+        type="asset",
+        subtype="cash",
+    )
+    session.add(account)
+    session.flush()
+    category = Category(
+        business_id=business_id,
+        name="Supplies",
+        account_id=account.id,
+    )
+    session.add(category)
+    session.flush()
+    return category
+
+
+def _seed_posted_txn(
+    session,
+    *,
+    business_id: str,
+    category_id: str,
+    source_event_id: str,
+    occurred_at: datetime,
+    description: str,
+    amount: float,
+):
+    event = RawEvent(
+        business_id=business_id,
+        source="plaid",
+        source_event_id=source_event_id,
+        occurred_at=occurred_at,
+        payload={"amount": amount, "description": description},
+    )
+    session.add(event)
+    session.add(
+        TxnCategorization(
+            business_id=business_id,
+            source_event_id=source_event_id,
+            category_id=category_id,
+            created_at=occurred_at,
+        )
+    )
+
+
+def test_refresh_creates_actions(api_client, sqlite_session):
+    now = datetime.now(timezone.utc)
+    biz = _create_business(sqlite_session)
+    category = _seed_account_and_category(sqlite_session, biz.id)
+
+    sqlite_session.add(
+        IntegrationConnection(
+            business_id=biz.id,
+            provider="plaid",
+            status="connected",
+            last_sync_at=now - timedelta(hours=24),
+        )
+    )
+
+    sqlite_session.add(
+        HealthSignalState(
+            business_id=biz.id,
+            signal_id="signal-1",
+            signal_type="cash_low",
+            status="open",
+            severity="high",
+            title="Cash balance dipped",
+            summary="Cash balance dropped below threshold.",
+            payload_json={
+                "ledger_anchors": [
+                    {
+                        "label": "Low cash window",
+                        "query": {
+                            "start_date": (now - timedelta(days=7)).date().isoformat(),
+                            "end_date": now.date().isoformat(),
+                            "source_event_ids": ["evt-anchor"],
+                        },
+                    }
+                ]
+            },
+            detected_at=now - timedelta(days=1),
+            last_seen_at=now,
+            updated_at=now,
+        )
+    )
+
+    sqlite_session.add(
+        RawEvent(
+            business_id=biz.id,
+            source="plaid",
+            source_event_id="uncat-1",
+            occurred_at=now - timedelta(days=2),
+            payload={"amount": -42.0, "description": "Uncategorized Vendor"},
+        )
+    )
+
+    _seed_posted_txn(
+        sqlite_session,
+        business_id=biz.id,
+        category_id=category.id,
+        source_event_id="vendor-baseline",
+        occurred_at=now - timedelta(days=30),
+        description="Big Vendor",
+        amount=-100.0,
+    )
+    _seed_posted_txn(
+        sqlite_session,
+        business_id=biz.id,
+        category_id=category.id,
+        source_event_id="vendor-recent",
+        occurred_at=now - timedelta(days=7),
+        description="Big Vendor",
+        amount=-450.0,
+    )
+
+    sqlite_session.commit()
+
+    resp = api_client.post(f"/api/actions/{biz.id}/refresh")
+    assert resp.status_code == 200
+    payload = resp.json()
+    action_types = {item["action_type"] for item in payload["actions"]}
+    assert "fix_mapping" in action_types
+    assert "investigate_anomaly" in action_types
+    assert "sync_integration" in action_types
+    assert "review_vendor" in action_types
+
+
+def test_refresh_is_idempotent(api_client, sqlite_session):
+    now = datetime.now(timezone.utc)
+    biz = _create_business(sqlite_session)
+    sqlite_session.add(
+        RawEvent(
+            business_id=biz.id,
+            source="plaid",
+            source_event_id="uncat-1",
+            occurred_at=now - timedelta(days=1),
+            payload={"amount": -12.0, "description": "Uncategorized Vendor"},
+        )
+    )
+    sqlite_session.commit()
+
+    resp = api_client.post(f"/api/actions/{biz.id}/refresh")
+    assert resp.status_code == 200
+    resp = api_client.post(f"/api/actions/{biz.id}/refresh")
+    assert resp.status_code == 200
+
+    count = sqlite_session.query(ActionItem).filter(ActionItem.business_id == biz.id).count()
+    assert count == 1
+
+
+def test_resolve_updates_status(api_client, sqlite_session):
+    now = datetime.now(timezone.utc)
+    biz = _create_business(sqlite_session)
+    sqlite_session.add(
+        ActionItem(
+            business_id=biz.id,
+            action_type="fix_mapping",
+            title="Categorize new transactions",
+            summary="Summary",
+            priority=3,
+            status="open",
+            created_at=now,
+            updated_at=now,
+            idempotency_key=f"{biz.id}:fix_mapping:none:all:{now.date().isoformat()}:uncategorized",
+        )
+    )
+    sqlite_session.commit()
+    action = sqlite_session.query(ActionItem).first()
+
+    resp = api_client.post(
+        f"/api/actions/{biz.id}/{action.id}/resolve",
+        json={"status": "done", "resolution_reason": "Reviewed"},
+    )
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["status"] == "done"
+    assert payload["resolution_reason"] == "Reviewed"
