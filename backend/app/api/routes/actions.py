@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, aliased
 
 from backend.app.api.deps import get_current_user, require_membership, require_membership_dep
 from backend.app.db import get_db
-from backend.app.models import ActionItem, ActionStateEvent, Business, BusinessMembership, User
+from backend.app.models import ActionItem, ActionStateEvent, Business, BusinessMembership, Plan, User
 from backend.app.services.actions_service import (
     assign_action,
     generate_actions_for_business,
@@ -45,6 +45,7 @@ class ActionItemOut(BaseModel):
     resolved_by_user_id: Optional[str]
     snoozed_until: Optional[datetime]
     idempotency_key: str
+    plan_id: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -113,6 +114,7 @@ class ActionTriageItemOut(BaseModel):
     resolved_by_user_id: Optional[str]
     snoozed_until: Optional[datetime]
     assigned_to_user: Optional[ActionTriageUserOut]
+    plan_id: Optional[str] = None
 
 
 class ActionTriageSummaryOut(BaseModel):
@@ -125,6 +127,27 @@ class ActionTriageOut(BaseModel):
     summary: ActionTriageSummaryOut
 
 
+def _plan_id_map(db: Session, action_ids: list[str]) -> dict[str, str]:
+    if not action_ids:
+        return {}
+    rows = (
+        db.execute(
+            select(Plan.id, Plan.source_action_id).where(Plan.source_action_id.in_(action_ids))
+        )
+        .all()
+    )
+    return {source_action_id: plan_id for plan_id, source_action_id in rows if source_action_id}
+
+
+def _serialize_actions(db: Session, actions: list[ActionItem]) -> list[ActionItemOut]:
+    plan_map = _plan_id_map(db, [action.id for action in actions])
+    payloads: list[ActionItemOut] = []
+    for action in actions:
+        plan_id = plan_map.get(action.id)
+        payloads.append(ActionItemOut.model_validate(action).model_copy(update={"plan_id": plan_id}))
+    return payloads
+
+
 @router.get("/{business_id}", response_model=ActionListOut, dependencies=[Depends(require_membership_dep())])
 def get_actions(
     business_id: str,
@@ -134,7 +157,7 @@ def get_actions(
     db: Session = Depends(get_db),
 ):
     actions, summary = list_actions(db, business_id, status=status, limit=limit, offset=offset)
-    return {"actions": actions, "summary": summary}
+    return {"actions": _serialize_actions(db, actions), "summary": summary}
 
 
 @router.post(
@@ -149,7 +172,7 @@ def refresh_actions(
     generate_actions_for_business(db, business_id)
     db.commit()
     actions, summary = list_actions(db, business_id, status="open", limit=50, offset=0)
-    return {"actions": actions, "summary": summary}
+    return {"actions": _serialize_actions(db, actions), "summary": summary}
 
 
 @router.post(
@@ -318,8 +341,10 @@ def triage_actions(
     stmt = stmt.order_by(ActionItem.priority.desc(), ActionItem.created_at.desc(), ActionItem.id.desc())
 
     rows = db.execute(stmt).all()
+    plan_map = _plan_id_map(db, [row[0].id for row in rows])
     actions = []
     for action, biz, assigned_row in rows:
+        plan_id = plan_map.get(action.id)
         assigned_payload = None
         if assigned_row:
             assigned_payload = ActionTriageUserOut(
@@ -350,6 +375,7 @@ def triage_actions(
                 resolved_by_user_id=action.resolved_by_user_id,
                 snoozed_until=action.snoozed_until,
                 assigned_to_user=assigned_payload,
+                plan_id=plan_id,
             )
         )
 
