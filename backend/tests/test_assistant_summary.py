@@ -13,7 +13,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///./test_assistant_summary.db")
 
 from backend.app.db import Base, SessionLocal, engine
 from backend.app.main import app
-from backend.app.models import Business, Organization
+from backend.app.models import Business, BusinessMembership, Organization, User
 
 
 @pytest.fixture()
@@ -43,9 +43,29 @@ def _create_business(db_session):
     return biz
 
 
+def _create_user(db_session, email: str) -> User:
+    user = User(email=email, name=email.split("@")[0])
+    db_session.add(user)
+    db_session.flush()
+    return user
+
+
+def _add_membership(db_session, business_id: str, user_id: str, role: str = "viewer"):
+    membership = BusinessMembership(business_id=business_id, user_id=user_id, role=role)
+    db_session.add(membership)
+    db_session.flush()
+    return membership
+
+
 def test_assistant_summary_empty(client, db_session):
     biz = _create_business(db_session)
-    resp = client.get(f"/api/assistant/summary/{biz.id}")
+    user = _create_user(db_session, "viewer@example.com")
+    _add_membership(db_session, biz.id, user.id, role="viewer")
+    db_session.commit()
+    resp = client.get(
+        f"/api/assistant/summary/{biz.id}",
+        headers={"X-User-Email": user.email},
+    )
     assert resp.status_code == 200
     payload = resp.json()
     assert payload["business_id"] == biz.id

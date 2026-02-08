@@ -16,7 +16,7 @@ os.environ.setdefault("ENV", "dev")
 
 from backend.app.db import Base, SessionLocal, engine
 from backend.app.main import app
-from backend.app.models import HealthSignalState, TxnCategorization
+from backend.app.models import BusinessMembership, HealthSignalState, TxnCategorization, User
 from backend.app.services import monitoring_service
 from backend.app.services.category_resolver import require_system_key_mapping
 
@@ -46,6 +46,18 @@ def test_golden_path_smoke(client, db_session):
     payload = seed_resp.json()
     business_id = payload["business_id"]
     window = payload["window"]
+    user = User(email="advisor@example.com", name="advisor")
+    db_session.add(user)
+    db_session.flush()
+    db_session.add(
+        BusinessMembership(
+            business_id=business_id,
+            user_id=user.id,
+            role="advisor",
+        )
+    )
+    db_session.commit()
+    headers = {"X-User-Email": user.email}
 
     pulse = monitoring_service.pulse(db_session, business_id, force_run=True)
     assert pulse["ran"] is True
@@ -57,12 +69,13 @@ def test_golden_path_smoke(client, db_session):
             "end_date": window["end_date"],
             "limit": 200,
         },
+        headers=headers,
     )
     assert ledger_resp.status_code == 200
     ledger_rows = ledger_resp.json()
     assert len(ledger_rows) > 0
 
-    signals_resp = client.get(f"/api/signals?business_id={business_id}")
+    signals_resp = client.get(f"/api/signals?business_id={business_id}", headers=headers)
     assert signals_resp.status_code == 200
     signals_payload = signals_resp.json()
     assert len(signals_payload.get("signals", [])) > 0
@@ -85,7 +98,10 @@ def test_golden_path_smoke(client, db_session):
     )
     assert target_state is not None
 
-    signal_detail_resp = client.get(f"/api/signals/{business_id}/{target_state.signal_id}")
+    signal_detail_resp = client.get(
+        f"/api/signals/{business_id}/{target_state.signal_id}",
+        headers=headers,
+    )
     assert signal_detail_resp.status_code == 200
     signal_detail = signal_detail_resp.json()
     payload_json = signal_detail.get("payload_json") or {}

@@ -1,4 +1,6 @@
 // src/api/client.ts
+import { getDevUserEmail } from "../utils/devAuth";
+
 export const API_BASE =
   import.meta.env.VITE_API_BASE ?? "http://127.0.0.1:8000";
 
@@ -44,8 +46,20 @@ async function parseJson<T>(res: Response): Promise<T> {
   }
 }
 
+function buildAuthHeaders(extra?: HeadersInit) {
+  const email = getDevUserEmail();
+  const authHeader = email ? { "X-User-Email": email } : {};
+  return {
+    ...authHeader,
+    ...extra,
+  };
+}
+
 export async function apiGet<T>(path: string, options?: { signal?: AbortSignal }): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, { signal: options?.signal });
+  const res = await fetch(`${API_BASE}${path}`, {
+    signal: options?.signal,
+    headers: buildAuthHeaders(),
+  });
   if (!res.ok) {
     const { message, body } = await parseError(res, `GET ${path} failed (${res.status})`);
     const url = res.url || `${API_BASE}${path}`;
@@ -57,7 +71,7 @@ export async function apiGet<T>(path: string, options?: { signal?: AbortSignal }
 export async function apiPost<T>(path: string, body?: any): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: buildAuthHeaders({ "Content-Type": "application/json" }),
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!res.ok) {
@@ -71,7 +85,7 @@ export async function apiPost<T>(path: string, body?: any): Promise<T> {
 export async function apiPut<T>(path: string, body: any): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: buildAuthHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -85,7 +99,7 @@ export async function apiPut<T>(path: string, body: any): Promise<T> {
 export async function apiPatch<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: buildAuthHeaders({ "Content-Type": "application/json" }),
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!res.ok) {
@@ -99,7 +113,7 @@ export async function apiPatch<T>(path: string, body?: unknown): Promise<T> {
 export async function apiDelete<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "DELETE",
-    headers: { "Content-Type": "application/json" },
+    headers: buildAuthHeaders({ "Content-Type": "application/json" }),
   });
   if (!res.ok) {
     const { message, body: errorBody } = await parseError(res, `DELETE ${path} failed (${res.status})`);

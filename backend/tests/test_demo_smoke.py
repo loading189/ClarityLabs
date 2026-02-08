@@ -24,6 +24,8 @@ from backend.app.models import (
     BusinessCategoryMap,
     CategoryRule,
     TxnCategorization,
+    BusinessMembership,
+    User,
 )
 
 
@@ -145,6 +147,20 @@ def _seed_posted_ledger_lines(db_session, business_id: str):
     db_session.commit()
 
 
+def _create_user(db_session, email: str) -> User:
+    user = User(email=email, name=email.split("@")[0])
+    db_session.add(user)
+    db_session.flush()
+    return user
+
+
+def _add_membership(db_session, business_id: str, user_id: str, role: str = "viewer"):
+    membership = BusinessMembership(business_id=business_id, user_id=user_id, role=role)
+    db_session.add(membership)
+    db_session.flush()
+    return membership
+
+
 def _drop_rule_run_columns(db_session):
     db_session.execute(text("ALTER TABLE category_rules RENAME TO category_rules_old"))
     db_session.execute(
@@ -245,6 +261,10 @@ def test_demo_dashboard_trends_and_ledger_smoke(client, db_session):
     seeded_business_id = "00000000-0000-4000-8000-000000000001"
     biz = _create_business(db_session, business_id=seeded_business_id)
     _seed_posted_ledger_lines(db_session, biz.id)
+    user = _create_user(db_session, "viewer@example.com")
+    _add_membership(db_session, biz.id, user.id, role="viewer")
+    db_session.commit()
+    headers = {"X-User-Email": user.email}
 
     dashboard = client.get(f"/demo/dashboard/{biz.id}")
     assert dashboard.status_code == 200
@@ -260,7 +280,8 @@ def test_demo_dashboard_trends_and_ledger_smoke(client, db_session):
         assert key in trends_json
 
     ledger = client.get(
-        f"/ledger/business/{biz.id}/lines?start_date=2024-01-01&end_date=2024-01-31&limit=50"
+        f"/ledger/business/{biz.id}/lines?start_date=2024-01-01&end_date=2024-01-31&limit=50",
+        headers=headers,
     )
     assert ledger.status_code == 200
     ledger_json = ledger.json()

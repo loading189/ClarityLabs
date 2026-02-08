@@ -173,6 +173,47 @@ class Business(Base):
     )
 
 
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    email: Mapped[str] = mapped_column(String(200), nullable=False, unique=True, index=True)
+    name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=utcnow,
+        onupdate=utcnow,
+    )
+
+
+class BusinessMembership(Base):
+    __tablename__ = "business_memberships"
+    __table_args__ = (
+        UniqueConstraint("business_id", "user_id", name="uq_business_memberships_business_user"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    business_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    role: Mapped[str] = mapped_column(String(20), nullable=False, default="viewer")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+    business = relationship("Business")
+    user = relationship("User")
+
+
 class Account(Base):
     """
     Chart of Accounts item.
@@ -373,6 +414,7 @@ class ActionItem(Base):
         UniqueConstraint("business_id", "idempotency_key", name="uq_action_items_business_idempotency"),
         Index("ix_action_items_business_status", "business_id", "status"),
         Index("ix_action_items_business_priority", "business_id", "priority"),
+        Index("ix_action_items_assigned_status", "assigned_to_user_id", "status"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
@@ -403,11 +445,53 @@ class ActionItem(Base):
     evidence_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     rationale_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     resolution_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    resolution_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    resolution_meta_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    assigned_to_user_id: Mapped[Optional[str]] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    resolved_by_user_id: Mapped[Optional[str]] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     snoozed_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     idempotency_key: Mapped[str] = mapped_column(String(220), nullable=False)
 
     business = relationship("Business")
+    assigned_to = relationship("User", foreign_keys=[assigned_to_user_id])
+    resolved_by = relationship("User", foreign_keys=[resolved_by_user_id])
+
+
+class ActionStateEvent(Base):
+    __tablename__ = "action_state_events"
+    __table_args__ = (
+        Index("ix_action_state_events_action_id", "action_id"),
+        Index("ix_action_state_events_actor_user_id", "actor_user_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    action_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("action_items.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    actor_user_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    from_status: Mapped[str] = mapped_column(String(20), nullable=False)
+    to_status: Mapped[str] = mapped_column(String(20), nullable=False)
+    reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+    action = relationship("ActionItem")
+    actor = relationship("User")
 
 
 class ProcessingEventState(Base):
