@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import Drawer from "../../components/common/Drawer";
-import { ActionItem, refreshActions, resolveAction, snoozeAction } from "../../api/actions";
-import { FilterState } from "../../app/filters/filters";
+import { refreshActions, resolveAction, snoozeAction } from "../../api/actions";
+import type {ActionItem} from "../../api/actions"
+import type { FilterState } from "../../app/filters/filters";
 import { ledgerPath } from "../../app/routes/routeUtils";
 import styles from "./NextActionsPanel.module.css";
 

@@ -1,3 +1,4 @@
+# backend/app/services/ledger_service.py
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
@@ -41,6 +42,7 @@ def is_inflow(direction: str) -> bool:
 def signed_amount(amount: float, direction: str) -> float:
     amt = float(amount or 0.0)
     if amt < 0:
+        # This should not happen for normalized txns; keep as a guard.
         logger.warning("Invariant guard: normalized transaction amount is negative: %s", amt)
     return amt if is_inflow(direction) else -amt
 
@@ -68,10 +70,14 @@ def _vendor_label(txn) -> str:
 
 
 def _matches_any(value: str, candidates: Optional[List[str]]) -> bool:
+    """
+    Case-insensitive exact match against a candidate list.
+    If candidates is None/empty, returns True (no filtering).
+    """
     if not candidates:
         return True
-    normalized = value.strip().lower()
-    return any(normalized == item.strip().lower() for item in candidates if item and item.strip())
+    normalized = (value or "").strip().lower()
+    return any(normalized == (item or "").strip().lower() for item in candidates if item and item.strip())
 
 
 def ledger_query(
@@ -90,49 +96,72 @@ def ledger_query(
     limit: int = 200,
     offset: int = 0,
 ) -> Dict[str, Any]:
+    """
+    Deterministic ledger query over posted transactions.
+
+    Notes:
+    - Filtering is applied in Python for MVP simplicity.
+    - `accounts` currently matches either account label OR account_id string.
+      (The call sites can pass either.)
+    - `start_balance` is the running balance prior to start_date.
+    """
     require_business(db, business_id)
     if not start_date or not end_date:
         start_date, end_date = default_ledger_window()
 
     details = fetch_posted_transaction_details(db, business_id)
+
     q = (search or "").strip().lower()
     filtered: List[Dict[str, Any]] = []
+
     start_balance = 0.0
-    source_id_set = {str(item) for item in source_event_ids or [] if item}
-    highlight_set = {str(item) for item in highlight_source_event_ids or [] if item}
+    source_id_set = {str(item) for item in (source_event_ids or []) if item}
+    highlight_set = {str(item) for item in (highlight_source_event_ids or []) if item}
     highlight_enabled = highlight_source_event_ids is not None
 
     for detail in details:
         txn = detail.txn
+
         amount = signed_amount(txn.amount or 0.0, txn.direction)
         vendor = _vendor_label(txn)
         account = (detail.account_name or txn.account or "").strip() or "Unknown"
-        account_id = detail.account_id
+        account_id = (str(detail.account_id).strip() if getattr(detail, "account_id", None) else "")
         category = (detail.category_name or txn.category or "").strip() or "Uncategorized"
 
-        if txn.occurred_at.date() < start_date:
+        # Window boundaries
+        txn_date = txn.occurred_at.date()
+        if txn_date < start_date:
             start_balance += amount
             continue
-        if txn.occurred_at.date() > end_date:
+        if txn_date > end_date:
             continue
+
+        # Optional exact filters
         if source_id_set and str(txn.source_event_id) not in source_id_set:
             continue
-        if not (_matches_any(account, accounts) or _matches_any(account_id, accounts)):
-            continue
+
+        if accounts:
+            # Allow either account label or account_id to match.
+            if not (_matches_any(account, accounts) or (account_id and _matches_any(account_id, accounts))):
+                continue
+
         if not _matches_any(vendor, vendors):
             continue
         if not _matches_any(category, categories):
             continue
+
         if direction and txn.direction != direction:
             continue
+
+        # Optional substring search
         if q:
-            haystack = f"{txn.description} {vendor} {account} {category}".lower()
+            haystack = f"{txn.description or ''} {vendor} {account} {category}".lower()
             if q not in haystack:
                 continue
 
-        row = {
+        row: Dict[str, Any] = {
             "occurred_at": txn.occurred_at,
-            "date": txn.occurred_at.date(),
+            "date": txn_date,
             "description": txn.description,
             "vendor": vendor,
             "amount": round(amount, 2),
@@ -143,22 +172,28 @@ def ledger_query(
         }
         if highlight_enabled:
             row["is_highlighted"] = str(txn.source_event_id) in highlight_set
+
         filtered.append(row)
 
-    filtered.sort(key=lambda row: (row["occurred_at"], row["source_event_id"]))
+    # Deterministic order
+    filtered.sort(key=lambda row: (row["occurred_at"], str(row["source_event_id"])))
+
+    # Running balance + totals
     balance = start_balance
     total_in = 0.0
     total_out = 0.0
     for row in filtered:
-        amount = float(row["amount"])
-        balance += amount
+        amt = float(row["amount"])
+        balance += amt
         row["balance"] = round(balance, 2)
-        if amount >= 0:
-            total_in += amount
+        if amt >= 0:
+            total_in += amt
         else:
-            total_out += abs(amount)
+            total_out += abs(amt)
 
-    page = filtered[offset: offset + limit]
+    # Page slice (after computing balances so balances are correct on the page)
+    page = filtered[offset : offset + limit]
+
     return {
         "rows": page,
         "summary": {
@@ -180,30 +215,41 @@ def ledger_dimensions(
     end_date: Optional[date],
     dimension: Literal["accounts", "vendors"],
 ) -> List[Dict[str, Any]]:
+    """
+    Dimension aggregation for UI facets.
+    Note: Uses a high limit to approximate "all rows" in MVP.
+    """
     payload = ledger_query(
         db,
         business_id,
         start_date=start_date,
         end_date=end_date,
-        limit=100000,
+        limit=1_000_000,
         offset=0,
     )
+
     groups: Dict[str, Dict[str, Any]] = {}
     for row in payload["rows"]:
         if dimension == "accounts":
             key = str(row["account"])
-            label = key
-            item = groups.setdefault(key, {"account": key, "label": label, "count": 0, "total": 0.0})
+            item = groups.setdefault(
+                key,
+                {"account": key, "label": key, "count": 0, "total": 0.0},
+            )
         else:
             key = str(row["vendor"])
-            label = key
-            item = groups.setdefault(key, {"vendor": key, "label": label, "count": 0, "total": 0.0})
+            item = groups.setdefault(
+                key,
+                {"vendor": key, "label": key, "count": 0, "total": 0.0},
+            )
+
         item["count"] += 1
         item["total"] += float(row["amount"])
 
     values = list(groups.values())
     for item in values:
         item["total"] = round(float(item["total"]), 2)
+
     values.sort(key=lambda item: (-int(item["count"]), str(item["label"]).lower()))
     return values
 
@@ -252,7 +298,7 @@ def ledger_lines(
             }
         )
 
-    return sorted(out, key=lambda row: (row["occurred_at"], row["source_event_id"]))
+    return sorted(out, key=lambda row: (row["occurred_at"], str(row["source_event_id"])))
 
 
 def ledger_context_for_source_event(
@@ -265,28 +311,33 @@ def ledger_context_for_source_event(
     Includes balance and running totals up to that row.
     """
     require_business(db, business_id)
-    txns = fetch_posted_transactions(db, business_id)
+
+    # Ensure deterministic ordering for running balances.
+    txns = sorted(
+        fetch_posted_transactions(db, business_id),
+        key=lambda t: (t.occurred_at, str(t.source_event_id)),
+    )
 
     balance = 0.0
     total_in = 0.0
     total_out = 0.0
 
     for txn in txns:
-        amount = signed_amount(txn.amount or 0.0, txn.direction)
-        balance += amount
-        if amount >= 0:
-            total_in += amount
+        amt = signed_amount(txn.amount or 0.0, txn.direction)
+        balance += amt
+        if amt >= 0:
+            total_in += amt
         else:
-            total_out += abs(amount)
+            total_out += abs(amt)
 
-        if txn.source_event_id == source_event_id:
+        if str(txn.source_event_id) == str(source_event_id):
             row = {
                 "source_event_id": txn.source_event_id,
                 "occurred_at": txn.occurred_at,
                 "date": txn.occurred_at.date(),
                 "description": txn.description,
                 "vendor": _vendor_label(txn),
-                "amount": round(amount, 2),
+                "amount": round(amt, 2),
                 "category": (txn.category or "").strip() or "Uncategorized",
                 "account": (txn.account or "").strip() or "Unknown",
                 "balance": round(balance, 2),
@@ -320,6 +371,7 @@ def ledger_trace_transactions(
         source_event_ids=txn_ids,
         limit=limit,
     )
+
     out: List[Dict[str, Any]] = []
     for detail in details:
         txn = detail.txn
@@ -341,7 +393,7 @@ def ledger_trace_transactions(
             }
         )
 
-    return sorted(out, key=lambda row: (row["occurred_at"], row["source_event_id"]))
+    return sorted(out, key=lambda row: (row["occurred_at"], str(row["source_event_id"])))
 
 
 def income_statement(
@@ -374,21 +426,17 @@ def income_statement(
         st = (detail.account_subtype or "").strip().lower()
 
         if t == "revenue":
-            # revenue should be positive; if negative (refund), it reduces revenue
             rev_total += amt
-            rev_by_name[detail.category_name] = rev_by_name.get(detail.category_name, 0.0) + amt
+            key = detail.category_name or "Uncategorized"
+            rev_by_name[key] = rev_by_name.get(key, 0.0) + amt
         elif t == "expense" or st == "cogs":
-            # expenses we report as positive numbers; rebates reduce expense
-            exp = -amt
+            exp = -amt  # report expenses as positive
             exp_total += exp
-            exp_by_name[detail.category_name] = exp_by_name.get(detail.category_name, 0.0) + exp
+            key = detail.category_name or "Uncategorized"
+            exp_by_name[key] = exp_by_name.get(key, 0.0) + exp
 
-    revenue_lines = [
-        {"name": k, "amount": round(v, 2)} for k, v in sorted(rev_by_name.items())
-    ]
-    expense_lines = [
-        {"name": k, "amount": round(v, 2)} for k, v in sorted(exp_by_name.items())
-    ]
+    revenue_lines = [{"name": k, "amount": round(v, 2)} for k, v in sorted(rev_by_name.items())]
+    expense_lines = [{"name": k, "amount": round(v, 2)} for k, v in sorted(exp_by_name.items())]
 
     net_income = rev_total - exp_total
 
@@ -415,7 +463,6 @@ def cash_flow(
     cash_out = sum of outflow amounts across posted lines in range
     """
     require_business(db, business_id)
-
     txns = fetch_posted_transactions(db, business_id)
 
     cash_in = 0.0
@@ -459,6 +506,8 @@ def cash_series(
             continue
         txns.append(txn)
 
+    # Deterministic order for chart series
+    txns.sort(key=lambda t: (t.occurred_at, str(t.source_event_id)))
     return _build_cash_series(txns, starting_cash)
 
 
@@ -478,7 +527,10 @@ def balance_sheet_v1(
     require_business(db, business_id)
 
     bal = float(starting_cash or 0.0)
-    for txn in fetch_posted_transactions(db, business_id):
+    txns = fetch_posted_transactions(db, business_id)
+    txns = sorted(txns, key=lambda t: (t.occurred_at, str(t.source_event_id)))
+
+    for txn in txns:
         if txn.occurred_at.date() <= as_of:
             bal += signed_amount(txn.amount or 0.0, txn.direction)
 
