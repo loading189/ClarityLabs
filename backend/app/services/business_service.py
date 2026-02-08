@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from backend.app.models import (
@@ -16,6 +16,10 @@ from backend.app.models import (
     HealthSignalState,
     IntegrationConnection,
     MonitorRuntime,
+    Plan,
+    PlanCondition,
+    PlanObservation,
+    PlanStateEvent,
     ProcessingEventState,
     RawEvent,
     TxnCategorization,
@@ -32,6 +36,11 @@ def hard_delete_business(db: Session, business_id: str) -> bool:
 
     db.execute(delete(AssistantMessage).where(AssistantMessage.business_id == business_id))
     db.execute(delete(ActionItem).where(ActionItem.business_id == business_id))
+    plan_ids = select(Plan.id).where(Plan.business_id == business_id)
+    db.execute(delete(PlanStateEvent).where(PlanStateEvent.plan_id.in_(plan_ids)))
+    db.execute(delete(PlanObservation).where(PlanObservation.plan_id.in_(plan_ids)))
+    db.execute(delete(PlanCondition).where(PlanCondition.plan_id.in_(plan_ids)))
+    db.execute(delete(Plan).where(Plan.business_id == business_id))
     db.execute(delete(HealthSignalState).where(HealthSignalState.business_id == business_id))
     db.execute(delete(AuditLog).where(AuditLog.business_id == business_id))
     db.execute(delete(MonitorRuntime).where(MonitorRuntime.business_id == business_id))

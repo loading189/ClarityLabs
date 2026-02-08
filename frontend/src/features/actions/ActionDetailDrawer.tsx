@@ -11,8 +11,10 @@ import {
   type ActionTriageItem,
 } from "../../api/actions";
 import { fetchBusinessMembers, type BusinessMember } from "../../api/businesses";
+import { createPlan } from "../../api/plansV2";
 import type { FilterState } from "../../app/filters/filters";
 import { ledgerPath } from "../../app/routes/routeUtils";
+import PlanDetailDrawer from "../plans/PlanDetailDrawer";
 import styles from "./ActionDetailDrawer.module.css";
 
 const SNOOZE_DAYS = 7;
@@ -80,9 +82,14 @@ export default function ActionDetailDrawer({
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [planIntent, setPlanIntent] = useState("");
+  const [planError, setPlanError] = useState<string | null>(null);
+  const [planIdOverride, setPlanIdOverride] = useState<string | null>(null);
+  const [planOpen, setPlanOpen] = useState(false);
 
   const actionId = action?.id;
   const businessId = action?.business_id;
+  const planId = planIdOverride ?? action?.plan_id ?? null;
 
   const loadMembers = useCallback(async () => {
     if (!businessId) return;
@@ -124,6 +131,9 @@ export default function ActionDetailDrawer({
     if (!open) return;
     setError(null);
     setNote(action?.resolution_note ?? "");
+    setPlanIntent("");
+    setPlanError(null);
+    setPlanIdOverride(null);
   }, [action?.resolution_note, open]);
 
   const ledgerLink = useMemo(() => {
@@ -187,6 +197,51 @@ export default function ActionDetailDrawer({
     }
   };
 
+  const handleCreatePlan = async () => {
+    if (!businessId || !actionId || !action) return;
+    if (!planIntent.trim()) {
+      setPlanError("Add a plan intent before creating.");
+      return;
+    }
+    setPlanError(null);
+    const conditions = action.source_signal_id
+      ? [
+          {
+            type: "signal_resolved" as const,
+            signal_id: action.source_signal_id,
+            baseline_window_days: 0,
+            evaluation_window_days: 14,
+            direction: "resolve" as const,
+          },
+        ]
+      : [
+          {
+            type: "metric_delta" as const,
+            metric_key: "health_score",
+            baseline_window_days: 30,
+            evaluation_window_days: 14,
+            threshold: 0.1,
+            direction: "improve" as const,
+          },
+        ];
+    try {
+      const response = await createPlan({
+        business_id: businessId,
+        title: action.title,
+        intent: planIntent.trim(),
+        source_action_id: actionId,
+        primary_signal_id: action.source_signal_id ?? undefined,
+        assigned_to_user_id: action.assigned_to_user_id ?? undefined,
+        conditions,
+      });
+      setPlanIdOverride(response.plan.id);
+      setPlanOpen(true);
+      onUpdated?.();
+    } catch (err: any) {
+      setPlanError(err?.message ?? "Failed to create plan");
+    }
+  };
+
   return (
     <Drawer open={open} title={action?.title ?? "Action detail"} onClose={onClose}>
       {action && (
@@ -221,6 +276,29 @@ export default function ActionDetailDrawer({
               onChange={(event) => setNote(event.target.value)}
               placeholder="Add context for the audit trail"
             />
+          </div>
+
+          <div className={styles.section}>
+            <div className={styles.label}>Plan</div>
+            {planError && <div className={styles.error}>{planError}</div>}
+            {planId ? (
+              <button type="button" className={styles.secondaryButton} onClick={() => setPlanOpen(true)}>
+                View Plan
+              </button>
+            ) : (
+              <>
+                <textarea
+                  className={styles.input}
+                  rows={3}
+                  value={planIntent}
+                  onChange={(event) => setPlanIntent(event.target.value)}
+                  placeholder="Document the plan intent and why it matters"
+                />
+                <button type="button" className={styles.primaryButton} onClick={handleCreatePlan}>
+                  Create Plan
+                </button>
+              </>
+            )}
           </div>
 
           <div className={styles.actions}>
@@ -289,6 +367,14 @@ export default function ActionDetailDrawer({
           </div>
         </div>
       )}
+
+      <PlanDetailDrawer
+        open={planOpen}
+        planId={planId}
+        businessId={businessId}
+        onClose={() => setPlanOpen(false)}
+        onUpdated={onUpdated}
+      />
     </Drawer>
   );
 }

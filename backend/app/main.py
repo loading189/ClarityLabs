@@ -36,6 +36,7 @@ from backend.app.api.routes.categorize_auto import router as categorize_auto_rou
 from backend.app.api.routes.plaid import router as plaid_router
 from backend.app.api.routes.processing import router as processing_router
 from backend.app.api.routes.actions import router as actions_router
+from backend.app.api.routes.plans import router as plans_router
 from backend.app.api.routes.me import router as me_router
 from backend.app.api.routes.config import router as config_router
 
@@ -111,6 +112,7 @@ app.include_router(integration_connections_router)
 app.include_router(webhooks_router)
 app.include_router(assistant_tools_router)
 app.include_router(actions_router)
+app.include_router(plans_router)
 app.include_router(categorize_auto_router)
 app.include_router(plaid_router)
 app.include_router(processing_router)

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional
 
 from sqlalchemy import (
     Boolean,
+    Date,
     DateTime,
     ForeignKey,
     JSON,
@@ -491,6 +492,139 @@ class ActionStateEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     action = relationship("ActionItem")
+    actor = relationship("User")
+
+
+class Plan(Base):
+    __tablename__ = "plans"
+    __table_args__ = (
+        Index("ix_plans_business_status", "business_id", "status"),
+        Index("ix_plans_business_created", "business_id", "created_at"),
+        Index("ix_plans_source_action_id", "source_action_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    business_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    created_by_user_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    assigned_to_user_id: Mapped[Optional[str]] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    intent: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="draft",
+        server_default=text("'draft'"),
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utcnow,
+        onupdate=utcnow,
+    )
+    activated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    source_action_id: Mapped[Optional[str]] = mapped_column(
+        String(36),
+        ForeignKey("action_items.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    primary_signal_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    idempotency_key: Mapped[Optional[str]] = mapped_column(String(220), nullable=True)
+
+    business = relationship("Business")
+    created_by = relationship("User", foreign_keys=[created_by_user_id])
+    assigned_to = relationship("User", foreign_keys=[assigned_to_user_id])
+
+
+class PlanCondition(Base):
+    __tablename__ = "plan_conditions"
+    __table_args__ = (
+        Index("ix_plan_conditions_plan_id", "plan_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    plan_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("plans.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    type: Mapped[str] = mapped_column(String(32), nullable=False)
+    signal_id: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    metric_key: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    baseline_window_days: Mapped[int] = mapped_column(Integer, nullable=False)
+    evaluation_window_days: Mapped[int] = mapped_column(Integer, nullable=False)
+    threshold: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    direction: Mapped[str] = mapped_column(String(20), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+    plan = relationship("Plan")
+
+
+class PlanObservation(Base):
+    __tablename__ = "plan_observations"
+    __table_args__ = (
+        Index("ix_plan_observations_plan_id", "plan_id"),
+        Index("ix_plan_observations_observed_at", "observed_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    plan_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("plans.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    evaluation_start: Mapped[date] = mapped_column(Date, nullable=False)
+    evaluation_end: Mapped[date] = mapped_column(Date, nullable=False)
+    signal_state: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    metric_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    metric_baseline: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    metric_delta: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    verdict: Mapped[str] = mapped_column(String(20), nullable=False)
+    evidence_json: Mapped[dict] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+    plan = relationship("Plan")
+
+
+class PlanStateEvent(Base):
+    __tablename__ = "plan_state_events"
+    __table_args__ = (
+        Index("ix_plan_state_events_plan_id", "plan_id"),
+        Index("ix_plan_state_events_actor_user_id", "actor_user_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    plan_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("plans.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    actor_user_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    event_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    from_status: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    to_status: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+    plan = relationship("Plan")
     actor = relationship("User")
 
 

@@ -24,6 +24,7 @@ export interface ActionItem {
   resolved_by_user_id?: string | null;
   snoozed_until?: string | null;
   idempotency_key: string;
+  plan_id?: string | null;
 }
 
 export interface ActionListResponse {
