@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from backend.app.api.deps import require_membership_dep
 from backend.app.db import get_db
 from backend.app.services import categorize_service
 
@@ -17,6 +18,10 @@ class AutoCategorizeOut(BaseModel):
     audit_id: str | None = None
 
 
-@router.post("/auto/{business_id}", response_model=AutoCategorizeOut)
+@router.post(
+    "/auto/{business_id}",
+    response_model=AutoCategorizeOut,
+    dependencies=[Depends(require_membership_dep())],
+)
 def auto_categorize(business_id: str, db: Session = Depends(get_db)):
     return AutoCategorizeOut(**categorize_service.auto_categorize_from_vendor_map(db, business_id))

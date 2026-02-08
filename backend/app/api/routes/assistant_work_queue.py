@@ -3,13 +3,14 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
+from backend.app.api.deps import require_membership_dep
 from backend.app.db import get_db
 from backend.app.services.assistant_work_queue_service import WorkQueueOut, list_work_queue
 
 router = APIRouter(prefix="/api/assistant/work_queue", tags=["assistant"])
 
 
-@router.get("", response_model=WorkQueueOut)
+@router.get("", response_model=WorkQueueOut, dependencies=[Depends(require_membership_dep())])
 def get_assistant_work_queue(
     business_id: str = Query(...),
     limit: int = Query(default=50, ge=1, le=200),

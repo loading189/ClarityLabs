@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from backend.app.api.deps import require_membership_dep
 from backend.app.db import get_db
 from backend.app.services import health_score_service
 from backend.app.api.routes.changes import ChangeEventOut
@@ -85,7 +86,7 @@ class HealthScoreOut(BaseModel):
     meta: HealthScoreMetaOut
 
 
-@router.get("", response_model=HealthScoreOut)
+@router.get("", response_model=HealthScoreOut, dependencies=[Depends(require_membership_dep())])
 def get_health_score(
     business_id: str = Query(...),
     db: Session = Depends(get_db),
@@ -97,7 +98,11 @@ def get_health_score(
     return health_score_service.compute_health_score(db, business_id)
 
 
-@router.get("/explain_change", response_model=HealthScoreChangeExplainOut)
+@router.get(
+    "/explain_change",
+    response_model=HealthScoreChangeExplainOut,
+    dependencies=[Depends(require_membership_dep())],
+)
 def get_health_score_change_explain(
     business_id: str = Query(...),
     since_hours: int = Query(72, ge=1, le=720),

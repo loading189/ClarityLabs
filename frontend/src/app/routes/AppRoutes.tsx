@@ -40,7 +40,8 @@ export default function AppRoutes() {
 
         {/* entry */}
         <Route path="/app" element={<AppIndexRedirect />} />
-        <Route path="/app/select" element={<BusinessSelectPage />} />
+        <Route path="/businesses" element={<BusinessSelectPage />} />
+        <Route path="/app/select" element={<Navigate to="/businesses" replace />} />
         <Route path="/onboarding" element={<OnboardingWizardPage />} />
         <Route path="/assistant" element={<AssistantCompatRedirect />} />
 

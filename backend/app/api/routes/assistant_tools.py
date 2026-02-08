@@ -8,10 +8,10 @@ from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
-from backend.app.api.deps import get_current_user, require_membership
+from backend.app.api.deps import require_membership_dep
 from backend.app.db import get_db
 from backend.app.integrations import get_adapter
-from backend.app.models import ActionItem, AuditLog, HealthSignalState, IntegrationConnection, User
+from backend.app.models import ActionItem, AuditLog, HealthSignalState, IntegrationConnection
 from backend.app.services import audit_service, monitoring_service, integration_connection_service
 from backend.app.services.ingest_orchestrator import process_ingested_events
 from backend.app.services.posted_txn_service import (
@@ -125,13 +125,11 @@ class AssistantActionIn(BaseModel):
     payload: Optional[dict] = None
 
 
-@router.get("/summary/{business_id}")
+@router.get("/summary/{business_id}", dependencies=[Depends(require_membership_dep())])
 def assistant_summary(
     business_id: str,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
 ):
-    require_membership(db, business_id, user)
     integrations = (
         db.execute(
             select(IntegrationConnection).where(IntegrationConnection.business_id == business_id)
@@ -188,14 +186,12 @@ def assistant_summary(
     }
 
 
-@router.post("/action/{business_id}")
+@router.post("/action/{business_id}", dependencies=[Depends(require_membership_dep(min_role="staff"))])
 def assistant_action(
     business_id: str,
     req: AssistantActionIn,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
 ):
-    require_membership(db, business_id, user, min_role="staff")
     action = (req.action_type or "").strip().lower()
     before = {
         "open_signals": _open_signals_count(db, business_id),

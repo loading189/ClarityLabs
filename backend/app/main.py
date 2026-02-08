@@ -37,6 +37,7 @@ from backend.app.api.routes.plaid import router as plaid_router
 from backend.app.api.routes.processing import router as processing_router
 from backend.app.api.routes.actions import router as actions_router
 from backend.app.api.routes.me import router as me_router
+from backend.app.api.routes.config import router as config_router
 
 
 logger = logging.getLogger(__name__)
@@ -114,3 +115,4 @@ app.include_router(categorize_auto_router)
 app.include_router(plaid_router)
 app.include_router(processing_router)
 app.include_router(me_router)
+app.include_router(config_router)

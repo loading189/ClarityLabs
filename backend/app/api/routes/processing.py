@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from backend.app.api.deps import require_membership_dep
 from backend.app.db import get_db
 from backend.app.services import processing_service
 
@@ -28,7 +29,7 @@ def _require_dev_ops() -> None:
         raise HTTPException(403, "dev processing ops disabled")
 
 
-@router.post("/reprocess/{business_id}")
+@router.post("/reprocess/{business_id}", dependencies=[Depends(require_membership_dep(min_role="staff"))])
 def reprocess_pipeline(
     business_id: str,
     req: ReprocessIn,
