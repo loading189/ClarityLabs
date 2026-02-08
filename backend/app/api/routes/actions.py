@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, aliased
 
-from backend.app.api.deps import get_current_user, require_membership
+from backend.app.api.deps import get_current_user, require_membership, require_membership_dep
 from backend.app.db import get_db
 from backend.app.models import ActionItem, ActionStateEvent, Business, BusinessMembership, User
 from backend.app.services.actions_service import (
@@ -125,34 +125,38 @@ class ActionTriageOut(BaseModel):
     summary: ActionTriageSummaryOut
 
 
-@router.get("/{business_id}", response_model=ActionListOut)
+@router.get("/{business_id}", response_model=ActionListOut, dependencies=[Depends(require_membership_dep())])
 def get_actions(
     business_id: str,
     status: Optional[str] = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
 ):
-    require_membership(db, business_id, user)
     actions, summary = list_actions(db, business_id, status=status, limit=limit, offset=offset)
     return {"actions": actions, "summary": summary}
 
 
-@router.post("/{business_id}/refresh", response_model=ActionListOut)
+@router.post(
+    "/{business_id}/refresh",
+    response_model=ActionListOut,
+    dependencies=[Depends(require_membership_dep(min_role="advisor"))],
+)
 def refresh_actions(
     business_id: str,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
 ):
-    require_membership(db, business_id, user, min_role="advisor")
     generate_actions_for_business(db, business_id)
     db.commit()
     actions, summary = list_actions(db, business_id, status="open", limit=50, offset=0)
     return {"actions": actions, "summary": summary}
 
 
-@router.post("/{business_id}/{action_id}/resolve", response_model=ActionItemOut)
+@router.post(
+    "/{business_id}/{action_id}/resolve",
+    response_model=ActionItemOut,
+    dependencies=[Depends(require_membership_dep(min_role="staff"))],
+)
 def resolve_action_item(
     business_id: str,
     action_id: str,
@@ -160,7 +164,6 @@ def resolve_action_item(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    require_membership(db, business_id, user, min_role="staff")
     try:
         row = resolve_action(
             db,
@@ -180,7 +183,11 @@ def resolve_action_item(
     return row
 
 
-@router.post("/{business_id}/{action_id}/snooze", response_model=ActionItemOut)
+@router.post(
+    "/{business_id}/{action_id}/snooze",
+    response_model=ActionItemOut,
+    dependencies=[Depends(require_membership_dep(min_role="staff"))],
+)
 def snooze_action_item(
     business_id: str,
     action_id: str,
@@ -188,7 +195,6 @@ def snooze_action_item(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    require_membership(db, business_id, user, min_role="staff")
     try:
         row = snooze_action(
             db,
@@ -207,7 +213,11 @@ def snooze_action_item(
     return row
 
 
-@router.post("/{business_id}/{action_id}/assign", response_model=ActionItemOut)
+@router.post(
+    "/{business_id}/{action_id}/assign",
+    response_model=ActionItemOut,
+    dependencies=[Depends(require_membership_dep(min_role="staff"))],
+)
 def assign_action_item(
     business_id: str,
     action_id: str,
@@ -215,7 +225,6 @@ def assign_action_item(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    require_membership(db, business_id, user, min_role="staff")
     try:
         row = assign_action(
             db,
@@ -231,14 +240,16 @@ def assign_action_item(
     return row
 
 
-@router.get("/{business_id}/{action_id}/events", response_model=list[ActionStateEventOut])
+@router.get(
+    "/{business_id}/{action_id}/events",
+    response_model=list[ActionStateEventOut],
+    dependencies=[Depends(require_membership_dep())],
+)
 def list_action_events(
     business_id: str,
     action_id: str,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
 ):
-    require_membership(db, business_id, user)
     action = db.get(ActionItem, action_id)
     if not action or action.business_id != business_id:
         raise HTTPException(status_code=404, detail="action not found")

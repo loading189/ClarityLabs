@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
+from backend.app.api.deps import require_membership_dep
 from backend.app.db import get_db
 from backend.app.models import (
     Organization,
@@ -303,7 +304,11 @@ def bootstrap_business(req: BootstrapBusinessIn, db: Session = Depends(get_db)):
     )
 
 
-@router.post("/businesses/{business_id}/coa/apply_template", response_model=ApplyCoaOut)
+@router.post(
+    "/businesses/{business_id}/coa/apply_template",
+    response_model=ApplyCoaOut,
+    dependencies=[Depends(require_membership_dep(min_role="staff"))],
+)
 def apply_coa_template(business_id: str, req: ApplyCoaIn, db: Session = Depends(get_db)):
     biz = db.get(Business, business_id)
     if not biz:
@@ -357,7 +362,11 @@ def apply_coa_template(business_id: str, req: ApplyCoaIn, db: Session = Depends(
     return ApplyCoaOut(business_id=business_id, template=req.template, created=created, skipped=skipped)
 
 
-@router.get("/businesses/{business_id}/status", response_model=BusinessStatusOut)
+@router.get(
+    "/businesses/{business_id}/status",
+    response_model=BusinessStatusOut,
+    dependencies=[Depends(require_membership_dep())],
+)
 def business_status(business_id: str, db: Session = Depends(get_db)):
     biz = db.get(Business, business_id)
     if not biz:

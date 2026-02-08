@@ -9,9 +9,10 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from backend.app.api.deps import require_membership_dep
 from backend.app.db import get_db
 from backend.app.integrations import get_adapter
-from backend.app.models import Business, IntegrationConnection, RawEvent
+from backend.app.models import IntegrationConnection, RawEvent
 from backend.app.services import audit_service
 from backend.app.services.ingest_orchestrator import process_ingested_events
 from backend.app.services import integration_connection_service
@@ -22,13 +23,6 @@ router = APIRouter(prefix="/api/integrations", tags=["integrations"])
 
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
-
-
-def require_business(db: Session, business_id: str) -> Business:
-    biz = db.get(Business, business_id)
-    if not biz:
-        raise HTTPException(404, "business not found")
-    return biz
 
 
 class IntegrationConnectIn(BaseModel):
@@ -83,14 +77,17 @@ def _require_dev_ops() -> None:
         raise HTTPException(403, "dev integration ops disabled")
 
 
-@router.post("/{business_id}/{provider}/connect", response_model=IntegrationConnectionOut)
+@router.post(
+    "/{business_id}/{provider}/connect",
+    response_model=IntegrationConnectionOut,
+    dependencies=[Depends(require_membership_dep())],
+)
 def connect_integration(
     business_id: str,
     provider: str,
     req: IntegrationConnectIn,
     db: Session = Depends(get_db),
 ):
-    require_business(db, business_id)
     provider_key = provider.strip().lower()
     existing = db.execute(
         select(IntegrationConnection).where(
@@ -145,13 +142,16 @@ def connect_integration(
     return row
 
 
-@router.post("/{business_id}/{provider}/disconnect", response_model=IntegrationConnectionOut)
+@router.post(
+    "/{business_id}/{provider}/disconnect",
+    response_model=IntegrationConnectionOut,
+    dependencies=[Depends(require_membership_dep())],
+)
 def disconnect_integration(
     business_id: str,
     provider: str,
     db: Session = Depends(get_db),
 ):
-    require_business(db, business_id)
     provider_key = provider.strip().lower()
     row = db.execute(
         select(IntegrationConnection).where(
@@ -184,13 +184,16 @@ def disconnect_integration(
     return row
 
 
-@router.post("/{business_id}/{provider}/disable", response_model=IntegrationConnectionOut)
+@router.post(
+    "/{business_id}/{provider}/disable",
+    response_model=IntegrationConnectionOut,
+    dependencies=[Depends(require_membership_dep())],
+)
 def disable_integration(
     business_id: str,
     provider: str,
     db: Session = Depends(get_db),
 ):
-    require_business(db, business_id)
     provider_key = provider.strip().lower()
     row = db.execute(
         select(IntegrationConnection).where(
@@ -218,13 +221,16 @@ def disable_integration(
     return row
 
 
-@router.post("/{business_id}/{provider}/enable", response_model=IntegrationConnectionOut)
+@router.post(
+    "/{business_id}/{provider}/enable",
+    response_model=IntegrationConnectionOut,
+    dependencies=[Depends(require_membership_dep())],
+)
 def enable_integration(
     business_id: str,
     provider: str,
     db: Session = Depends(get_db),
 ):
-    require_business(db, business_id)
     provider_key = provider.strip().lower()
     row = db.execute(
         select(IntegrationConnection).where(
@@ -253,9 +259,12 @@ def enable_integration(
     return row
 
 
-@router.get("/{business_id}", response_model=list[IntegrationConnectionOut])
+@router.get(
+    "/{business_id}",
+    response_model=list[IntegrationConnectionOut],
+    dependencies=[Depends(require_membership_dep())],
+)
 def list_connections(business_id: str, db: Session = Depends(get_db)):
-    require_business(db, business_id)
     rows = db.execute(
         select(IntegrationConnection).where(IntegrationConnection.business_id == business_id)
     ).scalars().all()
@@ -266,13 +275,16 @@ def list_connections(business_id: str, db: Session = Depends(get_db)):
     return rows
 
 
-@router.post("/{business_id}/{provider}/sync", response_model=IntegrationSyncOut)
+@router.post(
+    "/{business_id}/{provider}/sync",
+    response_model=IntegrationSyncOut,
+    dependencies=[Depends(require_membership_dep())],
+)
 def sync_integration(
     business_id: str,
     provider: str,
     db: Session = Depends(get_db),
 ):
-    require_business(db, business_id)
     provider_key = provider.strip().lower()
     adapter = get_adapter(provider_key)
 
@@ -348,7 +360,11 @@ def sync_integration(
     )
 
 
-@router.post("/{business_id}/{provider}/replay", response_model=IntegrationSyncOut)
+@router.post(
+    "/{business_id}/{provider}/replay",
+    response_model=IntegrationSyncOut,
+    dependencies=[Depends(require_membership_dep())],
+)
 def replay_integration(
     business_id: str,
     provider: str,
@@ -356,7 +372,6 @@ def replay_integration(
     db: Session = Depends(get_db),
 ):
     _require_dev_ops()
-    require_business(db, business_id)
     provider_key = provider.strip().lower()
     adapter = get_adapter(provider_key)
     connection = db.execute(

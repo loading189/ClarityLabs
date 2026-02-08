@@ -1,46 +1,43 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { fetchDashboard, seedDemo } from "../../api/demo";
-import { createBusiness, deleteBusiness } from "../../api/businesses";
-import { seedSimV2 } from "../../api/simV2";
+import { createBusiness, deleteBusiness, joinBusiness } from "../../api/businesses";
+import { fetchConfig, type AppConfig } from "../../api/config";
 import { assertBusinessId } from "../../utils/businessId";
+import { useBusinessesMine } from "../../hooks/useBusinessesMine";
 import { useAppState } from "../state/appState";
 
-type Card = {
-  business_id: string;
-  name?: string | null;
-  subtitle?: string | null;
+type JoinState = {
+  businessId: string;
+  role: string;
 };
 
 export default function BusinessSelectPage() {
   const navigate = useNavigate();
   const { setActiveBusinessId } = useAppState();
-  const [cards, setCards] = useState<Card[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const [newName, setNewName] = useState("New Demo Business");
-  const [isDemo, setIsDemo] = useState(true);
-  const [demoLoading, setDemoLoading] = useState(false);
-  const [demoErr, setDemoErr] = useState<string | null>(null);
-  const isDev = import.meta.env.DEV;
+  const { businesses, loading, error, reload } = useBusinessesMine();
+  const [config, setConfig] = useState<AppConfig | null>(null);
+  const [configError, setConfigError] = useState<string | null>(null);
+  const [newName, setNewName] = useState("");
+  const [createLoading, setCreateLoading] = useState(false);
+  const [createErr, setCreateErr] = useState<string | null>(null);
+  const [joinState, setJoinState] = useState<JoinState>({ businessId: "", role: "advisor" });
+  const [joinLoading, setJoinLoading] = useState(false);
+  const [joinErr, setJoinErr] = useState<string | null>(null);
+  const [deleteErr, setDeleteErr] = useState<string | null>(null);
 
-  const load = () => {
-    const controller = new AbortController();
-    setLoading(true);
-    setErr(null);
-
-    fetchDashboard(controller.signal)
-      .then((res) => setCards((res?.cards ?? []) as Card[]))
-      .catch((e: any) => {
-        if (e instanceof DOMException && e.name === "AbortError") return;
-        setErr(e?.message ?? "Failed to load businesses");
+  useEffect(() => {
+    let mounted = true;
+    fetchConfig()
+      .then((next) => {
+        if (mounted) setConfig(next);
       })
-      .finally(() => setLoading(false));
-
-    return () => controller.abort();
-  };
-
-  useEffect(() => load(), []);
+      .catch((err: any) => {
+        if (mounted) setConfigError(err?.message ?? "Failed to load config");
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleSelect = (rawId: string) => {
     const id = assertBusinessId(rawId, "BusinessSelectPage");
@@ -50,81 +47,140 @@ export default function BusinessSelectPage() {
   };
 
   const handleCreate = async () => {
-    const created = await createBusiness({ name: newName, is_demo: isDemo });
-    setActiveBusinessId(created.id);
-    if (isDemo) {
-      await seedSimV2({ business_id: created.id, preset_id: "healthy", mode: "replace" });
+    if (!newName.trim()) {
+      setCreateErr("Business name is required");
+      return;
     }
-    navigate(`/app/${created.id}/assistant`);
+    setCreateErr(null);
+    setCreateLoading(true);
+    try {
+      const created = await createBusiness({ name: newName.trim() });
+      setActiveBusinessId(created.business.id);
+      await reload();
+      navigate(`/app/${created.business.id}/assistant`);
+    } catch (err: any) {
+      setCreateErr(err?.message ?? "Failed to create business");
+    } finally {
+      setCreateLoading(false);
+    }
   };
 
-  const handleStartDemo = async () => {
-    setDemoLoading(true);
-    setDemoErr(null);
+  const handleJoin = async () => {
+    if (!joinState.businessId.trim()) {
+      setJoinErr("Business ID is required");
+      return;
+    }
+    setJoinErr(null);
+    setJoinLoading(true);
     try {
-      const seeded = await seedDemo();
-      const id = assertBusinessId(seeded.business_id, "BusinessSelectPage demo seed");
-      if (!id) return;
-      setActiveBusinessId(id);
-      navigate(`/app/${id}/assistant`);
-    } catch (e: any) {
-      setDemoErr(e?.message ?? "Failed to start demo");
+      await joinBusiness(joinState.businessId.trim(), { role: joinState.role });
+      await reload();
+    } catch (err: any) {
+      setJoinErr(err?.message ?? "Failed to join business");
     } finally {
-      setDemoLoading(false);
+      setJoinLoading(false);
     }
   };
 
   const handleDelete = async (businessId: string, businessName?: string | null) => {
-    const confirmation = window.prompt(`Type DELETE to remove ${businessName ?? businessId}`);
-    if (confirmation !== "DELETE") return;
-    await deleteBusiness(businessId);
-    navigate("/app/select");
-    load();
+    setDeleteErr(null);
+    const promptValue = window.prompt(
+      `Type DELETE or ${businessName ?? businessId} to confirm deletion.`
+    );
+    if (!promptValue) return;
+    const normalized = promptValue.trim().toLowerCase();
+    const expectedName = (businessName ?? "").trim().toLowerCase();
+    if (normalized !== "delete" && normalized !== expectedName) return;
+
+    try {
+      await deleteBusiness(businessId);
+      await reload();
+    } catch (err: any) {
+      setDeleteErr(err?.message ?? "Failed to delete business");
+    }
   };
+
+  const pilotModeEnabled = config?.pilot_mode_enabled ?? false;
+  const allowBusinessDelete = config?.allow_business_delete ?? false;
 
   return (
     <div style={{ padding: 24, maxWidth: 900, margin: "0 auto" }}>
-      <h2 style={{ margin: 0 }}>Select a business</h2>
-      <p style={{ opacity: 0.8, marginTop: 8 }}>Choose a workspace, onboard a business, or delete one.</p>
+      <h2 style={{ margin: 0 }}>Manage businesses</h2>
+      <p style={{ opacity: 0.8, marginTop: 8 }}>
+        Create a new business or switch to an existing workspace.
+      </p>
 
-      {isDev && (
-        <div style={{ marginTop: 12, padding: 12, border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12 }}>
-          <div style={{ fontWeight: 600 }}>Demo</div>
-          <p style={{ opacity: 0.75, marginTop: 6 }}>
-            Seed the deterministic golden-path demo data and jump into the Assistant.
-          </p>
-          <button onClick={handleStartDemo} disabled={demoLoading}>
-            {demoLoading ? "Starting demo…" : "Start Demo"}
-          </button>
-          {demoErr && <div style={{ color: "crimson", marginTop: 8 }}>Error: {demoErr}</div>}
-        </div>
+      {configError && (
+        <div style={{ color: "crimson", marginTop: 12 }}>Config error: {configError}</div>
       )}
 
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-        <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Business name" />
-        <label>
-          <input type="checkbox" checked={isDemo} onChange={(e) => setIsDemo(e.target.checked)} /> Demo
-        </label>
-        <button onClick={handleCreate}>Create business</button>
+        <input
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          placeholder="Business name"
+        />
+        <button onClick={handleCreate} disabled={createLoading}>
+          {createLoading ? "Creating…" : "Create business"}
+        </button>
       </div>
+      {createErr && <div style={{ color: "crimson", marginTop: 8 }}>Error: {createErr}</div>}
 
-      {loading && <div>Loading…</div>}
-      {err && <div style={{ color: "crimson" }}>Error: {err}</div>}
+      {pilotModeEnabled && (
+        <div style={{ marginTop: 16, padding: 12, border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12 }}>
+          <div style={{ fontWeight: 600 }}>Dev: Join business</div>
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            <input
+              value={joinState.businessId}
+              onChange={(e) => setJoinState((prev) => ({ ...prev, businessId: e.target.value }))}
+              placeholder="Business ID"
+            />
+            <select
+              value={joinState.role}
+              onChange={(e) => setJoinState((prev) => ({ ...prev, role: e.target.value }))}
+            >
+              <option value="advisor">advisor</option>
+              <option value="staff">staff</option>
+              <option value="viewer">viewer</option>
+              <option value="owner">owner</option>
+            </select>
+            <button onClick={handleJoin} disabled={joinLoading}>
+              {joinLoading ? "Joining…" : "Join"}
+            </button>
+          </div>
+          {joinErr && <div style={{ color: "crimson", marginTop: 8 }}>Error: {joinErr}</div>}
+        </div>
+      )}
 
-      {!loading && !err && cards.length === 0 && <div style={{ opacity: 0.85 }}>No businesses yet — create one.</div>}
+      {loading && <div style={{ marginTop: 16 }}>Loading…</div>}
+      {error && <div style={{ color: "crimson", marginTop: 16 }}>Error: {error}</div>}
+
+      {!loading && !error && businesses.length === 0 && (
+        <div style={{ opacity: 0.85, marginTop: 16 }}>
+          No businesses yet — create your first workspace.
+        </div>
+      )}
+
+      {deleteErr && <div style={{ color: "crimson", marginTop: 12 }}>Error: {deleteErr}</div>}
 
       <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
-        {cards.map((c) => (
-          <div key={c.business_id} style={{ border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12, padding: 14 }}>
-            <button type="button" onClick={() => handleSelect(c.business_id)} style={{ textAlign: "left", width: "100%" }}>
+        {businesses.map((biz) => (
+          <div key={biz.business_id} style={{ border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12, padding: 14 }}>
+            <button
+              type="button"
+              onClick={() => handleSelect(biz.business_id)}
+              style={{ textAlign: "left", width: "100%" }}
+            >
               <div style={{ fontWeight: 700 }}>
-                {c.name ?? "Demo business"} <span style={{ opacity: 0.6, fontWeight: 400 }}>({c.business_id})</span>
+                {biz.business_name} <span style={{ opacity: 0.6, fontWeight: 400 }}>({biz.business_id})</span>
               </div>
-              {c.subtitle ? <div style={{ opacity: 0.75, marginTop: 6 }}>{c.subtitle}</div> : null}
+              <div style={{ opacity: 0.75, marginTop: 6 }}>Role: {biz.role}</div>
             </button>
-            <button style={{ marginTop: 8 }} onClick={() => handleDelete(c.business_id, c.name)}>
-              Delete business
-            </button>
+            {allowBusinessDelete && biz.role === "owner" && (
+              <button style={{ marginTop: 8 }} onClick={() => handleDelete(biz.business_id, biz.business_name)}>
+                Delete business
+              </button>
+            )}
           </div>
         ))}
       </div>

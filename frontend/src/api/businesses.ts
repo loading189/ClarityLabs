@@ -8,6 +8,11 @@ export type BusinessOut = {
   is_demo?: boolean;
 };
 
+export type BusinessCreateOut = {
+  business: BusinessOut;
+  membership: BusinessMembershipSummary;
+};
+
 export type BusinessMembershipSummary = {
   business_id: string;
   business_name: string;
@@ -22,11 +27,18 @@ export type BusinessMember = {
 };
 
 export function createBusiness(payload: { name: string; is_demo?: boolean }) {
-  return apiPost<BusinessOut>("/api/businesses", payload);
+  return apiPost<BusinessCreateOut>("/api/businesses", payload);
 }
 
 export function deleteBusiness(businessId: string) {
   return apiDelete<{ deleted: boolean; business_id: string }>(`/api/businesses/${businessId}?confirm=true`);
+}
+
+export function joinBusiness(businessId: string, payload: { role?: string }) {
+  return apiPost<{ business_id: string; user_id: string; role: string }>(
+    `/api/businesses/${businessId}/join`,
+    payload
+  );
 }
 
 export function fetchBusinessesMine() {

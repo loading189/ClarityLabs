@@ -93,7 +93,7 @@ export default function AppLayout() {
           <p className={styles.emptyText}>
             Your URL is missing a valid business id. Go pick a business workspace.
           </p>
-          <a href="/app/select" className={styles.switchLink}>Go to Business Picker</a>
+          <a href="/businesses" className={styles.switchLink}>Go to Business Picker</a>
         </div>
       </div>
     );

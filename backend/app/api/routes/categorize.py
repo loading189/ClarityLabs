@@ -8,10 +8,15 @@ from fastapi.params import Query as QueryParam
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from backend.app.api.deps import require_membership_dep
 from backend.app.db import get_db
 from backend.app.services import categorize_service
 
-router = APIRouter(prefix="/categorize", tags=["categorize"])
+router = APIRouter(
+    prefix="/categorize",
+    tags=["categorize"],
+    dependencies=[Depends(require_membership_dep())],
+)
 
 
 class NormalizedTxnOut(BaseModel):

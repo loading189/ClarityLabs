@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from backend.app.api.deps import require_membership_dep
 from backend.app.db import get_db
 from backend.app.services import sim_service
 
@@ -154,42 +155,73 @@ def get_scenario_catalog():
     return sim_service.get_scenario_catalog()
 
 
-@router.get("/simulator/truth/{business_id}", response_model=TruthOut)
+@router.get(
+    "/simulator/truth/{business_id}",
+    response_model=TruthOut,
+    dependencies=[Depends(require_membership_dep())],
+)
 def get_sim_truth(business_id: str, db: Session = Depends(get_db)):
     return sim_service.get_sim_truth(db, business_id)
 
 
-@router.get("/simulator/plan/{business_id}", response_model=SimPlanOut)
+@router.get(
+    "/simulator/plan/{business_id}",
+    response_model=SimPlanOut,
+    dependencies=[Depends(require_membership_dep())],
+)
 def get_sim_plan(business_id: str, db: Session = Depends(get_db)):
     return sim_service.get_sim_plan(db, business_id)
 
 
-@router.put("/simulator/plan/{business_id}", response_model=SimPlanOut)
+@router.put(
+    "/simulator/plan/{business_id}",
+    response_model=SimPlanOut,
+    dependencies=[Depends(require_membership_dep(min_role="staff"))],
+)
 def put_sim_plan(business_id: str, req: SimPlanUpsert, db: Session = Depends(get_db)):
     return sim_service.put_sim_plan(db, business_id, req)
 
 
-@router.get("/simulator/interventions/{business_id}", response_model=List[InterventionOut])
+@router.get(
+    "/simulator/interventions/{business_id}",
+    response_model=List[InterventionOut],
+    dependencies=[Depends(require_membership_dep())],
+)
 def list_sim_interventions(business_id: str, db: Session = Depends(get_db)):
     return sim_service.list_sim_interventions(db, business_id)
 
 
-@router.post("/simulator/interventions/{business_id}", response_model=InterventionOut)
+@router.post(
+    "/simulator/interventions/{business_id}",
+    response_model=InterventionOut,
+    dependencies=[Depends(require_membership_dep(min_role="staff"))],
+)
 def create_sim_intervention(business_id: str, req: InterventionCreate, db: Session = Depends(get_db)):
     return sim_service.create_sim_intervention(db, business_id, req)
 
 
-@router.patch("/simulator/interventions/{business_id}/{intervention_id}", response_model=InterventionOut)
+@router.patch(
+    "/simulator/interventions/{business_id}/{intervention_id}",
+    response_model=InterventionOut,
+    dependencies=[Depends(require_membership_dep(min_role="staff"))],
+)
 def update_sim_intervention(business_id: str, intervention_id: str, req: InterventionPatch, db: Session = Depends(get_db)):
     return sim_service.update_sim_intervention(db, business_id, intervention_id, req)
 
 
-@router.delete("/simulator/interventions/{business_id}/{intervention_id}")
+@router.delete(
+    "/simulator/interventions/{business_id}/{intervention_id}",
+    dependencies=[Depends(require_membership_dep(min_role="staff"))],
+)
 def delete_sim_intervention(business_id: str, intervention_id: str, db: Session = Depends(get_db)):
     return sim_service.delete_sim_intervention(db, business_id, intervention_id)
 
 
-@router.post("/simulator/generate/{business_id}", response_model=GenerateOut)
+@router.post(
+    "/simulator/generate/{business_id}",
+    response_model=GenerateOut,
+    dependencies=[Depends(require_membership_dep(min_role="staff"))],
+)
 def generate_history(business_id: str, req: GenerateIn, db: Session = Depends(get_db)):
     return sim_service.generate_history(db, business_id, req)
 
@@ -199,17 +231,25 @@ def generate_history(business_id: str, req: GenerateIn, db: Session = Depends(ge
 # (keep so existing screens still work)
 # ============================================================
 
-@router.get("/sim/config/{business_id}", response_model=SimulatorConfigOut)
+@router.get(
+    "/sim/config/{business_id}",
+    response_model=SimulatorConfigOut,
+    dependencies=[Depends(require_membership_dep())],
+)
 def get_or_create_sim_config(business_id: str, db: Session = Depends(get_db)):
     return sim_service.get_or_create_sim_config(db, business_id)
 
 
-@router.put("/sim/config/{business_id}", response_model=SimulatorConfigOut)
+@router.put(
+    "/sim/config/{business_id}",
+    response_model=SimulatorConfigOut,
+    dependencies=[Depends(require_membership_dep(min_role="staff"))],
+)
 def upsert_sim_config(business_id: str, req: SimulatorConfigUpsert, db: Session = Depends(get_db)):
     return sim_service.upsert_sim_config(db, business_id, req)
 
 
-@router.post("/sim/pulse/{business_id}")
+@router.post("/sim/pulse/{business_id}", dependencies=[Depends(require_membership_dep(min_role="staff"))])
 def pulse(
     business_id: str,
     n: int = Query(25, ge=1, le=500),
@@ -219,7 +259,7 @@ def pulse(
     return sim_service.pulse(db, business_id, n, run_monitoring=run_monitoring)
 
 
-@router.post("/sim/run_history/{business_id}")
+@router.post("/sim/run_history/{business_id}", dependencies=[Depends(require_membership_dep(min_role="staff"))])
 def run_history_legacy(business_id: str, req: Dict[str, Any], db: Session = Depends(get_db)):
     """
     Legacy compatibility: call the new generator with a best-effort mapping.

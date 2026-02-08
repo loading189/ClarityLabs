@@ -9,9 +9,10 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from backend.app.api.deps import require_membership_dep
 from backend.app.db import get_db
 from backend.app.integrations.plaid import PlaidAdapter, plaid_environment, plaid_is_configured
-from backend.app.models import Business, IntegrationConnection
+from backend.app.models import IntegrationConnection
 from backend.app.services import audit_service, integration_connection_service
 from backend.app.services.ingest_orchestrator import process_ingested_events
 
@@ -21,13 +22,6 @@ router = APIRouter(prefix="/integrations/plaid", tags=["integrations"])
 
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
-
-
-def require_business(db: Session, business_id: str) -> Business:
-    biz = db.get(Business, business_id)
-    if not biz:
-        raise HTTPException(404, "business not found")
-    return biz
 
 
 def require_plaid_configured() -> None:
@@ -83,9 +77,12 @@ class PlaidSyncOut(BaseModel):
     ingest_processed: dict
 
 
-@router.post("/link_token/{business_id}", response_model=LinkTokenOut)
+@router.post(
+    "/link_token/{business_id}",
+    response_model=LinkTokenOut,
+    dependencies=[Depends(require_membership_dep())],
+)
 def create_link_token(business_id: str, db: Session = Depends(get_db)):
-    require_business(db, business_id)
     require_plaid_configured()
     adapter = PlaidAdapter()
     response = adapter.create_link_token(business_id=business_id)
@@ -106,13 +103,16 @@ def create_link_token(business_id: str, db: Session = Depends(get_db)):
     )
 
 
-@router.post("/exchange/{business_id}", response_model=PlaidExchangeOut)
+@router.post(
+    "/exchange/{business_id}",
+    response_model=PlaidExchangeOut,
+    dependencies=[Depends(require_membership_dep(min_role="staff"))],
+)
 def exchange_public_token(
     business_id: str,
     req: ExchangeTokenIn,
     db: Session = Depends(get_db),
 ):
-    require_business(db, business_id)
     require_plaid_configured()
     adapter = PlaidAdapter()
     response = adapter.exchange_public_token(public_token=req.public_token)
@@ -182,9 +182,12 @@ def exchange_public_token(
     return PlaidExchangeOut(connection=row)
 
 
-@router.post("/sync/{business_id}", response_model=PlaidSyncOut)
+@router.post(
+    "/sync/{business_id}",
+    response_model=PlaidSyncOut,
+    dependencies=[Depends(require_membership_dep(min_role="staff"))],
+)
 def sync_plaid(business_id: str, db: Session = Depends(get_db)):
-    require_business(db, business_id)
     require_plaid_configured()
     adapter = PlaidAdapter()
 

@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from backend.app.api.deps import require_membership_dep
 from backend.app.db import get_db
 from backend.app.services.transaction_service import transaction_detail
 
@@ -128,7 +129,11 @@ class TransactionDetailOut(BaseModel):
     related_signals: List[RelatedSignalOut]
 
 
-@router.get("/{business_id}/{source_event_id}", response_model=TransactionDetailOut)
+@router.get(
+    "/{business_id}/{source_event_id}",
+    response_model=TransactionDetailOut,
+    dependencies=[Depends(require_membership_dep())],
+)
 def get_transaction_detail(
     business_id: str,
     source_event_id: str,

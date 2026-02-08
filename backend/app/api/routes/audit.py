@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from backend.app.api.deps import require_membership_dep
 from backend.app.db import get_db
 from backend.app.services import audit_service
 
@@ -31,7 +32,7 @@ class AuditLogPageOut(BaseModel):
     next_cursor: Optional[str] = None
 
 
-@router.get("/{business_id}", response_model=AuditLogPageOut)
+@router.get("/{business_id}", response_model=AuditLogPageOut, dependencies=[Depends(require_membership_dep())])
 def list_audit_events(
     business_id: str,
     limit: int = Query(100, ge=1, le=500),

@@ -3,11 +3,12 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import HTTPException, Request
+from fastapi import Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.app.models import Business, BusinessMembership, User
+from backend.app.db import get_db
 
 
 ROLE_ORDER = {
@@ -22,7 +23,7 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def get_current_user(db: Session, request: Request) -> User:
+def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
     email = request.headers.get("X-User-Email")
     user_id = request.headers.get("X-User-Id")
     if not email and not user_id:
@@ -79,6 +80,17 @@ def require_membership(
     if member_rank < min_rank:
         raise HTTPException(status_code=403, detail="insufficient role")
     return membership
+
+
+def require_membership_dep(min_role: str = "viewer"):
+    def _require_membership_dep(
+        business_id: str,
+        db: Session = Depends(get_db),
+        user: User = Depends(get_current_user),
+    ) -> BusinessMembership:
+        return require_membership(db, business_id, user, min_role=min_role)
+
+    return _require_membership_dep
 
 
 def role_at_least(membership: BusinessMembership, min_role: str) -> bool:

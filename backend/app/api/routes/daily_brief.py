@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from backend.app.api.deps import require_membership_dep
 from backend.app.db import get_db
 from backend.app.services import daily_brief_service
 from backend.app.services.assistant_thread_service import AssistantMessageOut
@@ -57,7 +58,7 @@ def _resolve_date(value: Optional[date]) -> date:
     return value or datetime.now(timezone.utc).date()
 
 
-@router.get("", response_model=DailyBriefOut)
+@router.get("", response_model=DailyBriefOut, dependencies=[Depends(require_membership_dep())])
 def get_daily_brief(
     business_id: str = Query(...),
     date_value: Optional[date] = Query(default=None, alias="date"),
@@ -69,7 +70,7 @@ def get_daily_brief(
     return brief
 
 
-@router.post("/publish", response_model=DailyBriefPublishOut)
+@router.post("/publish", response_model=DailyBriefPublishOut, dependencies=[Depends(require_membership_dep(min_role="staff"))])
 def publish_daily_brief(
     business_id: str = Query(...),
     date_value: Optional[date] = Query(default=None, alias="date"),

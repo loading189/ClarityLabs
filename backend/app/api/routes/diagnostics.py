@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from backend.app.api.deps import require_membership_dep
 from backend.app.db import get_db
 from backend.app.services import diagnostics_service
 
@@ -105,7 +106,11 @@ class ReconcileOut(BaseModel):
     latest_markers: ReconcileLatestMarkersOut
 
 
-@router.get("/{business_id}", response_model=Union[DiagnosticsOut, DiagnosticsErrorOut])
+@router.get(
+    "/{business_id}",
+    response_model=Union[DiagnosticsOut, DiagnosticsErrorOut],
+    dependencies=[Depends(require_membership_dep())],
+)
 def get_diagnostics(business_id: str, db: Session = Depends(get_db)):
     try:
         payload = diagnostics_service.collect_diagnostics(db, business_id)
@@ -118,7 +123,11 @@ def get_diagnostics(business_id: str, db: Session = Depends(get_db)):
         )
 
 
-@router.get("/ingestion/{business_id}", response_model=Union[IngestionDiagnosticsOut, DiagnosticsErrorOut])
+@router.get(
+    "/ingestion/{business_id}",
+    response_model=Union[IngestionDiagnosticsOut, DiagnosticsErrorOut],
+    dependencies=[Depends(require_membership_dep())],
+)
 def get_ingestion_diagnostics(business_id: str, db: Session = Depends(get_db)):
     try:
         payload = diagnostics_service.collect_ingestion_diagnostics(db, business_id)
@@ -131,7 +140,11 @@ def get_ingestion_diagnostics(business_id: str, db: Session = Depends(get_db)):
         )
 
 
-@router.get("/reconcile/{business_id}", response_model=Union[ReconcileOut, DiagnosticsErrorOut])
+@router.get(
+    "/reconcile/{business_id}",
+    response_model=Union[ReconcileOut, DiagnosticsErrorOut],
+    dependencies=[Depends(require_membership_dep())],
+)
 def get_reconcile_report(business_id: str, db: Session = Depends(get_db)):
     try:
         payload = diagnostics_service.collect_reconcile_report(db, business_id)

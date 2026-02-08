@@ -3,12 +3,13 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from backend.app.api.deps import require_membership_dep
 from backend.app.db import get_db
-from backend.app.models import Business, BusinessIntegrationProfile
+from backend.app.models import BusinessIntegrationProfile
 
 router = APIRouter(prefix="/integrations", tags=["integrations"])
 
@@ -42,13 +43,6 @@ class IntegrationProfileUpsert(BaseModel):
     simulation_params: Optional[dict] = None
 
 
-def _require_business(db: Session, business_id: str) -> Business:
-    biz = db.get(Business, business_id)
-    if not biz:
-        raise HTTPException(status_code=404, detail="business not found")
-    return biz
-
-
 def _get_or_create_profile(db: Session, business_id: str) -> BusinessIntegrationProfile:
     prof = db.get(BusinessIntegrationProfile, business_id)
     if prof:
@@ -72,16 +66,22 @@ def _get_or_create_profile(db: Session, business_id: str) -> BusinessIntegration
     return prof
 
 
-@router.get("/business/{business_id}", response_model=IntegrationProfileOut)
+@router.get(
+    "/business/{business_id}",
+    response_model=IntegrationProfileOut,
+    dependencies=[Depends(require_membership_dep())],
+)
 def get_profile(business_id: str, db: Session = Depends(get_db)):
-    _require_business(db, business_id)
     prof = _get_or_create_profile(db, business_id)
     return prof
 
 
-@router.put("/business/{business_id}", response_model=IntegrationProfileOut)
+@router.put(
+    "/business/{business_id}",
+    response_model=IntegrationProfileOut,
+    dependencies=[Depends(require_membership_dep())],
+)
 def update_profile(business_id: str, req: IntegrationProfileUpsert, db: Session = Depends(get_db)):
-    _require_business(db, business_id)
     prof = _get_or_create_profile(db, business_id)
 
     data = req.model_dump(exclude_unset=True)

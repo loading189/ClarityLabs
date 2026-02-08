@@ -9,8 +9,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from backend.app.api.deps import require_membership_dep
 from backend.app.db import get_db
-from backend.app.models import Business, Account
+from backend.app.models import Account
 import uuid
 
 router = APIRouter(prefix="/coa", tags=["coa"])
@@ -22,12 +23,6 @@ def utcnow() -> datetime:
 
 def uuid_str() -> str:
     return str(uuid.uuid4())
-
-def _require_business(db: Session, business_id: str) -> Business:
-    biz = db.get(Business, business_id)
-    if not biz:
-        raise HTTPException(status_code=404, detail="business not found")
-    return biz
 
 # -------------------------
 # Schemas
@@ -61,14 +56,16 @@ class AccountUpdateIn(BaseModel):
 # Endpoints
 # -------------------------
 
-@router.get("/business/{business_id}/accounts", response_model=List[AccountOut])
+@router.get(
+    "/business/{business_id}/accounts",
+    response_model=List[AccountOut],
+    dependencies=[Depends(require_membership_dep())],
+)
 def list_accounts(
     business_id: str,
     include_inactive: bool = Query(False),
     db: Session = Depends(get_db),
 ):
-    _require_business(db, business_id)
-
     q = select(Account).where(Account.business_id == business_id)
     if not include_inactive:
         q = q.where(Account.active == True)  # noqa: E712
@@ -77,10 +74,12 @@ def list_accounts(
     rows = db.execute(q).scalars().all()
     return rows
 
-@router.post("/business/{business_id}/accounts", response_model=AccountOut)
+@router.post(
+    "/business/{business_id}/accounts",
+    response_model=AccountOut,
+    dependencies=[Depends(require_membership_dep(min_role="staff"))],
+)
 def create_account(business_id: str, req: AccountCreateIn, db: Session = Depends(get_db)):
-    _require_business(db, business_id)
-
     # prevent duplicate codes if provided
     if req.code:
         existing = db.execute(
@@ -104,10 +103,12 @@ def create_account(business_id: str, req: AccountCreateIn, db: Session = Depends
     db.refresh(a)
     return a
 
-@router.put("/business/{business_id}/accounts/{account_id}", response_model=AccountOut)
+@router.put(
+    "/business/{business_id}/accounts/{account_id}",
+    response_model=AccountOut,
+    dependencies=[Depends(require_membership_dep(min_role="staff"))],
+)
 def update_account(business_id: str, account_id: str, req: AccountUpdateIn, db: Session = Depends(get_db)):
-    _require_business(db, business_id)
-
     a = db.get(Account, account_id)
     if not a or a.business_id != business_id:
         raise HTTPException(status_code=404, detail="account not found")
@@ -134,10 +135,11 @@ def update_account(business_id: str, account_id: str, req: AccountUpdateIn, db: 
     db.refresh(a)
     return a
 
-@router.delete("/business/{business_id}/accounts/{account_id}")
+@router.delete(
+    "/business/{business_id}/accounts/{account_id}",
+    dependencies=[Depends(require_membership_dep(min_role="staff"))],
+)
 def deactivate_account(business_id: str, account_id: str, db: Session = Depends(get_db)):
-    _require_business(db, business_id)
-
     a = db.get(Account, account_id)
     if not a or a.business_id != business_id:
         raise HTTPException(status_code=404, detail="account not found")
