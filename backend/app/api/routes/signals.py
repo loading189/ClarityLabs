@@ -103,8 +103,22 @@ class SignalExplainEvidenceOut(BaseModel):
     anchors: Optional[SignalExplainEvidenceAnchorOut] = None
 
 
+class SignalExplainEvidenceSummaryOut(BaseModel):
+    counts: Dict[str, Any] = Field(default_factory=dict)
+    deltas: Dict[str, Any] = Field(default_factory=dict)
+    rows: List[str] = Field(default_factory=list)
 
 
+class SignalExplainExplanationOut(BaseModel):
+    observation: str
+    evidence: SignalExplainEvidenceSummaryOut
+    implication: str
+
+
+class SignalExplainLedgerAnchorOut(BaseModel):
+    label: str
+    query: SignalExplainEvidenceAnchorOut
+    evidence_keys: List[str] = Field(default_factory=list)
 
 
 class SignalExplainVerificationFactOut(BaseModel):
@@ -149,6 +163,8 @@ class SignalExplainOut(BaseModel):
     clear_condition: Optional[SignalExplainClearConditionOut] = None
     verification: SignalExplainVerificationOut
     playbooks: List[SignalExplainPlaybookOut] = Field(default_factory=list)
+    explanation: SignalExplainExplanationOut
+    ledger_anchors: List[SignalExplainLedgerAnchorOut] = Field(default_factory=list)
     links: List[str]
 
 
