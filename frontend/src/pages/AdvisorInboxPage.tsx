@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { fetchActionTriage, type ActionTriageItem } from "../api/actions";
+import { fetchActionTriage, refreshActions, type ActionTriageItem } from "../api/actions";
 import { ApiError } from "../api/client";
 import { useAuth } from "../app/auth/AuthContext";
 import PageHeader from "../components/common/PageHeader";
@@ -15,6 +15,7 @@ import {
 import { ensurePlanSummaries, readPlanSummary } from "../features/plans/planSummaryCache";
 import { useBusinessesMine } from "../hooks/useBusinessesMine";
 import type { PlanSummary } from "../api/plansV2";
+import { ledgerPath } from "../app/routes/routeUtils";
 import styles from "./AdvisorInboxPage.module.css";
 
 type AssignedFilter = "me" | "unassigned" | "any";
@@ -61,6 +62,8 @@ export default function AdvisorInboxPage() {
   const [actions, setActions] = useState<ActionTriageItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<LoadError | null>(null);
+  const [refreshError, setRefreshError] = useState<LoadError | null>(null);
+  const [refreshLoading, setRefreshLoading] = useState(false);
   const [selected, setSelected] = useState<ActionTriageItem | null>(null);
   const [planSummaries, setPlanSummaries] = useState<Map<string, PlanSummary>>(new Map());
   const [planSummaryError, setPlanSummaryError] = useState<LoadError | null>(null);
@@ -77,6 +80,9 @@ export default function AdvisorInboxPage() {
         logout();
         return;
       }
+      if (import.meta.env.DEV) {
+        console.error("Failed to load advisor inbox", err);
+      }
       setError({ message: err?.message ?? "Failed to load advisor inbox", status: err?.status });
     } finally {
       setLoading(false);
@@ -86,6 +92,11 @@ export default function AdvisorInboxPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (businessId !== "all" || businesses.length === 0) return;
+    setBusinessId(businesses[0]?.business_id ?? "all");
+  }, [businessId, businesses]);
 
   useEffect(() => {
     const planIds = actions.map((action) => action.plan_id).filter(Boolean) as string[];
@@ -105,6 +116,9 @@ export default function AdvisorInboxPage() {
           logout();
           return;
         }
+        if (import.meta.env.DEV) {
+          console.error("Failed to load plan summaries", err);
+        }
         setPlanSummaryError({ message: err?.message ?? "Failed to load plan summaries", status: err?.status });
       })
       .finally(() => {
@@ -121,6 +135,41 @@ export default function AdvisorInboxPage() {
       ...businesses,
     ];
   }, [businesses]);
+
+  const canRefreshActions = businessId !== "all";
+
+  const handleRefreshActions = useCallback(async () => {
+    if (!canRefreshActions) {
+      const message = "Select a specific business to refresh actions.";
+      setRefreshError({ message, status: 400 });
+      if (import.meta.env.DEV) {
+        console.warn("Refresh actions requires a specific business_id.");
+      }
+      return;
+    }
+    setRefreshLoading(true);
+    setRefreshError(null);
+    try {
+      await refreshActions(businessId);
+      await load();
+    } catch (err: any) {
+      if (err instanceof ApiError && err.status === 401) {
+        logout();
+        return;
+      }
+      if (import.meta.env.DEV) {
+        console.error("Failed to refresh actions", err);
+      }
+      setRefreshError({ message: err?.message ?? "Failed to refresh actions", status: err?.status });
+    } finally {
+      setRefreshLoading(false);
+    }
+  }, [businessId, canRefreshActions, load, logout]);
+
+  const ledgerLink = useMemo(() => {
+    if (!canRefreshActions) return null;
+    return ledgerPath(businessId, {});
+  }, [businessId, canRefreshActions]);
 
   const renderPlanSummary = (action: ActionTriageItem) => {
     if (!action.plan_id) {
@@ -214,6 +263,15 @@ export default function AdvisorInboxPage() {
         />
       )}
 
+      {refreshError && (
+        <InlineAlert
+          tone="error"
+          title="Unable to refresh actions"
+          description={refreshError.message}
+          action={<Button onClick={() => void handleRefreshActions()}>Retry refresh</Button>}
+        />
+      )}
+
       {planSummaryError && (
         <InlineAlert
           tone="error"
@@ -223,7 +281,26 @@ export default function AdvisorInboxPage() {
       )}
 
       {!loading && !error && actions.length === 0 && (
-        <EmptyState title="No actions yet" description="New actions will appear here once signals are triaged." />
+        <EmptyState
+          title="No open actions yet for this business."
+          description="Actions appear after signals are evaluated."
+          action={
+            <div className={styles.emptyActions}>
+              <Button
+                variant="primary"
+                onClick={() => void handleRefreshActions()}
+                disabled={!canRefreshActions || refreshLoading}
+              >
+                {refreshLoading ? "Refreshing Actions…" : "Refresh Actions"}
+              </Button>
+              {ledgerLink && (
+                <a className={styles.secondaryLink} href={ledgerLink}>
+                  Go to Ledger
+                </a>
+              )}
+            </div>
+          }
+        />
       )}
 
       {!loading && actions.length > 0 && (

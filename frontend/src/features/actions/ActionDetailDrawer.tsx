@@ -108,6 +108,8 @@ export default function ActionDetailDrawer({
   const [error, setError] = useState<LoadError | null>(null);
   const [planIntent, setPlanIntent] = useState("");
   const [planError, setPlanError] = useState<LoadError | null>(null);
+  const [planCreateLoading, setPlanCreateLoading] = useState(false);
+  const [planRefreshLoading, setPlanRefreshLoading] = useState(false);
   const [planIdOverride, setPlanIdOverride] = useState<string | null>(null);
   const [planOpen, setPlanOpen] = useState(false);
   const [planDetail, setPlanDetail] = useState<PlanDetail | null>(null);
@@ -193,11 +195,26 @@ export default function ActionDetailDrawer({
     setNote(action?.resolution_note ?? "");
     setPlanIntent("");
     setPlanError(null);
+    setPlanCreateLoading(false);
+    setPlanRefreshLoading(false);
     setPlanIdOverride(null);
     setPlanDetail(null);
     setLatestObservationOverride(null);
     setShowPlanClose(false);
   }, [action?.resolution_note, open]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!businessId || !actionId) {
+      console.warn("ActionDetailDrawer missing business_id or action_id; disabling plan actions.");
+    }
+    if (!planId && action?.plan_id == null) {
+      return;
+    }
+    if (planId && !businessId) {
+      console.warn("ActionDetailDrawer missing business_id for plan actions.");
+    }
+  }, [action?.plan_id, actionId, businessId, open, planId]);
 
   const ledgerLink = useMemo(() => {
     if (!action?.evidence_json) return null;
@@ -292,26 +309,16 @@ export default function ActionDetailDrawer({
       return;
     }
     setPlanError(null);
-    const conditions = action.source_signal_id
-      ? [
-          {
-            type: "signal_resolved" as const,
-            signal_id: action.source_signal_id,
-            baseline_window_days: 0,
-            evaluation_window_days: 14,
-            direction: "resolve" as const,
-          },
-        ]
-      : [
-          {
-            type: "metric_delta" as const,
-            metric_key: "health_score",
-            baseline_window_days: 30,
-            evaluation_window_days: 14,
-            threshold: 0.1,
-            direction: "improve" as const,
-          },
-        ];
+    const conditions = [
+      {
+        type: "signal_resolved" as const,
+        signal_id: action.source_signal_id ?? null,
+        baseline_window_days: 0,
+        evaluation_window_days: 14,
+        direction: "resolve" as const,
+      },
+    ];
+    setPlanCreateLoading(true);
     try {
       const response = await createPlan({
         business_id: businessId,
@@ -332,12 +339,15 @@ export default function ActionDetailDrawer({
         return;
       }
       setPlanError({ message: err?.message ?? "Failed to create plan", status: err?.status });
+    } finally {
+      setPlanCreateLoading(false);
     }
   };
 
   const handlePlanRefresh = async () => {
     if (!businessId || !planId) return;
     setPlanError(null);
+    setPlanRefreshLoading(true);
     try {
       const response = await refreshPlan(businessId, planId);
       setLatestObservationOverride(response.observation);
@@ -358,6 +368,8 @@ export default function ActionDetailDrawer({
         return;
       }
       setPlanError({ message: err?.message ?? "Failed to refresh plan", status: err?.status });
+    } finally {
+      setPlanRefreshLoading(false);
     }
   };
 
@@ -409,6 +421,16 @@ export default function ActionDetailDrawer({
     ? action?.evidence_json?.ledger_anchors
     : [];
   const evidenceSummary = action?.evidence_json?.summary ?? action?.evidence_json?.reason ?? "—";
+  const canCreatePlan = Boolean(businessId && actionId);
+  const canViewPlan = Boolean(planId && businessId);
+  const canRefreshPlan = Boolean(planId && businessId && planDetail?.plan.status === "active");
+  const handleOpenPlan = async () => {
+    if (!canViewPlan) return;
+    if (!planDetail) {
+      await loadPlan();
+    }
+    setPlanOpen(true);
+  };
 
   return (
     <Drawer open={open} title={action?.title ?? "Action detail"} onClose={onClose}>
@@ -480,6 +502,9 @@ export default function ActionDetailDrawer({
             {!planId && (
               <Card className={styles.planCard}>
                 <div className={styles.planTitle}>Create a remediation plan</div>
+                <div className={styles.planMeta}>
+                  Plans track the remediation outcome for this action and surface observations after refresh.
+                </div>
                 <textarea
                   className={styles.input}
                   rows={3}
@@ -487,8 +512,8 @@ export default function ActionDetailDrawer({
                   onChange={(event) => setPlanIntent(event.target.value)}
                   placeholder="Document the plan intent and why it matters"
                 />
-                <Button variant="primary" onClick={handleCreatePlan}>
-                  Create Plan
+                <Button variant="primary" onClick={handleCreatePlan} disabled={!canCreatePlan || planCreateLoading}>
+                  {planCreateLoading ? "Creating Plan…" : "Create Plan"}
                 </Button>
               </Card>
             )}
@@ -521,12 +546,12 @@ export default function ActionDetailDrawer({
                   </div>
                 </div>
                 <div className={styles.planActions}>
-                  <Button variant="secondary" onClick={() => setPlanOpen(true)}>
+                  <Button variant="secondary" onClick={handleOpenPlan} disabled={!canViewPlan}>
                     View Plan
                   </Button>
                   {planDetail.plan.status === "active" && (
-                    <Button variant="secondary" onClick={handlePlanRefresh}>
-                      Refresh
+                    <Button variant="secondary" onClick={handlePlanRefresh} disabled={!canRefreshPlan || planRefreshLoading}>
+                      {planRefreshLoading ? "Refreshing…" : "Refresh"}
                     </Button>
                   )}
                   {planDetail.plan.status !== "succeeded" &&

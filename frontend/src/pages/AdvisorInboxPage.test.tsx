@@ -1,13 +1,16 @@
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import AdvisorInboxPage from "./AdvisorInboxPage";
 
 const fetchActionTriage = vi.fn();
+const refreshActions = vi.fn();
 const getPlanSummaries = vi.fn();
 
 vi.mock("../api/actions", () => ({
   fetchActionTriage: (...args: unknown[]) => fetchActionTriage(...args),
+  refreshActions: (...args: unknown[]) => refreshActions(...args),
 }));
 
 vi.mock("../api/plansV2", () => ({
@@ -96,5 +99,22 @@ describe("AdvisorInboxPage", () => {
     expect(screen.getByText("Categorize transactions")).toBeInTheDocument();
     expect(await screen.findByText("Active")).toBeInTheDocument();
     expect(await screen.findByText("Success")).toBeInTheDocument();
+  });
+
+  it("renders empty state with refresh actions CTA", async () => {
+    fetchActionTriage.mockResolvedValueOnce({ actions: [], summary: { by_status: {}, by_business: [] } });
+    refreshActions.mockResolvedValueOnce({ actions: [], summary: { by_status: {}, by_business: [] } });
+
+    render(
+      <MemoryRouter>
+        <AdvisorInboxPage />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText("No open actions yet for this business.")).toBeInTheDocument();
+    const refreshButton = screen.getByRole("button", { name: "Refresh Actions" });
+    await waitFor(() => expect(refreshButton).toBeEnabled());
+    await userEvent.click(refreshButton);
+    await waitFor(() => expect(refreshActions).toHaveBeenCalledWith("biz-1"));
   });
 });
