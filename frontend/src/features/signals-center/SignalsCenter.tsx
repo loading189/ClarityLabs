@@ -62,19 +62,34 @@ function formatDomainLabel(domain?: string | null) {
   return domain.charAt(0).toUpperCase() + domain.slice(1);
 }
 
+function joinListParam(values?: string[] | null) {
+  if (!values || values.length === 0) return undefined;
+  return values.slice().sort((a, b) => a.localeCompare(b)).join(",");
+}
+
 function anchorToLedgerFilters(anchor: SignalExplainLedgerAnchor | null): FilterState | null {
   if (!anchor || !anchor.query) return null;
   const query = anchor.query;
   const filters: FilterState = {};
-  if (query.date_start && query.date_end) {
-    filters.start = query.date_start;
-    filters.end = query.date_end;
+  if (query.start_date && query.end_date) {
+    filters.start = query.start_date;
+    filters.end = query.end_date;
     filters.window = undefined;
   }
-  if (query.vendor) filters.vendor = query.vendor;
-  if (query.category) filters.category = query.category;
-  if (query.txn_ids && query.txn_ids.length > 0) {
-    filters.anchor_source_event_id = query.txn_ids[0] ?? undefined;
+  const accountParam = joinListParam(query.accounts ?? undefined);
+  if (accountParam) filters.account = accountParam;
+  const vendorParam = joinListParam(query.vendors ?? undefined);
+  if (vendorParam) filters.vendor = vendorParam;
+  const categoryParam = joinListParam(query.categories ?? undefined);
+  if (categoryParam) filters.category = categoryParam;
+  if (query.search) filters.q = query.search;
+  if (query.direction) filters.direction = query.direction;
+  const highlightParam = joinListParam(query.source_event_ids ?? undefined);
+  if (highlightParam) {
+    filters.highlight_source_event_ids = highlightParam;
+    if (query.source_event_ids && query.source_event_ids.length === 1) {
+      filters.anchor_source_event_id = query.source_event_ids[0] ?? undefined;
+    }
   }
   return filters;
 }
@@ -529,9 +544,9 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
     if (Array.isArray(evidence)) {
       evidence.forEach((item: any) => {
         const anchors = item?.anchors ?? null;
-        const txnIds = anchors?.txn_ids;
-        if (Array.isArray(txnIds)) {
-          txnIds.forEach((id: unknown) => add(id, item?.label ?? "Evidence", item?.source));
+        const sourceEventIds = anchors?.source_event_ids;
+        if (Array.isArray(sourceEventIds)) {
+          sourceEventIds.forEach((id: unknown) => add(id, item?.label ?? "Evidence", item?.source));
         }
       });
     }
@@ -965,8 +980,8 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
                       <div>
                         <div className={styles.auditEvent}>{anchor.label}</div>
                         <div className={styles.auditMeta}>
-                          {anchor.query?.date_start && anchor.query?.date_end
-                            ? `${anchor.query.date_start} → ${anchor.query.date_end}`
+                          {anchor.query?.start_date && anchor.query?.end_date
+                            ? `${anchor.query.start_date} → ${anchor.query.end_date}`
                             : "Transaction set"}
                         </div>
                       </div>

@@ -26,11 +26,11 @@ export default function LedgerTraceDrawer({
 
   const query = useMemo(() => {
     if (!anchors) return null;
-    if (anchors.txn_ids && anchors.txn_ids.length > 0) {
-      return { txn_ids: anchors.txn_ids };
+    if (anchors.source_event_ids && anchors.source_event_ids.length > 0) {
+      return { txn_ids: anchors.source_event_ids };
     }
-    if (anchors.date_start && anchors.date_end) {
-      return { date_start: anchors.date_start, date_end: anchors.date_end };
+    if (anchors.start_date && anchors.end_date) {
+      return { date_start: anchors.start_date, date_end: anchors.end_date };
     }
     return null;
   }, [anchors]);

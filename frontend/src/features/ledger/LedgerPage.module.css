@@ -243,6 +243,11 @@ thead .stickySecond {
   background: var(--primary-soft);
 }
 
+.rowHighlighted {
+  background: var(--surface-muted);
+  box-shadow: inset 3px 0 0 var(--primary);
+}
+
 .columnMenu summary {
   list-style: none;
   cursor: pointer;
