@@ -15,3 +15,27 @@
   background: var(--info-bg);
   color: var(--info);
 }
+
+.success {
+  border-color: var(--success-border);
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.warning {
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
+.danger {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.neutral {
+  border-color: var(--border);
+  background: var(--surface-muted);
+  color: var(--text-muted);
+}

@@ -55,6 +55,9 @@ vi.mock("../../api/signals", () => ({
 vi.mock("../../api/healthScore", () => ({ fetchHealthScore: (...args: unknown[]) => fetchHealthScore(...args) }));
 vi.mock("../../api/audit", () => ({ getAuditLog: vi.fn().mockResolvedValue({ items: [], next_cursor: null }) }));
 vi.mock("../../api/monitor", () => ({ getMonitorStatus: (...args: unknown[]) => getMonitorStatus(...args) }));
+vi.mock("../../app/auth/AuthContext", () => ({
+  useAuth: () => ({ logout: vi.fn() }),
+}));
 
 describe("SignalsCenter v2 filters", () => {
   it("renders status/severity/domain/search filters and applies", async () => {

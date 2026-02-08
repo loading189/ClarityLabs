@@ -186,23 +186,27 @@ def list_plans(
     return db.execute(stmt).scalars().all()
 
 
-def get_plan_detail(db: Session, business_id: str, plan_id: str) -> tuple[Plan, List[PlanCondition], Optional[PlanObservation], List[PlanStateEvent]]:
+def get_plan_detail(
+    db: Session,
+    business_id: str,
+    plan_id: str,
+) -> tuple[Plan, List[PlanCondition], Optional[PlanObservation], List[PlanObservation], List[PlanStateEvent]]:
     plan = _require_plan(db, business_id, plan_id)
     conditions = (
         db.execute(select(PlanCondition).where(PlanCondition.plan_id == plan.id).order_by(PlanCondition.created_at.asc()))
         .scalars()
         .all()
     )
-    latest_observation = (
+    observations = (
         db.execute(
             select(PlanObservation)
             .where(PlanObservation.plan_id == plan.id)
             .order_by(PlanObservation.observed_at.desc(), PlanObservation.id.desc())
-            .limit(1)
         )
         .scalars()
-        .first()
+        .all()
     )
+    latest_observation = observations[0] if observations else None
     events = (
         db.execute(
             select(PlanStateEvent)
@@ -212,7 +216,39 @@ def get_plan_detail(db: Session, business_id: str, plan_id: str) -> tuple[Plan, 
         .scalars()
         .all()
     )
-    return plan, conditions, latest_observation, events
+    return plan, conditions, latest_observation, observations, events
+
+
+def list_plan_summaries(
+    db: Session,
+    plan_ids: List[str],
+) -> List[tuple[Plan, Optional[PlanObservation]]]:
+    if not plan_ids:
+        return []
+    plans = db.execute(select(Plan).where(Plan.id.in_(plan_ids))).scalars().all()
+    if not plans:
+        return []
+    observations = (
+        db.execute(
+            select(PlanObservation)
+            .where(PlanObservation.plan_id.in_(plan_ids))
+            .order_by(PlanObservation.plan_id.asc(), PlanObservation.observed_at.desc(), PlanObservation.id.desc())
+        )
+        .scalars()
+        .all()
+    )
+    latest_by_plan: Dict[str, PlanObservation] = {}
+    for observation in observations:
+        if observation.plan_id not in latest_by_plan:
+            latest_by_plan[observation.plan_id] = observation
+    plan_by_id = {plan.id: plan for plan in plans}
+    ordered: List[tuple[Plan, Optional[PlanObservation]]] = []
+    for plan_id in plan_ids:
+        plan = plan_by_id.get(plan_id)
+        if not plan:
+            continue
+        ordered.append((plan, latest_by_plan.get(plan_id)))
+    return ordered
 
 
 def create_plan(

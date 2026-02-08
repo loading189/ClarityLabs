@@ -47,9 +47,9 @@ export default function AppRoutes() {
 
         {/* workspace */}
         <Route path="/app/:businessId" element={<AppLayout />}>
-          <Route index element={<Navigate to="assistant" replace />} />
-          <Route path="home" element={<Navigate to="../assistant" replace />} />
-          <Route path="health" element={<Navigate to="../assistant" replace />} />
+          <Route index element={<Navigate to="advisor" replace />} />
+          <Route path="home" element={<Navigate to="../advisor" replace />} />
+          <Route path="health" element={<Navigate to="../advisor" replace />} />
           <Route path="assistant" element={<AssistantPage />} />
           <Route path="advisor" element={<AdvisorInboxPage />} />
           <Route path="dashboard" element={<DashboardPage />} />

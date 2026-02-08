@@ -1,0 +1,26 @@
+.list {
+  display: grid;
+  gap: 12px 20px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.item {
+  display: grid;
+  gap: 4px;
+}
+
+.label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+
+.value {
+  font-size: 13px;
+  color: var(--text);
+}

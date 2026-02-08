@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Drawer from "../../components/common/Drawer";
-import { ErrorState, LoadingState } from "../../components/common/DataState";
 import { getAuditLog, type AuditLogOut } from "../../api/audit";
 import { fetchHealthScore, type HealthScoreOut } from "../../api/healthScore";
 import {
@@ -20,7 +19,7 @@ import {
 import { getMonitorStatus, type MonitorStatus } from "../../api/monitor";
 import styles from "./SignalsCenter.module.css";
 import HealthScoreBreakdownDrawer from "../../components/health-score/HealthScoreBreakdownDrawer";
-import { Button, Chip, Panel } from "../../components/ui";
+import { Button, Chip, EmptyState, InlineAlert, LoadingState, Panel } from "../../components/ui";
 import TransactionDetailDrawer from "../../components/transactions/TransactionDetailDrawer";
 import FilterBar from "../../components/common/FilterBar";
 import { useFilters } from "../../app/filters/useFilters";
@@ -28,6 +27,8 @@ import { resolveDateRange, type FilterState } from "../../app/filters/filters";
 import { useAppState } from "../../app/state/appState";
 import { ledgerPath } from "../../app/routes/routeUtils";
 import LedgerTraceDrawer from "../../components/ledger/LedgerTraceDrawer";
+import { ApiError } from "../../api/client";
+import { useAuth } from "../../app/auth/AuthContext";
 
 const STATUS_LABELS: Record<string, string> = {
   open: "Open",
@@ -42,6 +43,8 @@ const SIGNAL_AUDIT_TYPES = new Set([
   "signal_resolved",
   "signal_status_changed",
 ]);
+
+type LoadError = { message: string; status?: number };
 
 function formatDate(value: string | null | undefined) {
   if (!value) return "—";
@@ -114,6 +117,7 @@ function RelatedChanges({
   businessId: string;
   onSelect: (auditId: string) => void;
 }) {
+  const { logout } = useAuth();
   const [items, setItems] = useState<AuditLogOut[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -157,11 +161,15 @@ function RelatedChanges({
     setItems(collected.slice(0, DISPLAY_LIMIT));
     setNextCursor(next);
   } catch (e: any) {
+    if (e instanceof ApiError && e.status === 401) {
+      logout();
+      return;
+    }
     setErr(e?.message ?? "Failed to load audit history");
   } finally {
     setLoading(false);
   }
-  }, [businessId]);
+  }, [businessId, logout]);
 
 
  const loadMore = useCallback(async () => {
@@ -184,11 +192,15 @@ function RelatedChanges({
     setItems((prev) => prev.concat(collected.slice(0, DISPLAY_LIMIT)));
     setNextCursor(next);
   } catch (e: any) {
+    if (e instanceof ApiError && e.status === 401) {
+      logout();
+      return;
+    }
     setErr(e?.message ?? "Failed to load more audit history");
   } finally {
     setLoadingMore(false);
   }
-}, [businessId, loadingMore, nextCursor]);
+}, [businessId, loadingMore, logout, nextCursor]);
 
 
   return (
@@ -204,11 +216,15 @@ function RelatedChanges({
       </div>
 
       {loading && <LoadingState label="Loading related changes…" />}
-      {err && <ErrorState label={err} />}
+      {err && (
+        <InlineAlert tone="error" title="Unable to load related changes" description={err} />
+      )}
 
       {!loading && !err && (
         <div className={styles.auditList}>
-          {items.length === 0 && <div className={styles.empty}>No related changes yet.</div>}
+          {items.length === 0 && (
+            <EmptyState title="No related changes yet" description="Signal activity will appear here." />
+          )}
           {items.map((item) => (
             <button
               key={item.id}
@@ -246,17 +262,18 @@ const STALE_THRESHOLD_HOURS = 6;
 
 export default function SignalsCenter({ businessId }: { businessId: string }) {
   const navigate = useNavigate();
+  const { logout } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [filters, setFilters] = useFilters();
   const { setDateRange } = useAppState();
   const [signals, setSignals] = useState<SignalState[]>([]);
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [err, setErr] = useState<LoadError | null>(null);
   const [useLegacyV1, setUseLegacyV1] = useState(false);
   const [selected, setSelected] = useState<SignalState | null>(null);
   const [detail, setDetail] = useState<SignalStateDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [detailErr, setDetailErr] = useState<string | null>(null);
+  const [detailErr, setDetailErr] = useState<LoadError | null>(null);
   const [detailExplain, setDetailExplain] = useState<any | null>(null);
   const [statusSelections, setStatusSelections] = useState<Record<string, SignalStatus>>({});
   const [statusSaving, setStatusSaving] = useState<Record<string, boolean>>({});
@@ -267,13 +284,13 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
   const [selectedLedgerAnchor, setSelectedLedgerAnchor] = useState<SignalExplainLedgerAnchor | null>(null);
   const [healthScore, setHealthScore] = useState<HealthScoreOut | null>(null);
   const [healthScoreLoading, setHealthScoreLoading] = useState(false);
-  const [healthScoreErr, setHealthScoreErr] = useState<string | null>(null);
+  const [healthScoreErr, setHealthScoreErr] = useState<LoadError | null>(null);
   const [breakdownOpen, setBreakdownOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [toastAuditId, setToastAuditId] = useState<string | null>(null);
   const [monitorStatus, setMonitorStatus] = useState<MonitorStatus | null>(null);
   const [monitorLoading, setMonitorLoading] = useState(false);
-  const [monitorErr, setMonitorErr] = useState<string | null>(null);
+  const [monitorErr, setMonitorErr] = useState<LoadError | null>(null);
   const resolvedRange = useMemo(() => resolveDateRange(filters), [filters]);
   const selectedSignalIdParam = searchParams.get("signal_id") ?? "";
   const updateSignalParam = useCallback(
@@ -311,11 +328,15 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
         setSignals(data.signals ?? []);
       }
     } catch (e: any) {
-      setErr(e?.message ?? "Failed to load signals");
+      if (e instanceof ApiError && e.status === 401) {
+        logout();
+        return;
+      }
+      setErr({ message: e?.message ?? "Failed to load signals", status: e?.status });
     } finally {
       setLoading(false);
     }
-  }, [businessId, resolvedRange.end, resolvedRange.start, useLegacyV1]);
+  }, [businessId, logout, resolvedRange.end, resolvedRange.start, useLegacyV1]);
 
   const loadHealthScore = useCallback(async () => {
     if (!businessId) return;
@@ -325,11 +346,15 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
       const data = await fetchHealthScore(businessId);
       setHealthScore(data);
     } catch (e: any) {
-      setHealthScoreErr(e?.message ?? "Failed to load health score");
+      if (e instanceof ApiError && e.status === 401) {
+        logout();
+        return;
+      }
+      setHealthScoreErr({ message: e?.message ?? "Failed to load health score", status: e?.status });
     } finally {
       setHealthScoreLoading(false);
     }
-  }, [businessId]);
+  }, [businessId, logout]);
 
   const loadMonitorStatus = useCallback(async () => {
     if (!businessId) return;
@@ -339,11 +364,15 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
       const data = await getMonitorStatus(businessId);
       setMonitorStatus(data);
     } catch (e: any) {
-      setMonitorErr(e?.message ?? "Failed to load monitoring status");
+      if (e instanceof ApiError && e.status === 401) {
+        logout();
+        return;
+      }
+      setMonitorErr({ message: e?.message ?? "Failed to load monitoring status", status: e?.status });
     } finally {
       setMonitorLoading(false);
     }
-  }, [businessId]);
+  }, [businessId, logout]);
 
   useEffect(() => {
     loadSignals();
@@ -379,7 +408,11 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
         setDetailExplain(explainData);
       } catch (e: any) {
         if (!active) return;
-        setDetailErr(e?.message ?? "Failed to load signal details");
+        if (e instanceof ApiError && e.status === 401) {
+          logout();
+          return;
+        }
+        setDetailErr({ message: e?.message ?? "Failed to load signal details", status: e?.status });
       } finally {
         if (active) setDetailLoading(false);
       }
@@ -388,7 +421,7 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
     return () => {
       active = false;
     };
-  }, [businessId, selected, useLegacyV1]);
+  }, [businessId, logout, selected, useLegacyV1]);
 
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") ?? "");
   const [severityFilter, setSeverityFilter] = useState(searchParams.get("severity") ?? "");
@@ -575,7 +608,9 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
         <div>
           <div className={styles.scoreTitle}>Health score</div>
           {healthScoreLoading && <div className={styles.scoreMuted}>Loading…</div>}
-          {healthScoreErr && <div className={styles.scoreError}>{healthScoreErr}</div>}
+          {healthScoreErr && (
+            <InlineAlert tone="error" title="Unable to load health score" description={healthScoreErr.message} />
+          )}
           {!healthScoreLoading && !healthScoreErr && healthScore && (
             <div className={styles.scoreValue}>{Math.round(healthScore.score)}</div>
           )}
@@ -601,7 +636,9 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
         <div className={styles.monitoringPanel}>
           <div className={styles.monitoringTitle}>Monitoring</div>
           {monitorLoading && <div className={styles.scoreMuted}>Loading status…</div>}
-          {monitorErr && <div className={styles.scoreError}>{monitorErr}</div>}
+          {monitorErr && (
+            <InlineAlert tone="error" title="Unable to load monitoring" description={monitorErr.message} />
+          )}
           {!monitorLoading && !monitorErr && monitorStatus && (
             <div className={styles.monitoringBody}>
               <div className={styles.monitoringRow}>
@@ -728,12 +765,23 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
       )}
 
       {loading && <LoadingState label="Loading signals…" />}
-      {err && <ErrorState label={err} />}
+      {err?.status === 403 && (
+        <EmptyState
+          title="You don’t have access"
+          description="Ask an admin to grant access to this business."
+        />
+      )}
+      {err && err.status !== 403 && (
+        <InlineAlert tone="error" title="Unable to load signals" description={err.message} />
+      )}
 
       {!loading && !err && (
         <div className={styles.list}>
           {filteredSignals.length === 0 && (
-            <div className={styles.empty}>No signals match the selected filters.</div>
+            <EmptyState
+              title="No signals match filters"
+              description="Adjust filters or check back after the next monitoring run."
+            />
           )}
           {filteredSignals.map((signal) => (
             <div
@@ -829,7 +877,12 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
         }}
       >
         {detailLoading && <LoadingState label="Loading signal details…" />}
-        {detailErr && <ErrorState label={detailErr} />}
+        {detailErr?.status === 403 && (
+          <EmptyState title="Access restricted" description="You don’t have permission to view this signal." />
+        )}
+        {detailErr && detailErr.status !== 403 && (
+          <InlineAlert tone="error" title="Unable to load signal detail" description={detailErr.message} />
+        )}
 
         {!detailLoading && !detailErr && detail && (
           <div className={styles.detailContent}>

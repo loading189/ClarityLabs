@@ -1,0 +1,15 @@
+.loading {
+  display: grid;
+  gap: 10px;
+  padding: 12px 0;
+}
+
+.label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.skeletons {
+  display: grid;
+  gap: 8px;
+}

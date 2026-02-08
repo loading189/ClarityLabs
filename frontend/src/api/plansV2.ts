@@ -66,12 +66,22 @@ export type PlanDetail = {
   plan: Plan;
   conditions: PlanCondition[];
   latest_observation?: PlanObservation | null;
+  observations: PlanObservation[];
   state_events: PlanStateEvent[];
 };
 
 export type PlanRefresh = {
   observation: PlanObservation;
   success_candidate: boolean;
+};
+
+export type PlanSummary = {
+  id: string;
+  business_id: string;
+  title: string;
+  status: PlanStatus;
+  assigned_to_user_id?: string | null;
+  latest_observation?: PlanObservation | null;
 };
 
 export function createPlan(payload: {
@@ -130,4 +140,8 @@ export function refreshPlan(businessId: string, planId: string) {
 export function closePlan(businessId: string, planId: string, payload: { outcome: PlanCloseOutcome; note?: string | null }) {
   const query = new URLSearchParams({ business_id: businessId });
   return apiPost<PlanDetail>(`/api/plans/${encodeURIComponent(planId)}/close?${query.toString()}`, payload);
+}
+
+export function getPlanSummaries(planIds: string[]) {
+  return apiPost<PlanSummary[]>("/api/plans/summary", { plan_ids: planIds });
 }

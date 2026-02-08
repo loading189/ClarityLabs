@@ -76,6 +76,9 @@ vi.mock("../../api/signals", () => ({
   updateSignalStatus: (...args: unknown[]) => updateSignalStatus(...args),
   fetchSignals: (...args: unknown[]) => fetchSignals(...args),
 }));
+vi.mock("../../app/auth/AuthContext", () => ({
+  useAuth: () => ({ logout: vi.fn() }),
+}));
 
 vi.mock("../../api/audit", () => ({
   getAuditLog: (...args: unknown[]) => getAuditLog(...args),
