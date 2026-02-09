@@ -1,41 +1,46 @@
 .content {
   display: grid;
-  gap: 16px;
+  gap: 20px;
 }
 
-.section {
-  display: grid;
-  gap: 6px;
-}
-
-.label {
-  font-size: 12px;
-  text-transform: uppercase;
-  opacity: 0.6;
-  letter-spacing: 0.08em;
-}
-
-.text {
-  font-size: 14px;
-}
-
-.row {
+.header {
   display: flex;
-  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
   flex-wrap: wrap;
 }
 
-.select,
-.input {
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(20, 20, 20, 0.8);
-  color: inherit;
+.title {
+  font-size: 18px;
+  font-weight: 600;
 }
 
-.input {
-  width: 100%;
+.subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.outcomeCard {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+}
+
+.outcomeSummary {
+  font-size: 14px;
+}
+
+.outcomeMeta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--text-muted);
+  align-items: center;
 }
 
 .actions {
@@ -44,23 +49,66 @@
   flex-wrap: wrap;
 }
 
-.primaryButton {
-  padding: 8px 12px;
-  border-radius: 10px;
-  border: none;
-  background: #4f46e5;
-  color: white;
-  font-weight: 600;
-  cursor: pointer;
+.textCard {
+  padding: 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  font-size: 13px;
 }
 
-.secondaryButton {
-  padding: 8px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  background: transparent;
+.select {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--input-bg);
   color: inherit;
-  cursor: pointer;
+}
+
+.input {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--input-bg);
+  color: inherit;
+  width: 100%;
+}
+
+.closeRow {
+  display: grid;
+  gap: 10px;
+}
+
+.historyList {
+  display: grid;
+  gap: 10px;
+}
+
+.historyHeader {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.historyItem {
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+}
+
+.historySummary {
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.historyMeta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--text-muted);
+  align-items: center;
 }
 
 .auditList {
@@ -69,18 +117,14 @@
 }
 
 .auditItem {
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.05);
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
   font-size: 13px;
 }
 
 .muted {
   opacity: 0.7;
   font-size: 12px;
-}
-
-.error {
-  color: #ff8b8b;
-  font-size: 13px;
 }

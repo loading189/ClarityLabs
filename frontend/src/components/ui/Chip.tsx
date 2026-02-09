@@ -1,6 +1,6 @@
 import styles from "./Chip.module.css";
 
-type ChipTone = "default" | "info";
+type ChipTone = "default" | "info" | "success" | "warning" | "danger" | "neutral";
 
 export default function Chip({
   children,

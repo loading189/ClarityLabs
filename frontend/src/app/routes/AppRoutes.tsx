@@ -29,7 +29,7 @@ function AssistantCompatRedirect() {
   }
 
   const nextSearch = signalId ? `?signalId=${encodeURIComponent(signalId)}` : "";
-  return <Navigate to={`/app/${businessId}/assistant${nextSearch}`} replace />;
+  return <Navigate to={`/app/${businessId}/summary${nextSearch}`} replace />;
 }
 
 export default function AppRoutes() {
@@ -47,10 +47,11 @@ export default function AppRoutes() {
 
         {/* workspace */}
         <Route path="/app/:businessId" element={<AppLayout />}>
-          <Route index element={<Navigate to="assistant" replace />} />
-          <Route path="home" element={<Navigate to="../assistant" replace />} />
-          <Route path="health" element={<Navigate to="../assistant" replace />} />
-          <Route path="assistant" element={<AssistantPage />} />
+          <Route index element={<Navigate to="advisor" replace />} />
+          <Route path="home" element={<Navigate to="../advisor" replace />} />
+          <Route path="health" element={<Navigate to="../advisor" replace />} />
+          <Route path="assistant" element={<Navigate to="../summary" replace />} />
+          <Route path="summary" element={<AssistantPage />} />
           <Route path="advisor" element={<AdvisorInboxPage />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="signals" element={<SignalsCenterPage />} />
@@ -62,7 +63,7 @@ export default function AppRoutes() {
           <Route path="integrations" element={<IntegrationsPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="admin/simulator" element={<AdminSimulatorPage />} />
-          <Route path="*" element={<Navigate to="assistant" replace />} />
+          <Route path="*" element={<Navigate to="summary" replace />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/app" replace />} />

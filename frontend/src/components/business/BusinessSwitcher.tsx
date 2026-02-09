@@ -40,9 +40,6 @@ export default function BusinessSwitcher() {
       </select>
       {error && <div className={styles.error}>{error}</div>}
       {!error && current && <div className={styles.meta}>Role: {current.role}</div>}
-      <a className={styles.manageLink} href="/businesses">
-        Manage businesses
-      </a>
     </div>
   );
 }

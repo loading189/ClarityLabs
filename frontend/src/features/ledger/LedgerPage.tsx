@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import PageHeader from "../../components/common/PageHeader";
-import { ErrorState } from "../../components/common/DataState";
 import { assertBusinessId } from "../../utils/businessId";
 import { useFilters } from "../../app/filters/useFilters";
 import { resolveDateRange, type DateWindow } from "../../app/filters/filters";
 import { useAppState } from "../../app/state/appState";
+import { ApiError } from "../../api/client";
+import { useAuth } from "../../app/auth/AuthContext";
 import {
   fetchLedgerAccountDimensions,
   fetchLedgerQuery,
@@ -16,12 +17,14 @@ import {
   type LedgerQueryRow,
 } from "../../api/ledger";
 import TransactionDetailDrawer from "../../components/transactions/TransactionDetailDrawer";
+import { Button, EmptyState, InlineAlert } from "../../components/ui";
 import styles from "./LedgerPage.module.css";
 
 const SIDEBAR_TOP_N = 12;
 const COLUMN_STORAGE_KEY = "ledger-column-visibility";
 const ALL_COLUMNS = ["date", "description", "account", "vendor", "category", "amount", "balance"] as const;
 type ColumnKey = (typeof ALL_COLUMNS)[number];
+type LoadError = { message: string; status?: number };
 
 type ColumnVisibility = Record<ColumnKey, boolean>;
 const DEFAULT_VISIBILITY: ColumnVisibility = {
@@ -94,6 +97,7 @@ function monthStartEnd(offsetMonths = 0) {
 export default function LedgerPage() {
   const { businessId: businessIdParam } = useParams();
   const businessId = assertBusinessId(businessIdParam, "LedgerPage");
+  const { logout } = useAuth();
   const [filters, setFilters] = useFilters();
   const { setDateRange, activeBusinessId, setActiveBusinessId, dataVersion } = useAppState();
   const [sidebarTab, setSidebarTab] = useState<"accounts" | "vendors">("accounts");
@@ -123,7 +127,7 @@ export default function LedgerPage() {
   const [accounts, setAccounts] = useState<LedgerDimensionAccount[]>([]);
   const [vendors, setVendors] = useState<LedgerDimensionVendor[]>([]);
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [err, setErr] = useState<LoadError | null>(null);
   const [drawerSourceEventId, setDrawerSourceEventId] = useState<string | null>(null);
   const [highlightSourceEventId, setHighlightSourceEventId] = useState<string | null>(null);
   const rowRefs = useRef(new Map<string, HTMLTableRowElement | null>());
@@ -204,7 +208,11 @@ export default function LedgerPage() {
       })
       .catch((e: any) => {
         if (!alive) return;
-        setErr(e?.message ?? "Failed to load ledger");
+        if (e instanceof ApiError && e.status === 401) {
+          logout();
+          return;
+        }
+        setErr({ message: e?.message ?? "Failed to load ledger", status: e?.status });
       })
       .finally(() => {
         if (alive) setLoading(false);
@@ -219,6 +227,7 @@ export default function LedgerPage() {
     dataVersion,
     filters.direction,
     filters.q,
+    logout,
     range.end,
     range.start,
     selectedAccounts.join("|"),
@@ -482,7 +491,20 @@ export default function LedgerPage() {
         </aside>
 
         <section className={styles.main}>
-          {err && <ErrorState label={err} />}
+          {err?.status === 403 && (
+            <EmptyState
+              title="You don’t have access"
+              description="Ask an admin to grant access to this business."
+            />
+          )}
+          {err && err.status !== 403 && (
+            <InlineAlert
+              tone="error"
+              title="Unable to load ledger"
+              description={err.message}
+              action={<Button onClick={() => window.location.reload()}>Retry</Button>}
+            />
+          )}
           {!err && (
             <div className={styles.tableWrap}>
               <table className={`${styles.table} ${density === "compact" ? styles.tableCompact : ""}`}>
@@ -501,6 +523,16 @@ export default function LedgerPage() {
                   {loading && Array.from({ length: 12 }).map((_, idx) => (
                     <tr key={`s-${idx}`}><td colSpan={7}><div className={styles.skeletonRow} /></td></tr>
                   ))}
+                  {!loading && visibleRows.length === 0 && (
+                    <tr>
+                      <td colSpan={7}>
+                        <EmptyState
+                          title="No ledger activity for this range"
+                          description="Adjust filters or choose a wider date window."
+                        />
+                      </td>
+                    </tr>
+                  )}
                   {!loading && visibleRows.map((row) => (
                     <tr
                       key={row.source_event_id}

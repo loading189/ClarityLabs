@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Drawer from "../../components/common/Drawer";
-import { ErrorState, LoadingState } from "../../components/common/DataState";
 import { getAuditLog, type AuditLogOut } from "../../api/audit";
 import { fetchHealthScore, type HealthScoreOut } from "../../api/healthScore";
 import {
@@ -9,18 +8,16 @@ import {
   getSignalDetail,
   getSignalExplain,
   listSignalStates,
-  updateSignalStatus,
   type Signal,
   type SignalSeverity,
   type SignalState,
   type SignalStateDetail,
   type SignalExplainLedgerAnchor,
-  type SignalStatus,
 } from "../../api/signals";
 import { getMonitorStatus, type MonitorStatus } from "../../api/monitor";
 import styles from "./SignalsCenter.module.css";
 import HealthScoreBreakdownDrawer from "../../components/health-score/HealthScoreBreakdownDrawer";
-import { Button, Chip, Panel } from "../../components/ui";
+import { Button, Chip, EmptyState, InlineAlert, LoadingState, Panel } from "../../components/ui";
 import TransactionDetailDrawer from "../../components/transactions/TransactionDetailDrawer";
 import FilterBar from "../../components/common/FilterBar";
 import { useFilters } from "../../app/filters/useFilters";
@@ -28,6 +25,8 @@ import { resolveDateRange, type FilterState } from "../../app/filters/filters";
 import { useAppState } from "../../app/state/appState";
 import { ledgerPath } from "../../app/routes/routeUtils";
 import LedgerTraceDrawer from "../../components/ledger/LedgerTraceDrawer";
+import { ApiError } from "../../api/client";
+import { useAuth } from "../../app/auth/AuthContext";
 
 const STATUS_LABELS: Record<string, string> = {
   open: "Open",
@@ -42,6 +41,8 @@ const SIGNAL_AUDIT_TYPES = new Set([
   "signal_resolved",
   "signal_status_changed",
 ]);
+
+type LoadError = { message: string; status?: number };
 
 function formatDate(value: string | null | undefined) {
   if (!value) return "—";
@@ -114,6 +115,7 @@ function RelatedChanges({
   businessId: string;
   onSelect: (auditId: string) => void;
 }) {
+  const { logout } = useAuth();
   const [items, setItems] = useState<AuditLogOut[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -157,11 +159,15 @@ function RelatedChanges({
     setItems(collected.slice(0, DISPLAY_LIMIT));
     setNextCursor(next);
   } catch (e: any) {
+    if (e instanceof ApiError && e.status === 401) {
+      logout();
+      return;
+    }
     setErr(e?.message ?? "Failed to load audit history");
   } finally {
     setLoading(false);
   }
-  }, [businessId]);
+  }, [businessId, logout]);
 
 
  const loadMore = useCallback(async () => {
@@ -184,11 +190,15 @@ function RelatedChanges({
     setItems((prev) => prev.concat(collected.slice(0, DISPLAY_LIMIT)));
     setNextCursor(next);
   } catch (e: any) {
+    if (e instanceof ApiError && e.status === 401) {
+      logout();
+      return;
+    }
     setErr(e?.message ?? "Failed to load more audit history");
   } finally {
     setLoadingMore(false);
   }
-}, [businessId, loadingMore, nextCursor]);
+}, [businessId, loadingMore, logout, nextCursor]);
 
 
   return (
@@ -204,11 +214,15 @@ function RelatedChanges({
       </div>
 
       {loading && <LoadingState label="Loading related changes…" />}
-      {err && <ErrorState label={err} />}
+      {err && (
+        <InlineAlert tone="error" title="Unable to load related changes" description={err} />
+      )}
 
       {!loading && !err && (
         <div className={styles.auditList}>
-          {items.length === 0 && <div className={styles.empty}>No related changes yet.</div>}
+          {items.length === 0 && (
+            <EmptyState title="No related changes yet" description="Signal activity will appear here." />
+          )}
           {items.map((item) => (
             <button
               key={item.id}
@@ -246,34 +260,33 @@ const STALE_THRESHOLD_HOURS = 6;
 
 export default function SignalsCenter({ businessId }: { businessId: string }) {
   const navigate = useNavigate();
+  const { logout } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [filters, setFilters] = useFilters();
   const { setDateRange } = useAppState();
   const [signals, setSignals] = useState<SignalState[]>([]);
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [err, setErr] = useState<LoadError | null>(null);
   const [useLegacyV1, setUseLegacyV1] = useState(false);
   const [selected, setSelected] = useState<SignalState | null>(null);
   const [detail, setDetail] = useState<SignalStateDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [detailErr, setDetailErr] = useState<string | null>(null);
+  const [detailErr, setDetailErr] = useState<LoadError | null>(null);
   const [detailExplain, setDetailExplain] = useState<any | null>(null);
-  const [statusSelections, setStatusSelections] = useState<Record<string, SignalStatus>>({});
-  const [statusSaving, setStatusSaving] = useState<Record<string, boolean>>({});
-  const [statusErrors, setStatusErrors] = useState<Record<string, string>>({});
-  const [statusReasons, setStatusReasons] = useState<Record<string, string>>({});
+  const [rowActionLoading, setRowActionLoading] = useState<Record<string, boolean>>({});
+  const [rowActionError, setRowActionError] = useState<string | null>(null);
   const [detailSourceEventId, setDetailSourceEventId] = useState<string | null>(null);
   const [ledgerTraceOpen, setLedgerTraceOpen] = useState(false);
   const [selectedLedgerAnchor, setSelectedLedgerAnchor] = useState<SignalExplainLedgerAnchor | null>(null);
   const [healthScore, setHealthScore] = useState<HealthScoreOut | null>(null);
   const [healthScoreLoading, setHealthScoreLoading] = useState(false);
-  const [healthScoreErr, setHealthScoreErr] = useState<string | null>(null);
+  const [healthScoreErr, setHealthScoreErr] = useState<LoadError | null>(null);
   const [breakdownOpen, setBreakdownOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [toastAuditId, setToastAuditId] = useState<string | null>(null);
   const [monitorStatus, setMonitorStatus] = useState<MonitorStatus | null>(null);
   const [monitorLoading, setMonitorLoading] = useState(false);
-  const [monitorErr, setMonitorErr] = useState<string | null>(null);
+  const [monitorErr, setMonitorErr] = useState<LoadError | null>(null);
   const resolvedRange = useMemo(() => resolveDateRange(filters), [filters]);
   const selectedSignalIdParam = searchParams.get("signal_id") ?? "";
   const updateSignalParam = useCallback(
@@ -311,11 +324,15 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
         setSignals(data.signals ?? []);
       }
     } catch (e: any) {
-      setErr(e?.message ?? "Failed to load signals");
+      if (e instanceof ApiError && e.status === 401) {
+        logout();
+        return;
+      }
+      setErr({ message: e?.message ?? "Failed to load signals", status: e?.status });
     } finally {
       setLoading(false);
     }
-  }, [businessId, resolvedRange.end, resolvedRange.start, useLegacyV1]);
+  }, [businessId, logout, resolvedRange.end, resolvedRange.start, useLegacyV1]);
 
   const loadHealthScore = useCallback(async () => {
     if (!businessId) return;
@@ -325,11 +342,15 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
       const data = await fetchHealthScore(businessId);
       setHealthScore(data);
     } catch (e: any) {
-      setHealthScoreErr(e?.message ?? "Failed to load health score");
+      if (e instanceof ApiError && e.status === 401) {
+        logout();
+        return;
+      }
+      setHealthScoreErr({ message: e?.message ?? "Failed to load health score", status: e?.status });
     } finally {
       setHealthScoreLoading(false);
     }
-  }, [businessId]);
+  }, [businessId, logout]);
 
   const loadMonitorStatus = useCallback(async () => {
     if (!businessId) return;
@@ -339,11 +360,15 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
       const data = await getMonitorStatus(businessId);
       setMonitorStatus(data);
     } catch (e: any) {
-      setMonitorErr(e?.message ?? "Failed to load monitoring status");
+      if (e instanceof ApiError && e.status === 401) {
+        logout();
+        return;
+      }
+      setMonitorErr({ message: e?.message ?? "Failed to load monitoring status", status: e?.status });
     } finally {
       setMonitorLoading(false);
     }
-  }, [businessId]);
+  }, [businessId, logout]);
 
   useEffect(() => {
     loadSignals();
@@ -379,7 +404,11 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
         setDetailExplain(explainData);
       } catch (e: any) {
         if (!active) return;
-        setDetailErr(e?.message ?? "Failed to load signal details");
+        if (e instanceof ApiError && e.status === 401) {
+          logout();
+          return;
+        }
+        setDetailErr({ message: e?.message ?? "Failed to load signal details", status: e?.status });
       } finally {
         if (active) setDetailLoading(false);
       }
@@ -388,7 +417,7 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
     return () => {
       active = false;
     };
-  }, [businessId, selected, useLegacyV1]);
+  }, [businessId, logout, selected, useLegacyV1]);
 
   const [statusFilter, setStatusFilter] = useState(searchParams.get("status") ?? "");
   const [severityFilter, setSeverityFilter] = useState(searchParams.get("severity") ?? "");
@@ -462,52 +491,32 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
     });
   }, [domainFilter, hasLedgerAnchors, signals, severityFilter, statusFilter, textFilter]);
 
-  const handleStatusUpdate = async (signalId: string) => {
-    if (useLegacyV1) return;
-    const selectedSignal =
-      signals.find((signal) => signal.id === signalId) ||
-      (detail && detail.id === signalId ? detail : null);
-    const nextStatus =
-      statusSelections[signalId] ??
-      (selectedSignal?.status as SignalStatus) ??
-      "open";
-    const reason = statusReasons[signalId]?.trim() || undefined;
-    setStatusSaving((prev) => ({ ...prev, [signalId]: true }));
-    setStatusErrors((prev) => ({ ...prev, [signalId]: "" }));
-    setToastMsg(null);
-    setToastAuditId(null);
-    try {
-      const result = await updateSignalStatus(businessId, signalId, {
-        status: nextStatus,
-        reason,
-      });
-      setToastAuditId(result.audit_id ?? null);
-      setToastMsg(`Status updated to ${STATUS_LABELS[result.status] ?? result.status}.`);
-      await loadSignals();
-      await loadHealthScore();
-      await loadMonitorStatus();
-      if (detail && detail.id === signalId) {
-        const detailData = await getSignalDetail(businessId, signalId);
-        setDetail(detailData);
+  const handleViewLedger = useCallback(
+    async (signalId: string) => {
+      if (!businessId || !signalId) return;
+      setRowActionError(null);
+      setRowActionLoading((prev) => ({ ...prev, [signalId]: true }));
+      try {
+        const explainData = await getSignalExplain(businessId, signalId);
+        const anchor = (explainData.ledger_anchors ?? [])[0] ?? null;
+        const filters = anchorToLedgerFilters(anchor);
+        if (!filters) {
+          setRowActionError("No ledger anchor available yet for this signal.");
+          return;
+        }
+        navigate(ledgerPath(businessId, filters));
+      } catch (e: any) {
+        setRowActionError(e?.message ?? "Unable to open ledger for this signal.");
+      } finally {
+        setRowActionLoading((prev) => ({ ...prev, [signalId]: false }));
       }
-      setSelected((prev) => (prev && prev.id === signalId ? { ...prev, status: result.status } : prev));
-      setStatusReasons((prev) => ({ ...prev, [signalId]: "" }));
-    } catch (e: any) {
-      setStatusErrors((prev) => ({
-        ...prev,
-        [signalId]: e?.message ?? "Failed to update status",
-      }));
-    } finally {
-      setStatusSaving((prev) => ({ ...prev, [signalId]: false }));
-    }
-  };
+    },
+    [businessId, navigate]
+  );
 
   const handleAuditSelect = (auditId: string) => {
     navigate(`/app/${businessId}/categorize?auditId=${auditId}#recent-changes`);
   };
-
-  const buildStatusValue = (signalId: string, fallback: SignalStatus) =>
-    statusSelections[signalId] ?? fallback;
 
   const evidenceTxns = useMemo(() => {
     const entries = new Map<string, { id: string; label?: string; source?: string }>();
@@ -575,7 +584,9 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
         <div>
           <div className={styles.scoreTitle}>Health score</div>
           {healthScoreLoading && <div className={styles.scoreMuted}>Loading…</div>}
-          {healthScoreErr && <div className={styles.scoreError}>{healthScoreErr}</div>}
+          {healthScoreErr && (
+            <InlineAlert tone="error" title="Unable to load health score" description={healthScoreErr.message} />
+          )}
           {!healthScoreLoading && !healthScoreErr && healthScore && (
             <div className={styles.scoreValue}>{Math.round(healthScore.score)}</div>
           )}
@@ -601,7 +612,9 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
         <div className={styles.monitoringPanel}>
           <div className={styles.monitoringTitle}>Monitoring</div>
           {monitorLoading && <div className={styles.scoreMuted}>Loading status…</div>}
-          {monitorErr && <div className={styles.scoreError}>{monitorErr}</div>}
+          {monitorErr && (
+            <InlineAlert tone="error" title="Unable to load monitoring" description={monitorErr.message} />
+          )}
           {!monitorLoading && !monitorErr && monitorStatus && (
             <div className={styles.monitoringBody}>
               <div className={styles.monitoringRow}>
@@ -658,6 +671,9 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
         showCategoryFilter={false}
         showSearch={false}
       />
+      <div className={styles.microcopy}>
+        Signals show what the system detects. They don’t require action until you create an action.
+      </div>
       <div className={styles.filters}>
         <label className={styles.filterField}>
           Status
@@ -723,17 +739,29 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
       </div>
       {useLegacyV1 && (
         <div className={styles.legacyNote}>
-          Legacy signals are read-only. Switch off to manage statuses and view details.
+          Legacy signals are read-only. Switch off to view details.
         </div>
       )}
+      {rowActionError && <InlineAlert tone="error" title="Signal action unavailable" description={rowActionError} />}
 
       {loading && <LoadingState label="Loading signals…" />}
-      {err && <ErrorState label={err} />}
+      {err?.status === 403 && (
+        <EmptyState
+          title="You don’t have access"
+          description="Ask an admin to grant access to this business."
+        />
+      )}
+      {err && err.status !== 403 && (
+        <InlineAlert tone="error" title="Unable to load signals" description={err.message} />
+      )}
 
       {!loading && !err && (
         <div className={styles.list}>
           {filteredSignals.length === 0 && (
-            <div className={styles.empty}>No signals match the selected filters.</div>
+            <EmptyState
+              title="No signals match filters"
+              description="Adjust filters or check back after the next monitoring run."
+            />
           )}
           {filteredSignals.map((signal) => (
             <div
@@ -767,36 +795,29 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
                 <div className={styles.rowSummary}>{signal.summary ?? "—"}</div>
                 {!useLegacyV1 && (
                   <div className={styles.rowActions} onClick={(event) => event.stopPropagation()}>
-                    <select
-                      className={styles.rowSelect}
-                      value={buildStatusValue(signal.id, signal.status)}
-                      onChange={(event) =>
-                        setStatusSelections((prev) => ({
-                          ...prev,
-                          [signal.id]: event.target.value as SignalStatus,
-                        }))
-                      }
-                    >
-                      <option value="open">Open</option>
-                      <option value="in_progress">In progress</option>
-                      <option value="resolved">Resolved</option>
-                      <option value="ignored">Ignored</option>
-                    </select>
                     <button
                       className={styles.secondaryButton}
                       type="button"
-                      onClick={() => handleStatusUpdate(signal.id)}
-                      disabled={statusSaving[signal.id]}
+                      onClick={() => {
+                        setSelected(signal);
+                        updateSignalParam(signal.id);
+                      }}
                     >
-                      {statusSaving[signal.id] ? "Saving…" : "Update"}
+                      Explain
                     </button>
-                    {statusErrors[signal.id] && (
-                      <span className={styles.inlineError}>{statusErrors[signal.id]}</span>
-                    )}
+                    <button
+                      className={styles.secondaryButton}
+                      type="button"
+                      onClick={() => void handleViewLedger(signal.id)}
+                      disabled={rowActionLoading[signal.id]}
+                    >
+                      {rowActionLoading[signal.id] ? "Opening…" : "View in Ledger"}
+                    </button>
                   </div>
                 )}
               </div>
               <div className={styles.rowMeta}>
+                <div className={styles.metaLabel}>Last evaluated</div>
                 <div>{formatDate(signal.updated_at)}</div>
                 <div className={styles.statusPill}>{STATUS_LABELS[signal.status] ?? signal.status}</div>
               </div>
@@ -829,7 +850,12 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
         }}
       >
         {detailLoading && <LoadingState label="Loading signal details…" />}
-        {detailErr && <ErrorState label={detailErr} />}
+        {detailErr?.status === 403 && (
+          <EmptyState title="Access restricted" description="You don’t have permission to view this signal." />
+        )}
+        {detailErr && detailErr.status !== 403 && (
+          <InlineAlert tone="error" title="Unable to load signal detail" description={detailErr.message} />
+        )}
 
         {!detailLoading && !detailErr && detail && (
           <div className={styles.detailContent}>
@@ -844,66 +870,10 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
             </div>
 
             <div className={styles.statusActions}>
-              <select
-                className={styles.select}
-                value={buildStatusValue(detail.id, detail.status)}
-                onChange={(event) =>
-                  setStatusSelections((prev) => ({
-                    ...prev,
-                    [detail.id]: event.target.value as SignalStatus,
-                  }))
-                }
-              >
-                <option value="open">Open</option>
-                <option value="in_progress">In progress</option>
-                <option value="resolved">Resolved</option>
-                <option value="ignored">Ignored</option>
-              </select>
-              <div className={styles.reasonField}>
-                <label className={styles.reasonLabel}>Resolution reason</label>
-                <textarea
-                  className={styles.reasonInput}
-                  placeholder="Add context for this status change…"
-                  rows={2}
-                  value={statusReasons[detail.id] ?? ""}
-                  onChange={(event) =>
-                    setStatusReasons((prev) => ({
-                      ...prev,
-                      [detail.id]: event.target.value,
-                    }))
-                  }
-                />
-              </div>
-              <button
-                className={styles.primaryButton}
-                type="button"
-                onClick={() => handleStatusUpdate(detail.id)}
-                disabled={statusSaving[detail.id]}
-              >
-                {statusSaving[detail.id] ? "Saving…" : "Update status"}
-              </button>
-              {detail && (
-                <Link
-                  className={styles.secondaryButton}
-                  to={`/app/${businessId}/assistant?signalId=${detail.id}`}
-                >
-                  Open in Assistant
-                </Link>
-              )}
-              {detail && (
-                <Link
-                  className={styles.secondaryButton}
-                  to={`/app/${businessId}/assistant?signalId=${detail.id}&createPlanSignalId=${detail.id}`}
-                >
-                  Create plan
-                </Link>
-              )}
+              <Chip tone="neutral">{STATUS_LABELS[detail.status] ?? detail.status}</Chip>
               {ledgerFilters && (
-                <Link
-                  className={styles.secondaryButton}
-                  to={ledgerPath(businessId, ledgerFilters)}
-                >
-                  Open ledger
+                <Link className={styles.secondaryButton} to={ledgerPath(businessId, ledgerFilters)}>
+                  View in Ledger
                 </Link>
               )}
               {primaryLedgerAnchor && (

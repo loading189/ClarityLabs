@@ -138,7 +138,7 @@ export default function SimulatorV2Page() {
                 <tr key={`${row.detector_id}:${row.signal_id}`}>
                   <td>{row.detector_id}</td>
                   <td>
-                    <Link to={`/app/${businessId}/assistant?signalId=${encodeURIComponent(row.signal_id)}`}>
+                    <Link to={`/app/${businessId}/signals?signal_id=${encodeURIComponent(row.signal_id)}`}>
                       {row.signal_id}
                     </Link>
                   </td>

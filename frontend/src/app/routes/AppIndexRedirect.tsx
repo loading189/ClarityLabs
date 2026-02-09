@@ -17,7 +17,7 @@ export default function AppIndexRedirect() {
           return;
         }
 
-        navigate(`/app/${candidate}/assistant`, { replace: true });
+        navigate(`/app/${candidate}/advisor`, { replace: true });
       } catch (e: any) {
         console.error("[AppIndexRedirect] failed", e);
         navigate("/businesses", { replace: true });

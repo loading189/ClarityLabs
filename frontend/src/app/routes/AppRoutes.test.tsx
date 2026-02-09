@@ -4,14 +4,12 @@ import { MemoryRouter, Outlet } from "react-router-dom";
 import { AppStateProvider } from "../state/appState";
 import AppRoutes from "./AppRoutes";
 
-const fetchDashboard = vi.fn().mockResolvedValue({ cards: [{ business_id: "11111111-1111-4111-8111-111111111111" }] });
-const fetchBusinessDashboard = vi
-  .fn()
-  .mockResolvedValue({ metadata: { business_id: "11111111-1111-4111-8111-111111111111" } });
+const fetchBusinessesMine = vi.fn().mockResolvedValue([
+  { business_id: "11111111-1111-4111-8111-111111111111", business_name: "Acme", role: "advisor" },
+]);
 
-vi.mock("../../api/demo", () => ({
-  fetchDashboard: (...args: unknown[]) => fetchDashboard(...args),
-  fetchBusinessDashboard: (...args: unknown[]) => fetchBusinessDashboard(...args),
+vi.mock("../../api/businesses", () => ({
+  fetchBusinessesMine: (...args: unknown[]) => fetchBusinessesMine(...args),
 }));
 
 vi.mock("../layout/AppLayout", () => ({
@@ -24,6 +22,7 @@ vi.mock("../layout/AppLayout", () => ({
 }));
 
 vi.mock("./AssistantPage", () => ({ default: () => <div>assistant-page</div> }));
+vi.mock("../../pages/AdvisorInboxPage", () => ({ default: () => <div>advisor-page</div> }));
 vi.mock("./DashboardPage", () => ({ default: () => <div>dashboard-page</div> }));
 vi.mock("./SignalsCenterPage", () => ({ default: () => <div>signals-page</div> }));
 vi.mock("../../features/ledger/LedgerPage", () => ({ default: () => <div>ledger-page</div> }));
@@ -53,14 +52,14 @@ function renderRoutes(path: string) {
 }
 
 describe("AppRoutes redirects", () => {
-  it("redirects workspace home to assistant", async () => {
+  it("redirects workspace home to advisor inbox", async () => {
     renderRoutes("/app/11111111-1111-4111-8111-111111111111/home");
-    await waitFor(() => expect(screen.getAllByText("assistant-page").length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getAllByText("advisor-page").length).toBeGreaterThan(0));
   });
 
-  it("redirects workspace health to assistant", async () => {
+  it("redirects workspace health to advisor inbox", async () => {
     renderRoutes("/app/11111111-1111-4111-8111-111111111111/health");
-    await waitFor(() => expect(screen.getAllByText("assistant-page").length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getAllByText("advisor-page").length).toBeGreaterThan(0));
   });
 
   it("redirects top-level assistant compatibility route", async () => {
@@ -68,14 +67,14 @@ describe("AppRoutes redirects", () => {
     await waitFor(() => expect(screen.getAllByText("assistant-page").length).toBeGreaterThan(0));
   });
 
-  it("redirects /app to assistant default route", async () => {
+  it("redirects /app to advisor default route", async () => {
     renderRoutes("/app");
-    await waitFor(() => expect(fetchDashboard).toHaveBeenCalled());
-    await waitFor(() => expect(screen.getAllByText("assistant-page").length).toBeGreaterThan(0));
+    await waitFor(() => expect(fetchBusinessesMine).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getAllByText("advisor-page").length).toBeGreaterThan(0));
   });
 
-  it("redirects /app/:businessId to assistant", async () => {
+  it("redirects /app/:businessId to advisor", async () => {
     renderRoutes("/app/11111111-1111-4111-8111-111111111111");
-    await waitFor(() => expect(screen.getAllByText("assistant-page").length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getAllByText("advisor-page").length).toBeGreaterThan(0));
   });
 });

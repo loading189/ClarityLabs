@@ -5,8 +5,8 @@ export default function AssistantRoutePage() {
   return (
     <div>
       <PageHeader
-        title="Assistant"
-        subtitle="Summarize live alerts and inspect deterministic signal explanations."
+        title="Summary"
+        subtitle="Recent changes across signals and actions, with links to evidence and work."
       />
       <AssistantPage />
     </div>

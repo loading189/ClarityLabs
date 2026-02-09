@@ -3,13 +3,14 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.app.api.deps import get_current_user, require_membership_dep
 from backend.app.db import get_db
-from backend.app.models import User
+from backend.app.models import BusinessMembership, User
 from backend.app.services.plan_service import (
     PLAN_CONDITION_DIRECTIONS,
     PLAN_CONDITION_TYPES,
@@ -22,6 +23,7 @@ from backend.app.services.plan_service import (
     create_plan,
     get_plan_detail,
     list_plans,
+    list_plan_summaries,
     refresh_plan,
 )
 
@@ -170,12 +172,33 @@ class PlanDetailOut(BaseModel):
     plan: PlanOut
     conditions: List[PlanConditionOut]
     latest_observation: Optional[PlanObservationOut]
+    observations: List[PlanObservationOut]
     state_events: List[PlanStateEventOut]
 
 
 class PlanRefreshOut(BaseModel):
     observation: PlanObservationOut
     success_candidate: bool
+
+
+class PlanSummaryIn(BaseModel):
+    plan_ids: List[str] = Field(default_factory=list)
+
+
+class PlanSummaryOut(BaseModel):
+    id: str
+    business_id: str
+    title: str
+    status: str
+    assigned_to_user_id: Optional[str]
+    latest_observation: Optional[PlanObservationOut]
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, value: str) -> str:
+        if value not in PLAN_STATUSES:
+            raise ValueError("invalid plan status")
+        return value
 
 
 @router.post("", response_model=PlanDetailOut, dependencies=[Depends(require_membership_dep(min_role="staff"))])
@@ -197,11 +220,12 @@ def post_plan(
         conditions=[condition.model_dump() for condition in req.conditions],
     )
     db.commit()
-    plan, conditions, latest_observation, events = get_plan_detail(db, req.business_id, plan.id)
+    plan, conditions, latest_observation, observations, events = get_plan_detail(db, req.business_id, plan.id)
     return PlanDetailOut(
         plan=PlanOut.model_validate(plan),
         conditions=[PlanConditionOut.model_validate(condition) for condition in conditions],
         latest_observation=PlanObservationOut.model_validate(latest_observation) if latest_observation else None,
+        observations=[PlanObservationOut.model_validate(observation) for observation in observations],
         state_events=[PlanStateEventOut.model_validate(event) for event in events],
     )
 
@@ -230,11 +254,12 @@ def get_plan(
     business_id: str = Query(...),
     db: Session = Depends(get_db),
 ):
-    plan, conditions, latest_observation, events = get_plan_detail(db, business_id, plan_id)
+    plan, conditions, latest_observation, observations, events = get_plan_detail(db, business_id, plan_id)
     return PlanDetailOut(
         plan=PlanOut.model_validate(plan),
         conditions=[PlanConditionOut.model_validate(condition) for condition in conditions],
         latest_observation=PlanObservationOut.model_validate(latest_observation) if latest_observation else None,
+        observations=[PlanObservationOut.model_validate(observation) for observation in observations],
         state_events=[PlanStateEventOut.model_validate(event) for event in events],
     )
 
@@ -248,11 +273,12 @@ def post_activate_plan(
 ):
     activate_plan(db, business_id, plan_id, user.id)
     db.commit()
-    plan, conditions, latest_observation, events = get_plan_detail(db, business_id, plan_id)
+    plan, conditions, latest_observation, observations, events = get_plan_detail(db, business_id, plan_id)
     return PlanDetailOut(
         plan=PlanOut.model_validate(plan),
         conditions=[PlanConditionOut.model_validate(condition) for condition in conditions],
         latest_observation=PlanObservationOut.model_validate(latest_observation) if latest_observation else None,
+        observations=[PlanObservationOut.model_validate(observation) for observation in observations],
         state_events=[PlanStateEventOut.model_validate(event) for event in events],
     )
 
@@ -267,11 +293,12 @@ def post_assign_plan(
 ):
     assign_plan(db, business_id, plan_id, user.id, req.assigned_to_user_id)
     db.commit()
-    plan, conditions, latest_observation, events = get_plan_detail(db, business_id, plan_id)
+    plan, conditions, latest_observation, observations, events = get_plan_detail(db, business_id, plan_id)
     return PlanDetailOut(
         plan=PlanOut.model_validate(plan),
         conditions=[PlanConditionOut.model_validate(condition) for condition in conditions],
         latest_observation=PlanObservationOut.model_validate(latest_observation) if latest_observation else None,
+        observations=[PlanObservationOut.model_validate(observation) for observation in observations],
         state_events=[PlanStateEventOut.model_validate(event) for event in events],
     )
 
@@ -286,11 +313,12 @@ def post_note_plan(
 ):
     add_plan_note(db, business_id, plan_id, user.id, req.note)
     db.commit()
-    plan, conditions, latest_observation, events = get_plan_detail(db, business_id, plan_id)
+    plan, conditions, latest_observation, observations, events = get_plan_detail(db, business_id, plan_id)
     return PlanDetailOut(
         plan=PlanOut.model_validate(plan),
         conditions=[PlanConditionOut.model_validate(condition) for condition in conditions],
         latest_observation=PlanObservationOut.model_validate(latest_observation) if latest_observation else None,
+        observations=[PlanObservationOut.model_validate(observation) for observation in observations],
         state_events=[PlanStateEventOut.model_validate(event) for event in events],
     )
 
@@ -320,10 +348,49 @@ def post_close_plan(
 ):
     close_plan(db, business_id, plan_id, user.id, outcome=req.outcome, note=req.note)
     db.commit()
-    plan, conditions, latest_observation, events = get_plan_detail(db, business_id, plan_id)
+    plan, conditions, latest_observation, observations, events = get_plan_detail(db, business_id, plan_id)
     return PlanDetailOut(
         plan=PlanOut.model_validate(plan),
         conditions=[PlanConditionOut.model_validate(condition) for condition in conditions],
         latest_observation=PlanObservationOut.model_validate(latest_observation) if latest_observation else None,
+        observations=[PlanObservationOut.model_validate(observation) for observation in observations],
         state_events=[PlanStateEventOut.model_validate(event) for event in events],
     )
+
+
+@router.post("/summary", response_model=List[PlanSummaryOut])
+def post_plan_summaries(
+    req: PlanSummaryIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    plan_ids = [plan_id for plan_id in req.plan_ids if plan_id]
+    if not plan_ids:
+        return []
+    summaries = list_plan_summaries(db, plan_ids)
+    if not summaries:
+        return []
+    business_ids = {plan.business_id for plan, _ in summaries}
+    memberships = (
+        db.execute(
+            select(BusinessMembership.business_id).where(
+                BusinessMembership.user_id == user.id,
+                BusinessMembership.business_id.in_(business_ids),
+            )
+        )
+        .scalars()
+        .all()
+    )
+    if business_ids - set(memberships):
+        raise HTTPException(status_code=403, detail="membership required")
+    return [
+        PlanSummaryOut(
+            id=plan.id,
+            business_id=plan.business_id,
+            title=plan.title,
+            status=plan.status,
+            assigned_to_user_id=plan.assigned_to_user_id,
+            latest_observation=PlanObservationOut.model_validate(observation) if observation else None,
+        )
+        for plan, observation in summaries
+    ]

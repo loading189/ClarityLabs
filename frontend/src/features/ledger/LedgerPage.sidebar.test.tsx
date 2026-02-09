@@ -15,8 +15,11 @@ vi.mock("../../api/ledger", () => ({
   fetchLedgerAccountDimensions: (...args: unknown[]) => fetchLedgerAccountDimensions(...args),
   fetchLedgerVendorDimensions: (...args: unknown[]) => fetchLedgerVendorDimensions(...args),
 }));
+vi.mock("../../app/auth/AuthContext", () => ({
+  useAuth: () => ({ logout: vi.fn() }),
+}));
 
-const BIZ_ID = "11111111-1111-1111-1111-111111111111";
+const BIZ_ID = "11111111-1111-4111-8111-111111111111";
 
 function renderPage(path = `/app/${BIZ_ID}/ledger`) {
   return render(

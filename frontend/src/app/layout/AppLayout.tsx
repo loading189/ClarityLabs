@@ -8,25 +8,16 @@ import ErrorBoundary from "../../components/common/ErrorBoundary";
 import { useFilters } from "../filters/useFilters";
 import { buildSearchParams, resolveDateRange } from "../filters/filters";
 import BusinessSwitcher from "../../components/business/BusinessSwitcher";
+import { useAuth } from "../auth/AuthContext";
 
 type NavItem = { label: string; path: string };
+type NavSectionItem = { title: string; items: NavItem[] };
 
-const primaryNav: NavItem[] = [
-  { label: "Assistant", path: "assistant" },
-  { label: "Advisor Inbox", path: "advisor" },
-  { label: "Signals", path: "signals" },
-  { label: "Ledger", path: "ledger" },
-];
-
-const toolsNav: NavItem[] = [
-  { label: "Categorize", path: "categorize" },
-  { label: "Rules", path: "rules" },
-  { label: "Vendors", path: "vendors" },
-  { label: "Integrations", path: "integrations" },
-  { label: "Trends", path: "trends" },
-  { label: "Settings", path: "settings" },
-  { label: "Simulator", path: "admin/simulator" },
-  { label: "Dashboard", path: "dashboard" },
+const navSections: NavSectionItem[] = [
+  { title: "Work", items: [{ label: "Inbox", path: "advisor" }] },
+  { title: "Observe", items: [{ label: "Signals", path: "signals" }] },
+  { title: "Verify", items: [{ label: "Ledger", path: "ledger" }] },
+  { title: "Explain", items: [{ label: "Summary", path: "summary" }] },
 ];
 
 
@@ -65,6 +56,7 @@ export default function AppLayout() {
   const { businessId: businessIdParam } = useParams();
   const businessId = assertBusinessId(businessIdParam, "AppLayout");
   const { setActiveBusinessId, setDateRange } = useAppState();
+  const { user, logout } = useAuth();
   const [filters] = useFilters();
   const resolvedRange = useMemo(() => resolveDateRange(filters), [filters]);
   const navSearch = useMemo(() => {
@@ -109,23 +101,15 @@ export default function AppLayout() {
             <div className={styles.brandMeta}>Workspace</div>
           </div>
         </div>
-        <BusinessSwitcher />
-
-        <NavSection title="Workspace" items={primaryNav} businessId={businessId} search={navSearch} />
-        <details className={styles.toolsDropdown} open>
-          <summary className={styles.toolsSummary}>Tools</summary>
-          <div className={styles.navItems}>
-            {toolsNav.map((item) => (
-              <NavLink
-                key={item.path}
-                to={`/app/${businessId}/${item.path}${navSearch}`}
-                className={({ isActive }) => `${styles.navItem} ${isActive ? styles.navItemActive : ""}`}
-              >
-                <span className={styles.navLabel}>{item.label}</span>
-              </NavLink>
-            ))}
-          </div>
-        </details>
+        {navSections.map((section) => (
+          <NavSection
+            key={section.title}
+            title={section.title}
+            items={section.items}
+            businessId={businessId}
+            search={navSearch}
+          />
+        ))}
       </aside>
 
       <div className={styles.main}>
@@ -133,6 +117,13 @@ export default function AppLayout() {
           <div>
             <div className={styles.topbarTitle}>Financial intelligence workspace</div>
             <div className={styles.topbarSubtitle}>Observe → Investigate → Correct → Operate</div>
+          </div>
+          <div className={styles.topbarActions}>
+            <BusinessSwitcher />
+            <a className={styles.manageLink} href="/businesses">Manage businesses</a>
+            <button type="button" className={styles.userChip} onClick={logout}>
+              {user?.name ?? user?.email ?? "Signed in"}
+            </button>
           </div>
         </header>
         <main className={styles.content}>

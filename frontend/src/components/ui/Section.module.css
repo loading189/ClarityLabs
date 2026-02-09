@@ -1,0 +1,9 @@
+.section {
+  display: grid;
+  gap: 12px;
+}
+
+.body {
+  display: grid;
+  gap: 12px;
+}

@@ -8,20 +8,28 @@ import {
   closePlan,
   getPlanDetail,
   refreshPlan,
-  type PlanDetail,
   type PlanCloseOutcome,
+  type PlanDetail,
   type PlanObservation,
 } from "../../api/plansV2";
+import { ApiError } from "../../api/client";
+import { useAuth } from "../../app/auth/AuthContext";
+import { Button, Card, Chip, EmptyState, InlineAlert, LoadingState, Section } from "../../components/ui";
+import {
+  formatObservationSummary,
+  formatObservationWindow,
+  formatPlanStatus,
+  formatVerdict,
+  planStatusTone,
+  verdictTone,
+} from "./planSummary";
 import styles from "./PlanDetailDrawer.module.css";
+
+type LoadError = { message: string; status?: number };
 
 function formatTimestamp(value?: string | null) {
   if (!value) return "—";
   return new Date(value).toLocaleString();
-}
-
-function formatNumber(value?: number | null) {
-  if (value === null || value === undefined || Number.isNaN(value)) return "—";
-  return value.toFixed(2);
 }
 
 export default function PlanDetailDrawer({
@@ -37,10 +45,12 @@ export default function PlanDetailDrawer({
   onClose: () => void;
   onUpdated?: () => void;
 }) {
+  const { logout } = useAuth();
   const [detail, setDetail] = useState<PlanDetail | null>(null);
   const [members, setMembers] = useState<BusinessMember[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<LoadError | null>(null);
+  const [latestObservationOverride, setLatestObservationOverride] = useState<PlanObservation | null>(null);
   const [note, setNote] = useState("");
   const [closeOutcome, setCloseOutcome] = useState<PlanCloseOutcome>("succeeded");
   const [closeNote, setCloseNote] = useState("");
@@ -53,11 +63,15 @@ export default function PlanDetailDrawer({
       const response = await getPlanDetail(businessId, planId);
       setDetail(response);
     } catch (err: any) {
-      setError(err?.message ?? "Failed to load plan");
+      if (err instanceof ApiError && err.status === 401) {
+        logout();
+        return;
+      }
+      setError({ message: err?.message ?? "Failed to load plan", status: err?.status });
     } finally {
       setLoading(false);
     }
-  }, [businessId, planId]);
+  }, [businessId, logout, planId]);
 
   const loadMembers = useCallback(async () => {
     if (!businessId) return;
@@ -65,9 +79,13 @@ export default function PlanDetailDrawer({
       const response = await fetchBusinessMembers(businessId);
       setMembers(response ?? []);
     } catch (err: any) {
-      setError(err?.message ?? "Failed to load members");
+      if (err instanceof ApiError && err.status === 401) {
+        logout();
+        return;
+      }
+      setError({ message: err?.message ?? "Failed to load members", status: err?.status });
     }
-  }, [businessId]);
+  }, [businessId, logout]);
 
   useEffect(() => {
     if (!open) return;
@@ -80,10 +98,12 @@ export default function PlanDetailDrawer({
     setNote("");
     setCloseNote("");
     setError(null);
+    setLatestObservationOverride(null);
   }, [open, planId]);
 
   const plan = detail?.plan;
-  const latestObservation: PlanObservation | null = detail?.latest_observation ?? null;
+  const latestObservation: PlanObservation | null =
+    latestObservationOverride ?? detail?.latest_observation ?? null;
 
   const conditionSummary = useMemo(() => {
     if (!detail?.conditions?.length) return "No conditions configured.";
@@ -97,6 +117,18 @@ export default function PlanDetailDrawer({
       .join(" ");
   }, [detail?.conditions]);
 
+  const assignedMember = members.find((member) => member.id === plan?.assigned_to_user_id);
+  const assignedLabel = assignedMember?.name ?? assignedMember?.email ?? "Unassigned";
+
+  const orderedObservations = useMemo(() => {
+    if (!detail?.observations) return [];
+    return [...detail.observations].sort((a, b) => {
+      const aTime = a.observed_at ? new Date(a.observed_at).getTime() : 0;
+      const bTime = b.observed_at ? new Date(b.observed_at).getTime() : 0;
+      return aTime - bTime;
+    });
+  }, [detail?.observations]);
+
   const handleActivate = async () => {
     if (!planId || !businessId) return;
     setError(null);
@@ -105,7 +137,11 @@ export default function PlanDetailDrawer({
       await loadPlan();
       onUpdated?.();
     } catch (err: any) {
-      setError(err?.message ?? "Failed to activate plan");
+      if (err instanceof ApiError && err.status === 401) {
+        logout();
+        return;
+      }
+      setError({ message: err?.message ?? "Failed to activate plan", status: err?.status });
     }
   };
 
@@ -113,11 +149,25 @@ export default function PlanDetailDrawer({
     if (!planId || !businessId) return;
     setError(null);
     try {
-      await refreshPlan(businessId, planId);
-      await loadPlan();
+      const response = await refreshPlan(businessId, planId);
+      setLatestObservationOverride(response.observation);
+      setDetail((current) => {
+        if (!current) return current;
+        const nextObservation = response.observation;
+        const existing = current.observations.filter((obs) => obs.id !== nextObservation.id);
+        return {
+          ...current,
+          latest_observation: nextObservation,
+          observations: [nextObservation, ...existing],
+        };
+      });
       onUpdated?.();
     } catch (err: any) {
-      setError(err?.message ?? "Failed to refresh plan");
+      if (err instanceof ApiError && err.status === 401) {
+        logout();
+        return;
+      }
+      setError({ message: err?.message ?? "Failed to refresh plan", status: err?.status });
     }
   };
 
@@ -131,7 +181,11 @@ export default function PlanDetailDrawer({
       await loadPlan();
       onUpdated?.();
     } catch (err: any) {
-      setError(err?.message ?? "Failed to update assignment");
+      if (err instanceof ApiError && err.status === 401) {
+        logout();
+        return;
+      }
+      setError({ message: err?.message ?? "Failed to update assignment", status: err?.status });
     }
   };
 
@@ -144,7 +198,11 @@ export default function PlanDetailDrawer({
       await loadPlan();
       onUpdated?.();
     } catch (err: any) {
-      setError(err?.message ?? "Failed to add note");
+      if (err instanceof ApiError && err.status === 401) {
+        logout();
+        return;
+      }
+      setError({ message: err?.message ?? "Failed to add note", status: err?.status });
     }
   };
 
@@ -152,87 +210,99 @@ export default function PlanDetailDrawer({
     if (!planId || !businessId) return;
     setError(null);
     try {
-      await closePlan(businessId, planId, { outcome: closeOutcome, note: closeNote || undefined });
-      await loadPlan();
+      const response = await closePlan(businessId, planId, { outcome: closeOutcome, note: closeNote || undefined });
+      setDetail(response);
       onUpdated?.();
     } catch (err: any) {
-      setError(err?.message ?? "Failed to close plan");
+      if (err instanceof ApiError && err.status === 401) {
+        logout();
+        return;
+      }
+      setError({ message: err?.message ?? "Failed to close plan", status: err?.status });
     }
   };
 
   return (
     <Drawer open={open} title={plan?.title ?? "Plan detail"} onClose={onClose}>
       <div className={styles.content}>
-        {error && <div className={styles.error}>{error}</div>}
-        {loading && <div className={styles.muted}>Loading plan details…</div>}
+        {error?.status === 403 && (
+          <EmptyState title="You don’t have access" description="Ask an admin to grant plan access." />
+        )}
+        {error && error.status !== 403 && (
+          <InlineAlert tone="error" title="Plan update failed" description={error.message} />
+        )}
+        {loading && <LoadingState label="Loading plan details…" rows={3} />}
 
         {plan && (
           <>
-            <div className={styles.section}>
-              <div className={styles.label}>Intent</div>
-              <div className={styles.text}>{plan.intent}</div>
-            </div>
-
-            <div className={styles.section}>
-              <div className={styles.label}>Assignment</div>
-              <div className={styles.row}>
-                <select
-                  className={styles.select}
-                  value={plan.assigned_to_user_id ?? ""}
-                  onChange={(event) => handleAssign(event.target.value)}
-                >
-                  <option value="">Unassigned</option>
-                  {members.map((member) => (
-                    <option key={member.id} value={member.id}>
-                      {member.name ?? member.email} · {member.role}
-                    </option>
-                  ))}
-                </select>
+            <div className={styles.header}>
+              <div>
+                <div className={styles.title}>{plan.title}</div>
+                <div className={styles.subtitle}>Assigned to {assignedLabel}</div>
               </div>
+              <Chip tone={planStatusTone(plan.status)}>{formatPlanStatus(plan.status)}</Chip>
             </div>
 
-            <div className={styles.section}>
-              <div className={styles.label}>Status</div>
-              <div className={styles.text}>
-                {plan.status} · Created {formatTimestamp(plan.created_at)}
-              </div>
-              {plan.activated_at && <div className={styles.muted}>Activated {formatTimestamp(plan.activated_at)}</div>}
-              {plan.closed_at && <div className={styles.muted}>Closed {formatTimestamp(plan.closed_at)}</div>}
-            </div>
-
-            <div className={styles.section}>
-              <div className={styles.label}>Conditions</div>
-              <div className={styles.text}>{conditionSummary}</div>
-            </div>
-
-            <div className={styles.section}>
-              <div className={styles.label}>Latest observation</div>
-              {latestObservation ? (
-                <div className={styles.text}>
-                  Verdict: {latestObservation.verdict} · Baseline {formatNumber(latestObservation.metric_baseline)} →
-                  {" "}
-                  {formatNumber(latestObservation.metric_value)} (Δ {formatNumber(latestObservation.metric_delta)})
+            <Section title="Latest outcome" subtitle="Most recent observation summary and verdict.">
+              <Card className={styles.outcomeCard}>
+                <div className={styles.outcomeSummary}>
+                  {formatObservationSummary(latestObservation, detail.conditions)}
                 </div>
-              ) : (
-                <div className={styles.muted}>No observations recorded yet.</div>
-              )}
-            </div>
+                <div className={styles.outcomeMeta}>
+                  <Chip tone={verdictTone(latestObservation?.verdict)}>{formatVerdict(latestObservation?.verdict)}</Chip>
+                  <span>Last checked {formatTimestamp(latestObservation?.observed_at)}</span>
+                  <span>Window {formatObservationWindow(latestObservation)}</span>
+                </div>
+              </Card>
+            </Section>
 
-            <div className={styles.actions}>
-              {plan.status === "draft" && (
-                <button type="button" className={styles.primaryButton} onClick={handleActivate}>
-                  Activate plan
-                </button>
-              )}
-              {plan.status === "active" && (
-                <button type="button" className={styles.secondaryButton} onClick={handleRefresh}>
-                  Refresh observation
-                </button>
-              )}
-            </div>
+            <Section title="Primary actions">
+              <div className={styles.actions}>
+                {plan.status === "draft" && (
+                  <Button variant="primary" onClick={handleActivate}>
+                    Activate plan
+                  </Button>
+                )}
+                {plan.status === "active" && (
+                  <Button variant="secondary" onClick={handleRefresh}>
+                    Refresh
+                  </Button>
+                )}
+                <Button variant="secondary" onClick={handleAddNote}>
+                  Add note
+                </Button>
+                {plan.status !== "succeeded" && plan.status !== "failed" && plan.status !== "canceled" && (
+                  <Button variant="ghost" onClick={handleClose}>
+                    Close plan
+                  </Button>
+                )}
+              </div>
+            </Section>
 
-            <div className={styles.section}>
-              <div className={styles.label}>Add note</div>
+            <Section title="Intent">
+              <Card className={styles.textCard}>{plan.intent}</Card>
+            </Section>
+
+            <Section title="Conditions">
+              <Card className={styles.textCard}>{conditionSummary}</Card>
+            </Section>
+
+            <Section title="Assignment">
+              <select
+                className={styles.select}
+                value={plan.assigned_to_user_id ?? ""}
+                onChange={(event) => handleAssign(event.target.value)}
+              >
+                <option value="">Unassigned</option>
+                {members.map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.name ?? member.email} · {member.role}
+                  </option>
+                ))}
+              </select>
+            </Section>
+
+            <Section title="Add note">
               <textarea
                 className={styles.input}
                 rows={3}
@@ -240,15 +310,11 @@ export default function PlanDetailDrawer({
                 onChange={(event) => setNote(event.target.value)}
                 placeholder="Add advisor note"
               />
-              <button type="button" className={styles.secondaryButton} onClick={handleAddNote}>
-                Add note
-              </button>
-            </div>
+            </Section>
 
             {plan.status !== "succeeded" && plan.status !== "failed" && plan.status !== "canceled" && (
-              <div className={styles.section}>
-                <div className={styles.label}>Close plan</div>
-                <div className={styles.row}>
+              <Section title="Close plan">
+                <div className={styles.closeRow}>
                   <select
                     className={styles.select}
                     value={closeOutcome}
@@ -258,23 +324,47 @@ export default function PlanDetailDrawer({
                     <option value="failed">Failed</option>
                     <option value="canceled">Canceled</option>
                   </select>
-                  <button type="button" className={styles.secondaryButton} onClick={handleClose}>
-                    Close plan
-                  </button>
+                  <textarea
+                    className={styles.input}
+                    rows={2}
+                    value={closeNote}
+                    onChange={(event) => setCloseNote(event.target.value)}
+                    placeholder="Optional close note"
+                  />
                 </div>
-                <textarea
-                  className={styles.input}
-                  rows={2}
-                  value={closeNote}
-                  onChange={(event) => setCloseNote(event.target.value)}
-                  placeholder="Optional close note"
-                />
-              </div>
+              </Section>
             )}
 
-            <div className={styles.section}>
-              <div className={styles.label}>Audit trail</div>
-              {detail.state_events.length === 0 && <div className={styles.muted}>No events logged yet.</div>}
+            <Section title="Observation history" subtitle="Chronological tracking of plan checks.">
+              <div className={styles.historyHeader}>
+                Last checked {formatTimestamp(latestObservation?.observed_at)}
+              </div>
+              {detail.observations.length === 0 && (
+                <EmptyState
+                  title="No observations yet"
+                  description="Run a refresh to capture the first observation." 
+                />
+              )}
+              <div className={styles.historyList}>
+                {orderedObservations.map((observation) => (
+                  <Card key={observation.id} className={styles.historyItem}>
+                    <div className={styles.historySummary}>
+                      {formatObservationSummary(observation, detail.conditions)}
+                    </div>
+                    <div className={styles.historyMeta}>
+                      <Chip tone={verdictTone(observation.verdict)}>{formatVerdict(observation.verdict)}</Chip>
+                      <span>{formatTimestamp(observation.observed_at)}</span>
+                      <span>Window {formatObservationWindow(observation)}</span>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </Section>
+
+            <Section title="Plan events" subtitle="Audit trail for the plan lifecycle.">
+              {detail.state_events.length === 0 && (
+                <EmptyState title="No events logged yet" description="Plan activity will appear here." />
+              )}
               <div className={styles.auditList}>
                 {detail.state_events.map((event) => (
                   <div key={event.id} className={styles.auditItem}>
@@ -287,7 +377,7 @@ export default function PlanDetailDrawer({
                   </div>
                 ))}
               </div>
-            </div>
+            </Section>
           </>
         )}
       </div>

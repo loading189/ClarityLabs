@@ -43,7 +43,7 @@ export default function BusinessSelectPage() {
     const id = assertBusinessId(rawId, "BusinessSelectPage");
     if (!id) return;
     setActiveBusinessId(id);
-    navigate(`/app/${id}/assistant`);
+    navigate(`/app/${id}/summary`);
   };
 
   const handleCreate = async () => {
@@ -57,7 +57,7 @@ export default function BusinessSelectPage() {
       const created = await createBusiness({ name: newName.trim() });
       setActiveBusinessId(created.business.id);
       await reload();
-      navigate(`/app/${created.business.id}/assistant`);
+      navigate(`/app/${created.business.id}/summary`);
     } catch (err: any) {
       setCreateErr(err?.message ?? "Failed to create business");
     } finally {

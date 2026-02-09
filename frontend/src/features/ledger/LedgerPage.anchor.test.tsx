@@ -20,6 +20,9 @@ vi.mock("../../api/ledger", () => ({
 vi.mock("../../api/transactions", () => ({
   fetchTransactionDetail: (...args: unknown[]) => fetchTransactionDetail(...args),
 }));
+vi.mock("../../app/auth/AuthContext", () => ({
+  useAuth: () => ({ logout: vi.fn() }),
+}));
 
 const BIZ_ID = "11111111-1111-4111-8111-111111111111";
 

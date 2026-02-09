@@ -49,18 +49,23 @@
 }
 
 .filters { display: flex; gap: 12px; flex-wrap: wrap; }
+.microcopy {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: -4px;
+}
 .filterField,.legacyToggle { display: flex; flex-direction: column; font-size: 12px; color: var(--text-muted); gap: 6px; }
 .legacyToggle input { width: 16px; height: 16px; }
 .legacyNote { font-size: 12px; color: var(--text-muted); background: var(--surface-muted); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 12px; }
 .select { border: 1px solid var(--input-border); border-radius: var(--radius-sm); padding: 6px 10px; font-size: 12px; min-width: 140px; background: var(--input-bg); color: var(--text); }
 
-.list { display: grid; gap: 8px; }
+.list { display: grid; gap: 10px; }
 .row {
-  display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 12px; align-items: center;
-  border: 1px solid var(--border); border-radius: var(--radius-md); padding: 10px 12px;
-  background: var(--card-bg); text-align: left; cursor: pointer;
+  display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 14px; align-items: center;
+  border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px 14px;
+  background: var(--surface); text-align: left; cursor: pointer;
 }
-.row:hover { background: var(--surface-2); }
+.row:hover { background: var(--surface-muted); }
 .rowDisabled { opacity: .7; cursor: not-allowed; }
 .rowActive { border-color: var(--btn-primary-border); box-shadow: 0 0 0 1px var(--btn-primary-border); }
 
@@ -75,15 +80,8 @@
 .rowDomain { font-size: 11px; color: var(--text-soft); text-transform: uppercase; letter-spacing: .04em; }
 .rowSummary { font-size: 12px; color: var(--text-muted); }
 .rowActions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
-.rowSelect {
-  border: 1px solid var(--input-border);
-  border-radius: var(--radius-sm);
-  padding: 4px 8px;
-  font-size: 11px;
-  background: var(--input-bg);
-  color: var(--text);
-}
 .rowMeta { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; font-size: 11px; color: var(--text-muted); }
+.metaLabel { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-soft); }
 .statusPill { border: 1px solid var(--pill-border); border-radius: var(--radius-pill); padding: 3px 8px; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--pill-text); background: var(--pill-bg); }
 .empty { font-size: 12px; color: var(--text-muted); padding: 12px; border: 1px dashed var(--border); border-radius: var(--radius-sm); }
 
@@ -91,18 +89,7 @@
 .detailTitle { font-size: 16px; font-weight: 600; }
 .detailSummary { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
 .detailMeta { display: flex; gap: 16px; font-size: 12px; color: var(--text-muted); margin-top: 8px; }
-.statusActions { display: flex; gap: 8px; flex-wrap: wrap; }
-.reasonField { display: flex; flex-direction: column; gap: 6px; min-width: 220px; }
-.reasonLabel { font-size: 11px; color: var(--text-muted); }
-.reasonInput {
-  border: 1px solid var(--input-border);
-  border-radius: var(--radius-sm);
-  padding: 6px 8px;
-  font-size: 12px;
-  background: var(--input-bg);
-  color: var(--text);
-  min-height: 48px;
-}
+.statusActions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .primaryButton,.secondaryButton,.loadMore {
   border: 1px solid var(--btn-border); border-radius: var(--radius-sm); padding: 6px 12px; font-size: 12px; cursor: pointer;
 }

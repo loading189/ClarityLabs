@@ -50,7 +50,7 @@ export default function DashboardPage() {
       <NextActionsPanel businessId={businessId} />
 
       <div className={styles.tableCard} style={{ marginBottom: 12 }}>
-        Assistant is now the primary workspace view. <Link to={`/app/${businessId}/assistant`}>Open Assistant</Link> for live signal triage and explain workflows.
+        Summary is now the primary workspace view. <Link to={`/app/${businessId}/summary`}>Open Summary</Link> for recent changes across signals and actions.
       </div>
 
       {loading && <LoadingState label="Loading dashboard metrics…" />}
