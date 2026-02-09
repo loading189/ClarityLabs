@@ -67,7 +67,7 @@ describe("BusinessSelectPage", () => {
     fireEvent.click(screen.getByText("Create business"));
 
     await waitFor(() => expect(createBusiness).toHaveBeenCalledWith({ name: "New Biz" }));
-    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith("/app/b2/assistant"));
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith("/app/b2/summary"));
   });
 
   it("allows delete when flag enabled and user is owner", async () => {

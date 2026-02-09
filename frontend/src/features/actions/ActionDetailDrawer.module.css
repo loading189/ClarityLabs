@@ -71,6 +71,11 @@
   background: var(--surface-muted);
 }
 
+.planHelp {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 .planHeader {
   display: flex;
   justify-content: space-between;

@@ -11,11 +11,13 @@ import BusinessSwitcher from "../../components/business/BusinessSwitcher";
 import { useAuth } from "../auth/AuthContext";
 
 type NavItem = { label: string; path: string };
+type NavSectionItem = { title: string; items: NavItem[] };
 
-const primaryNav: NavItem[] = [
-  { label: "Inbox", path: "advisor" },
-  { label: "Signals", path: "signals" },
-  { label: "Ledger", path: "ledger" },
+const navSections: NavSectionItem[] = [
+  { title: "Work", items: [{ label: "Inbox", path: "advisor" }] },
+  { title: "Observe", items: [{ label: "Signals", path: "signals" }] },
+  { title: "Verify", items: [{ label: "Ledger", path: "ledger" }] },
+  { title: "Explain", items: [{ label: "Summary", path: "summary" }] },
 ];
 
 
@@ -99,7 +101,15 @@ export default function AppLayout() {
             <div className={styles.brandMeta}>Workspace</div>
           </div>
         </div>
-        <NavSection title="Workspace" items={primaryNav} businessId={businessId} search={navSearch} />
+        {navSections.map((section) => (
+          <NavSection
+            key={section.title}
+            title={section.title}
+            items={section.items}
+            businessId={businessId}
+            search={navSearch}
+          />
+        ))}
       </aside>
 
       <div className={styles.main}>
