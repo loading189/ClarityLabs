@@ -30,7 +30,7 @@ const getSignalDetail = vi.fn().mockImplementation((_biz: string, signalId: stri
     updated_at: null,
   })
 );
-const getSignalExplain = vi.fn().mockResolvedValue({ clear_condition: { summary: "ok", type: "threshold" } });
+const getSignalExplain = vi.fn().mockResolvedValue({ clear_condition: { summary: "ok", type: "threshold" }, ledger_anchors: [] });
 const fetchHealthScore = vi.fn().mockResolvedValue({ business_id: "biz-1", score: 50, generated_at: new Date().toISOString(), domains: [], contributors: [], meta: {} });
 const getMonitorStatus = vi.fn().mockResolvedValue({
   business_id: "biz-1",
@@ -49,7 +49,6 @@ vi.mock("../../api/signals", () => ({
   listSignalStates: (...args: unknown[]) => listSignalStates(...args),
   getSignalDetail: (...args: unknown[]) => getSignalDetail(...args),
   getSignalExplain: (...args: unknown[]) => getSignalExplain(...args),
-  updateSignalStatus: vi.fn(),
   fetchSignals: vi.fn(),
 }));
 vi.mock("../../api/healthScore", () => ({ fetchHealthScore: (...args: unknown[]) => fetchHealthScore(...args) }));

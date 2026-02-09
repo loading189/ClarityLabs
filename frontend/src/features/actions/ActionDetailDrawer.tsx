@@ -88,6 +88,14 @@ function formatTimestamp(value?: string | null) {
   return new Date(value).toLocaleString();
 }
 
+function formatPriority(priority?: number | null) {
+  if (!priority) return "—";
+  if (priority >= 5) return "Critical";
+  if (priority >= 4) return "High";
+  if (priority >= 3) return "Medium";
+  return "Low";
+}
+
 export default function ActionDetailDrawer({
   open,
   action,
@@ -424,6 +432,11 @@ export default function ActionDetailDrawer({
   const canCreatePlan = Boolean(businessId && actionId);
   const canViewPlan = Boolean(planId && businessId);
   const canRefreshPlan = Boolean(planId && businessId && planDetail?.plan.status === "active");
+  const planHelpText = !canCreatePlan
+    ? "Plan actions need a business and action id."
+    : !planIntent.trim() && !planId
+      ? "Add a plan intent to enable plan creation."
+      : null;
   const handleOpenPlan = async () => {
     if (!canViewPlan) return;
     if (!planDetail) {
@@ -447,11 +460,46 @@ export default function ActionDetailDrawer({
             />
           )}
 
-          <Section title="Summary" subtitle="What happened and why it matters.">
+          <Section title="Ownership & status" subtitle="Who owns this case and where it stands.">
             <Card className={styles.card}>
               <div className={styles.summaryText}>{action.summary}</div>
               <div className={styles.summaryMeta}>Created {formatTimestamp(action.created_at)}</div>
             </Card>
+            <KeyValueList
+              items={[
+                { label: "Status", value: action.status },
+                { label: "Priority", value: formatPriority(action.priority) },
+                { label: "Assigned to", value: assignedLabel },
+                { label: "Due", value: formatTimestamp(action.due_at) },
+              ]}
+            />
+            <div className={styles.row}>
+              <select
+                className={styles.select}
+                value={assignedTo}
+                onChange={(event) => handleAssign(event.target.value)}
+                disabled={loadingMembers}
+              >
+                <option value="">Unassigned</option>
+                {members.map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.name ?? member.email} · {member.role}
+                  </option>
+                ))}
+              </select>
+              <Chip tone={assignedTo ? "info" : "neutral"}>{assignedLabel}</Chip>
+            </div>
+            <div className={styles.actions}>
+              <Button variant="primary" onClick={() => handleResolve("done")}>
+                Mark done
+              </Button>
+              <Button variant="secondary" onClick={() => handleResolve("ignored")}>
+                Ignore
+              </Button>
+              <Button variant="secondary" onClick={handleSnooze}>
+                Snooze 7d
+              </Button>
+            </div>
           </Section>
 
           <Section title="Evidence" subtitle="Signals and ledger anchors that informed this action.">
@@ -476,28 +524,17 @@ export default function ActionDetailDrawer({
             </div>
           </Section>
 
-          <Section title="Assignment" subtitle="Assign the case owner.">
-            <div className={styles.row}>
-              <select
-                className={styles.select}
-                value={assignedTo}
-                onChange={(event) => handleAssign(event.target.value)}
-                disabled={loadingMembers}
-              >
-                <option value="">Unassigned</option>
-                {members.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.name ?? member.email} · {member.role}
-                  </option>
-                ))}
-              </select>
-              <Chip tone={assignedTo ? "info" : "neutral"}>{assignedLabel}</Chip>
-            </div>
-          </Section>
-
           <Section title="Plan" subtitle="Track the remediation plan linked to this action.">
             {planError && (
               <InlineAlert tone="error" title="Plan update failed" description={planError.message} />
+            )}
+            {planHelpText && <div className={styles.planHelp}>{planHelpText}</div>}
+            {planId && !canViewPlan && (
+              <InlineAlert
+                tone="info"
+                title="Plan actions unavailable"
+                description="Select a business to view and refresh the linked plan."
+              />
             )}
             {!planId && (
               <Card className={styles.planCard}>
@@ -589,7 +626,7 @@ export default function ActionDetailDrawer({
             )}
           </Section>
 
-          <Section title="Resolution note" subtitle="Captured for the audit trail.">
+          <Section title="Resolution notes & audit" subtitle="Captured for the audit trail.">
             <textarea
               className={styles.input}
               rows={3}
@@ -597,23 +634,6 @@ export default function ActionDetailDrawer({
               onChange={(event) => setNote(event.target.value)}
               placeholder="Add context for the audit trail"
             />
-          </Section>
-
-          <Section title="Action controls">
-            <div className={styles.actions}>
-              <Button variant="primary" onClick={() => handleResolve("done")}>
-                Mark done
-              </Button>
-              <Button variant="secondary" onClick={() => handleResolve("ignored")}>
-                Ignore
-              </Button>
-              <Button variant="secondary" onClick={handleSnooze}>
-                Snooze 7d
-              </Button>
-            </div>
-          </Section>
-
-          <Section title="Activity" subtitle="Action and plan activity in one timeline.">
             {loadingEvents && <LoadingState label="Loading activity…" rows={2} />}
             {!loadingEvents && activityItems.length === 0 && (
               <EmptyState title="No activity yet" description="Action updates will appear here as the case progresses." />

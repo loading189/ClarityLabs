@@ -8,13 +8,11 @@ import {
   getSignalDetail,
   getSignalExplain,
   listSignalStates,
-  updateSignalStatus,
   type Signal,
   type SignalSeverity,
   type SignalState,
   type SignalStateDetail,
   type SignalExplainLedgerAnchor,
-  type SignalStatus,
 } from "../../api/signals";
 import { getMonitorStatus, type MonitorStatus } from "../../api/monitor";
 import styles from "./SignalsCenter.module.css";
@@ -275,10 +273,8 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailErr, setDetailErr] = useState<LoadError | null>(null);
   const [detailExplain, setDetailExplain] = useState<any | null>(null);
-  const [statusSelections, setStatusSelections] = useState<Record<string, SignalStatus>>({});
-  const [statusSaving, setStatusSaving] = useState<Record<string, boolean>>({});
-  const [statusErrors, setStatusErrors] = useState<Record<string, string>>({});
-  const [statusReasons, setStatusReasons] = useState<Record<string, string>>({});
+  const [rowActionLoading, setRowActionLoading] = useState<Record<string, boolean>>({});
+  const [rowActionError, setRowActionError] = useState<string | null>(null);
   const [detailSourceEventId, setDetailSourceEventId] = useState<string | null>(null);
   const [ledgerTraceOpen, setLedgerTraceOpen] = useState(false);
   const [selectedLedgerAnchor, setSelectedLedgerAnchor] = useState<SignalExplainLedgerAnchor | null>(null);
@@ -495,52 +491,32 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
     });
   }, [domainFilter, hasLedgerAnchors, signals, severityFilter, statusFilter, textFilter]);
 
-  const handleStatusUpdate = async (signalId: string) => {
-    if (useLegacyV1) return;
-    const selectedSignal =
-      signals.find((signal) => signal.id === signalId) ||
-      (detail && detail.id === signalId ? detail : null);
-    const nextStatus =
-      statusSelections[signalId] ??
-      (selectedSignal?.status as SignalStatus) ??
-      "open";
-    const reason = statusReasons[signalId]?.trim() || undefined;
-    setStatusSaving((prev) => ({ ...prev, [signalId]: true }));
-    setStatusErrors((prev) => ({ ...prev, [signalId]: "" }));
-    setToastMsg(null);
-    setToastAuditId(null);
-    try {
-      const result = await updateSignalStatus(businessId, signalId, {
-        status: nextStatus,
-        reason,
-      });
-      setToastAuditId(result.audit_id ?? null);
-      setToastMsg(`Status updated to ${STATUS_LABELS[result.status] ?? result.status}.`);
-      await loadSignals();
-      await loadHealthScore();
-      await loadMonitorStatus();
-      if (detail && detail.id === signalId) {
-        const detailData = await getSignalDetail(businessId, signalId);
-        setDetail(detailData);
+  const handleViewLedger = useCallback(
+    async (signalId: string) => {
+      if (!businessId || !signalId) return;
+      setRowActionError(null);
+      setRowActionLoading((prev) => ({ ...prev, [signalId]: true }));
+      try {
+        const explainData = await getSignalExplain(businessId, signalId);
+        const anchor = (explainData.ledger_anchors ?? [])[0] ?? null;
+        const filters = anchorToLedgerFilters(anchor);
+        if (!filters) {
+          setRowActionError("No ledger anchor available yet for this signal.");
+          return;
+        }
+        navigate(ledgerPath(businessId, filters));
+      } catch (e: any) {
+        setRowActionError(e?.message ?? "Unable to open ledger for this signal.");
+      } finally {
+        setRowActionLoading((prev) => ({ ...prev, [signalId]: false }));
       }
-      setSelected((prev) => (prev && prev.id === signalId ? { ...prev, status: result.status } : prev));
-      setStatusReasons((prev) => ({ ...prev, [signalId]: "" }));
-    } catch (e: any) {
-      setStatusErrors((prev) => ({
-        ...prev,
-        [signalId]: e?.message ?? "Failed to update status",
-      }));
-    } finally {
-      setStatusSaving((prev) => ({ ...prev, [signalId]: false }));
-    }
-  };
+    },
+    [businessId, navigate]
+  );
 
   const handleAuditSelect = (auditId: string) => {
     navigate(`/app/${businessId}/categorize?auditId=${auditId}#recent-changes`);
   };
-
-  const buildStatusValue = (signalId: string, fallback: SignalStatus) =>
-    statusSelections[signalId] ?? fallback;
 
   const evidenceTxns = useMemo(() => {
     const entries = new Map<string, { id: string; label?: string; source?: string }>();
@@ -695,6 +671,9 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
         showCategoryFilter={false}
         showSearch={false}
       />
+      <div className={styles.microcopy}>
+        Signals show what the system detects. They don’t require action until you create an action.
+      </div>
       <div className={styles.filters}>
         <label className={styles.filterField}>
           Status
@@ -760,9 +739,10 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
       </div>
       {useLegacyV1 && (
         <div className={styles.legacyNote}>
-          Legacy signals are read-only. Switch off to manage statuses and view details.
+          Legacy signals are read-only. Switch off to view details.
         </div>
       )}
+      {rowActionError && <InlineAlert tone="error" title="Signal action unavailable" description={rowActionError} />}
 
       {loading && <LoadingState label="Loading signals…" />}
       {err?.status === 403 && (
@@ -815,36 +795,29 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
                 <div className={styles.rowSummary}>{signal.summary ?? "—"}</div>
                 {!useLegacyV1 && (
                   <div className={styles.rowActions} onClick={(event) => event.stopPropagation()}>
-                    <select
-                      className={styles.rowSelect}
-                      value={buildStatusValue(signal.id, signal.status)}
-                      onChange={(event) =>
-                        setStatusSelections((prev) => ({
-                          ...prev,
-                          [signal.id]: event.target.value as SignalStatus,
-                        }))
-                      }
-                    >
-                      <option value="open">Open</option>
-                      <option value="in_progress">In progress</option>
-                      <option value="resolved">Resolved</option>
-                      <option value="ignored">Ignored</option>
-                    </select>
                     <button
                       className={styles.secondaryButton}
                       type="button"
-                      onClick={() => handleStatusUpdate(signal.id)}
-                      disabled={statusSaving[signal.id]}
+                      onClick={() => {
+                        setSelected(signal);
+                        updateSignalParam(signal.id);
+                      }}
                     >
-                      {statusSaving[signal.id] ? "Saving…" : "Update"}
+                      Explain
                     </button>
-                    {statusErrors[signal.id] && (
-                      <span className={styles.inlineError}>{statusErrors[signal.id]}</span>
-                    )}
+                    <button
+                      className={styles.secondaryButton}
+                      type="button"
+                      onClick={() => void handleViewLedger(signal.id)}
+                      disabled={rowActionLoading[signal.id]}
+                    >
+                      {rowActionLoading[signal.id] ? "Opening…" : "View in Ledger"}
+                    </button>
                   </div>
                 )}
               </div>
               <div className={styles.rowMeta}>
+                <div className={styles.metaLabel}>Last evaluated</div>
                 <div>{formatDate(signal.updated_at)}</div>
                 <div className={styles.statusPill}>{STATUS_LABELS[signal.status] ?? signal.status}</div>
               </div>
@@ -897,66 +870,10 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
             </div>
 
             <div className={styles.statusActions}>
-              <select
-                className={styles.select}
-                value={buildStatusValue(detail.id, detail.status)}
-                onChange={(event) =>
-                  setStatusSelections((prev) => ({
-                    ...prev,
-                    [detail.id]: event.target.value as SignalStatus,
-                  }))
-                }
-              >
-                <option value="open">Open</option>
-                <option value="in_progress">In progress</option>
-                <option value="resolved">Resolved</option>
-                <option value="ignored">Ignored</option>
-              </select>
-              <div className={styles.reasonField}>
-                <label className={styles.reasonLabel}>Resolution reason</label>
-                <textarea
-                  className={styles.reasonInput}
-                  placeholder="Add context for this status change…"
-                  rows={2}
-                  value={statusReasons[detail.id] ?? ""}
-                  onChange={(event) =>
-                    setStatusReasons((prev) => ({
-                      ...prev,
-                      [detail.id]: event.target.value,
-                    }))
-                  }
-                />
-              </div>
-              <button
-                className={styles.primaryButton}
-                type="button"
-                onClick={() => handleStatusUpdate(detail.id)}
-                disabled={statusSaving[detail.id]}
-              >
-                {statusSaving[detail.id] ? "Saving…" : "Update status"}
-              </button>
-              {detail && (
-                <Link
-                  className={styles.secondaryButton}
-                  to={`/app/${businessId}/assistant?signalId=${detail.id}`}
-                >
-                  Open in Assistant
-                </Link>
-              )}
-              {detail && (
-                <Link
-                  className={styles.secondaryButton}
-                  to={`/app/${businessId}/assistant?signalId=${detail.id}&createPlanSignalId=${detail.id}`}
-                >
-                  Create plan
-                </Link>
-              )}
+              <Chip tone="neutral">{STATUS_LABELS[detail.status] ?? detail.status}</Chip>
               {ledgerFilters && (
-                <Link
-                  className={styles.secondaryButton}
-                  to={ledgerPath(businessId, ledgerFilters)}
-                >
-                  Open ledger
+                <Link className={styles.secondaryButton} to={ledgerPath(businessId, ledgerFilters)}>
+                  View in Ledger
                 </Link>
               )}
               {primaryLedgerAnchor && (

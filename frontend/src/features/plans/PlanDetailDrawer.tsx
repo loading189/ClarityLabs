@@ -120,6 +120,15 @@ export default function PlanDetailDrawer({
   const assignedMember = members.find((member) => member.id === plan?.assigned_to_user_id);
   const assignedLabel = assignedMember?.name ?? assignedMember?.email ?? "Unassigned";
 
+  const orderedObservations = useMemo(() => {
+    if (!detail?.observations) return [];
+    return [...detail.observations].sort((a, b) => {
+      const aTime = a.observed_at ? new Date(a.observed_at).getTime() : 0;
+      const bTime = b.observed_at ? new Date(b.observed_at).getTime() : 0;
+      return aTime - bTime;
+    });
+  }, [detail?.observations]);
+
   const handleActivate = async () => {
     if (!planId || !businessId) return;
     setError(null);
@@ -326,7 +335,10 @@ export default function PlanDetailDrawer({
               </Section>
             )}
 
-            <Section title="Observation history" subtitle="Latest observations first.">
+            <Section title="Observation history" subtitle="Chronological tracking of plan checks.">
+              <div className={styles.historyHeader}>
+                Last checked {formatTimestamp(latestObservation?.observed_at)}
+              </div>
               {detail.observations.length === 0 && (
                 <EmptyState
                   title="No observations yet"
@@ -334,7 +346,7 @@ export default function PlanDetailDrawer({
                 />
               )}
               <div className={styles.historyList}>
-                {detail.observations.map((observation) => (
+                {orderedObservations.map((observation) => (
                   <Card key={observation.id} className={styles.historyItem}>
                     <div className={styles.historySummary}>
                       {formatObservationSummary(observation, detail.conditions)}

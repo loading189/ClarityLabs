@@ -5,221 +5,68 @@
   align-items: start;
 }
 
-.chatPane {
+.primaryColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.secondaryColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.cardPanel {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  min-height: 70vh;
-  border: 1px solid var(--border);
-  background: var(--card-bg);
-  border-radius: var(--radius-lg);
-  padding: 16px;
-}
-
-.chatHeader {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-}
-
-.chatBody {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  overflow-y: auto;
-}
-
-.chatInput {
-  display: flex;
-  gap: 8px;
-}
-
-.chatInput input {
-  flex: 1;
-  border: 1px solid var(--input-border);
-  border-radius: var(--radius-sm);
-  padding: 10px 12px;
-  background: var(--input-bg);
-  color: var(--text);
-}
-
-.chatInput button {
-  border: 1px solid var(--btn-border);
-  border-radius: var(--radius-sm);
-  padding: 10px 14px;
-  background: var(--btn-primary-bg);
-  color: var(--btn-primary-text);
-  cursor: pointer;
-}
-
-.chatInput button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.messageAssistant,
-.messageUser {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 10px 12px;
-  background: var(--surface-muted);
-}
-
-.messageUser {
-  background: var(--primary-soft);
-}
-
-.messageMeta {
-  display: flex;
-  justify-content: space-between;
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-bottom: 6px;
-}
-
-.messageContent {
-  font-size: 13px;
-}
-
-.actionsPane {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.panelCard {
-  border: 1px solid var(--border);
-  background: var(--card-bg);
-  border-radius: var(--radius-lg);
   padding: 14px;
+}
+
+.linkRow {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.linkButton {
+  font-size: 13px;
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.highlightList,
+.resolutionList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-.buttonGroup {
+.highlightItem,
+.resolutionItem {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.buttonGroup button {
-  border: 1px solid var(--btn-border);
-  border-radius: var(--radius-sm);
-  padding: 8px 12px;
-  background: var(--btn-bg);
-  color: var(--text);
-  text-align: left;
-  cursor: pointer;
-}
-
-.buttonGroup button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.secondaryButton {
-  border: 1px solid var(--btn-border);
-  border-radius: var(--radius-sm);
-  padding: 8px 12px;
-  background: var(--btn-bg);
-  color: var(--text);
-  cursor: pointer;
-  text-align: center;
-}
-
-.statusGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  justify-content: space-between;
   gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font-size: 13px;
 }
 
-.statusLabel {
-  display: block;
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.statusValue {
-  font-size: 14px;
+.highlightTitle,
+.resolutionTitle {
   font-weight: 600;
 }
 
-.list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 13px;
-}
-
-.checklist {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.checklistItem {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 10px;
-  background: var(--surface-muted);
-  font-size: 13px;
-}
-
-.checklistItem button {
-  align-self: flex-start;
-  border: 1px solid var(--btn-border);
-  border-radius: var(--radius-sm);
-  padding: 6px 10px;
-  background: var(--btn-bg);
-  color: var(--text);
-  cursor: pointer;
-}
-
-.checklistItem button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.subtleText {
+.highlightMeta,
+.resolutionMeta {
   font-size: 12px;
   color: var(--text-muted);
-}
-
-.subsection {
-  border-top: 1px solid var(--border);
-  padding-top: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.subsection h4 {
-  margin: 0;
-  font-size: 12px;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.emptyState {
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-.error {
-  color: var(--danger);
-  font-size: 12px;
 }
 
 @media (max-width: 1080px) {
