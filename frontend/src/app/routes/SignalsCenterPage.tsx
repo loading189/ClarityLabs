@@ -14,8 +14,8 @@ export default function SignalsCenterPage() {
   return (
     <div>
       <PageHeader
-        title="Signals Center"
-        subtitle="Monitor, triage, and resolve continuous alerts for this business."
+        title="Signals"
+        subtitle="Evidence registry for what the system detects."
       />
       <SignalsCenter businessId={businessId} />
     </div>

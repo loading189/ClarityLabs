@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { fetchActionTriage, type ActionTriageItem } from "../api/actions";
+import { useSearchParams } from "react-router-dom";
+import { fetchActionTriage, refreshActions, type ActionTriageItem } from "../api/actions";
 import { ApiError } from "../api/client";
 import { useAuth } from "../app/auth/AuthContext";
 import PageHeader from "../components/common/PageHeader";
@@ -15,10 +16,11 @@ import {
 import { ensurePlanSummaries, readPlanSummary } from "../features/plans/planSummaryCache";
 import { useBusinessesMine } from "../hooks/useBusinessesMine";
 import type { PlanSummary } from "../api/plansV2";
+import { ledgerPath } from "../app/routes/routeUtils";
 import styles from "./AdvisorInboxPage.module.css";
 
 type AssignedFilter = "me" | "unassigned" | "any";
-type StatusFilter = "open" | "snoozed" | "done" | "ignored";
+type StatusFilter = "all" | "open" | "snoozed" | "done";
 
 type LoadError = { message: string; status?: number };
 
@@ -29,6 +31,28 @@ function formatDate(value: string) {
 function formatTimestamp(value?: string | null) {
   if (!value) return "—";
   return new Date(value).toLocaleString();
+}
+
+function formatAge(value?: string | null) {
+  if (!value) return "—";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "—";
+  const diffMs = Date.now() - parsed.getTime();
+  const diffDays = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "1 day";
+  return `${diffDays} days`;
+}
+
+function parseStatusFilter(value: string | null): StatusFilter {
+  if (value === "open" || value === "snoozed" || value === "done") return value;
+  if (value === "resolved") return "done";
+  return "all";
+}
+
+function parseAssignedFilter(value: string | null): AssignedFilter {
+  if (value === "me" || value === "unassigned") return value;
+  return "any";
 }
 
 function formatPriority(priority: number) {
@@ -45,7 +69,7 @@ function priorityTone(priority: number) {
   return "neutral" as const;
 }
 
-function statusTone(status: StatusFilter) {
+function statusTone(status: string) {
   if (status === "done") return "success" as const;
   if (status === "snoozed") return "warning" as const;
   if (status === "ignored") return "neutral" as const;
@@ -55,27 +79,38 @@ function statusTone(status: StatusFilter) {
 export default function AdvisorInboxPage() {
   const { businesses } = useBusinessesMine();
   const { user, logout } = useAuth();
-  const [status, setStatus] = useState<StatusFilter>("open");
-  const [assigned, setAssigned] = useState<AssignedFilter>("any");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [status, setStatus] = useState<StatusFilter>(() => parseStatusFilter(searchParams.get("status")));
+  const [assigned, setAssigned] = useState<AssignedFilter>(() => parseAssignedFilter(searchParams.get("assigned")));
   const [businessId, setBusinessId] = useState<string>("all");
   const [actions, setActions] = useState<ActionTriageItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<LoadError | null>(null);
+  const [refreshError, setRefreshError] = useState<LoadError | null>(null);
+  const [refreshLoading, setRefreshLoading] = useState(false);
+  const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
   const [selected, setSelected] = useState<ActionTriageItem | null>(null);
   const [planSummaries, setPlanSummaries] = useState<Map<string, PlanSummary>>(new Map());
   const [planSummaryError, setPlanSummaryError] = useState<LoadError | null>(null);
   const [planSummaryLoading, setPlanSummaryLoading] = useState(false);
+  const [filterMode, setFilterMode] = useState<"status" | "assigned">("assigned");
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetchActionTriage(businessId, { status, assigned });
+      const response = await fetchActionTriage(businessId, {
+        status: status === "all" ? undefined : status,
+        assigned: assigned === "any" ? undefined : assigned,
+      });
       setActions(response.actions ?? []);
     } catch (err: any) {
       if (err instanceof ApiError && err.status === 401) {
         logout();
         return;
+      }
+      if (import.meta.env.DEV) {
+        console.error("Failed to load advisor inbox", err);
       }
       setError({ message: err?.message ?? "Failed to load advisor inbox", status: err?.status });
     } finally {
@@ -86,6 +121,28 @@ export default function AdvisorInboxPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (businessId !== "all" || businesses.length === 0) return;
+    setBusinessId(businesses[0]?.business_id ?? "all");
+  }, [businessId, businesses]);
+
+  useEffect(() => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (status === "all") {
+        next.delete("status");
+      } else {
+        next.set("status", status === "done" ? "resolved" : status);
+      }
+      if (assigned === "any") {
+        next.delete("assigned");
+      } else {
+        next.set("assigned", assigned);
+      }
+      return next;
+    });
+  }, [assigned, setSearchParams, status]);
 
   useEffect(() => {
     const planIds = actions.map((action) => action.plan_id).filter(Boolean) as string[];
@@ -105,6 +162,9 @@ export default function AdvisorInboxPage() {
           logout();
           return;
         }
+        if (import.meta.env.DEV) {
+          console.error("Failed to load plan summaries", err);
+        }
         setPlanSummaryError({ message: err?.message ?? "Failed to load plan summaries", status: err?.status });
       })
       .finally(() => {
@@ -121,6 +181,48 @@ export default function AdvisorInboxPage() {
       ...businesses,
     ];
   }, [businesses]);
+
+  const canRefreshActions = businessId !== "all";
+
+  const handleRefreshActions = useCallback(async () => {
+    if (!canRefreshActions) {
+      const message = "Select a specific business to refresh actions.";
+      setRefreshError({ message, status: 400 });
+      if (import.meta.env.DEV) {
+        console.warn("Refresh actions requires a specific business_id.");
+      }
+      return;
+    }
+    setRefreshLoading(true);
+    setRefreshError(null);
+    setRefreshMessage(null);
+    try {
+      const response = await refreshActions(businessId);
+      if (response?.actions) {
+        const createdCount = response.actions.length;
+        setRefreshMessage(createdCount > 0 ? `Created ${createdCount} new actions.` : "No new actions detected.");
+      } else {
+        setRefreshMessage("Refreshed.");
+      }
+      await load();
+    } catch (err: any) {
+      if (err instanceof ApiError && err.status === 401) {
+        logout();
+        return;
+      }
+      if (import.meta.env.DEV) {
+        console.error("Failed to refresh actions", err);
+      }
+      setRefreshError({ message: err?.message ?? "Failed to refresh actions", status: err?.status });
+    } finally {
+      setRefreshLoading(false);
+    }
+  }, [businessId, canRefreshActions, load, logout]);
+
+  const ledgerLink = useMemo(() => {
+    if (!canRefreshActions) return null;
+    return ledgerPath(businessId, {});
+  }, [businessId, canRefreshActions]);
 
   const renderPlanSummary = (action: ActionTriageItem) => {
     if (!action.plan_id) {
@@ -152,32 +254,34 @@ export default function AdvisorInboxPage() {
     );
   };
 
+  const filteredActions = useMemo(() => {
+    return actions.filter((action) => {
+      if (assigned === "me" && action.assigned_to_user_id !== user?.id) return false;
+      if (assigned === "unassigned" && action.assigned_to_user_id) return false;
+      if (status === "open" && action.status !== "open") return false;
+      if (status === "snoozed" && action.status !== "snoozed") return false;
+      if (status === "done" && action.status !== "done") return false;
+      return true;
+    });
+  }, [actions, assigned, status, user?.id]);
+
+  const handleResetFilters = () => {
+    setStatus("all");
+    setAssigned("any");
+  };
+
+  const signalsLink = useMemo(() => {
+    if (!canRefreshActions) return null;
+    return `/app/${businessId}/signals`;
+  }, [businessId, canRefreshActions]);
+
   return (
     <div className={styles.page}>
       <PageHeader
-        title="Advisor Inbox"
-        subtitle="Triage actions across assigned clients and track plan outcomes."
+        title="Inbox"
+        subtitle="Work queue for actions the firm chose to resolve."
         actions={
-          <div className={styles.filters}>
-            <select
-              className={styles.select}
-              value={status}
-              onChange={(event) => setStatus(event.target.value as StatusFilter)}
-            >
-              <option value="open">Open</option>
-              <option value="snoozed">Snoozed</option>
-              <option value="done">Done</option>
-              <option value="ignored">Ignored</option>
-            </select>
-            <select
-              className={styles.select}
-              value={assigned}
-              onChange={(event) => setAssigned(event.target.value as AssignedFilter)}
-            >
-              <option value="any">Any assignment</option>
-              <option value="me">Assigned to me</option>
-              <option value="unassigned">Unassigned</option>
-            </select>
+          <div className={styles.headerActions}>
             <select
               className={styles.select}
               value={businessId}
@@ -190,11 +294,96 @@ export default function AdvisorInboxPage() {
               ))}
             </select>
             <Button type="button" onClick={() => void load()}>
-              Refresh
+              Refresh list
             </Button>
           </div>
         }
       />
+
+      <div className={styles.filterBar}>
+        <div className={styles.filterGroup}>
+          <span className={styles.filterLabel}>Assignment</span>
+          <div className={styles.filterChips}>
+            <button
+              type="button"
+              className={`${styles.filterChip} ${assigned === "any" ? styles.filterChipActive : ""}`}
+              onClick={() => {
+                setAssigned("any");
+                setFilterMode("assigned");
+              }}
+            >
+              All
+            </button>
+            <button
+              type="button"
+              className={`${styles.filterChip} ${assigned === "me" ? styles.filterChipActive : ""}`}
+              onClick={() => {
+                setAssigned("me");
+                setFilterMode("assigned");
+              }}
+            >
+              Assigned to me
+            </button>
+            <button
+              type="button"
+              className={`${styles.filterChip} ${assigned === "unassigned" ? styles.filterChipActive : ""}`}
+              onClick={() => {
+                setAssigned("unassigned");
+                setFilterMode("assigned");
+              }}
+            >
+              Unassigned
+            </button>
+          </div>
+        </div>
+        <div className={styles.filterGroup}>
+          <span className={styles.filterLabel}>Status</span>
+          <div className={styles.filterChips}>
+            <button
+              type="button"
+              className={`${styles.filterChip} ${status === "all" ? styles.filterChipActive : ""}`}
+              onClick={() => {
+                setStatus("all");
+                setFilterMode("status");
+              }}
+            >
+              All
+            </button>
+            <button
+              type="button"
+              className={`${styles.filterChip} ${status === "open" ? styles.filterChipActive : ""}`}
+              onClick={() => {
+                setStatus("open");
+                setFilterMode("status");
+              }}
+            >
+              Open
+            </button>
+            <button
+              type="button"
+              className={`${styles.filterChip} ${status === "snoozed" ? styles.filterChipActive : ""}`}
+              onClick={() => {
+                setStatus("snoozed");
+                setFilterMode("status");
+              }}
+            >
+              Snoozed
+            </button>
+            <button
+              type="button"
+              className={`${styles.filterChip} ${status === "done" ? styles.filterChipActive : ""}`}
+              onClick={() => {
+                setStatus("done");
+                setFilterMode("status");
+              }}
+            >
+              Resolved
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {refreshMessage && <div className={styles.refreshNotice}>{refreshMessage}</div>}
 
       {loading && <LoadingState label="Loading actions…" rows={4} />}
 
@@ -214,6 +403,15 @@ export default function AdvisorInboxPage() {
         />
       )}
 
+      {refreshError && (
+        <InlineAlert
+          tone="error"
+          title="Unable to refresh actions"
+          description={refreshError.message}
+          action={<Button onClick={() => void handleRefreshActions()}>Retry refresh</Button>}
+        />
+      )}
+
       {planSummaryError && (
         <InlineAlert
           tone="error"
@@ -223,12 +421,48 @@ export default function AdvisorInboxPage() {
       )}
 
       {!loading && !error && actions.length === 0 && (
-        <EmptyState title="No actions yet" description="New actions will appear here once signals are triaged." />
+        <EmptyState
+          title="No actions in this queue yet."
+          description="Actions appear when your firm decides to work a signal."
+          action={
+            <div className={styles.emptyActions}>
+              <Button
+                variant="primary"
+                onClick={() => void handleRefreshActions()}
+                disabled={!canRefreshActions || refreshLoading}
+              >
+                {refreshLoading ? "Refreshing Actions…" : "Refresh Actions"}
+              </Button>
+              {signalsLink && (
+                <a className={styles.secondaryLink} href={signalsLink}>
+                  View Signals
+                </a>
+              )}
+              {ledgerLink && (
+                <a className={styles.secondaryLink} href={ledgerLink}>
+                  View Ledger
+                </a>
+              )}
+            </div>
+          }
+        />
       )}
 
-      {!loading && actions.length > 0 && (
+      {!loading && actions.length > 0 && filteredActions.length === 0 && (
+        <EmptyState
+          title="No items match filters."
+          description={`Try adjusting the ${filterMode === "assigned" ? "assignment" : "status"} filters.`}
+          action={
+            <button type="button" className={styles.resetLink} onClick={handleResetFilters}>
+              Reset filters
+            </button>
+          }
+        />
+      )}
+
+      {!loading && filteredActions.length > 0 && (
         <Panel className={styles.list}>
-          {actions.map((action) => {
+          {filteredActions.map((action) => {
             const assignedLabel =
               action.assigned_to_user?.id && action.assigned_to_user?.id === user?.id
                 ? "Me"
@@ -241,6 +475,13 @@ export default function AdvisorInboxPage() {
             const latestSummary = action.plan_id
               ? formatObservationSummary(planSummary?.latest_observation)
               : null;
+            const signalName =
+              (action.evidence_json as any)?.signal_title ??
+              (action.evidence_json as any)?.signal_name ??
+              action.source_signal_id ??
+              "—";
+            const ageLabel = formatAge(action.created_at);
+            const stale = ageLabel !== "—" && ageLabel !== "Today" && ageLabel !== "1 day";
 
             return (
               <button
@@ -254,11 +495,15 @@ export default function AdvisorInboxPage() {
                     <div className={styles.business}>{action.business_name}</div>
                     <div className={styles.title}>{action.title}</div>
                     <div className={styles.summary}>{action.summary}</div>
+                    <div className={styles.source}>From: {signalName}</div>
                   </div>
-                  <div className={styles.created}>Created {formatDate(action.created_at)}</div>
+                  <div className={styles.created}>
+                    <div>Created {formatDate(action.created_at)}</div>
+                    <div className={stale ? styles.stale : styles.age}>Age {ageLabel}</div>
+                  </div>
                 </div>
                 <div className={styles.rowChips}>
-                  <Chip tone={statusTone(action.status as StatusFilter)}>{action.status}</Chip>
+                  <Chip tone={statusTone(action.status)}>{action.status}</Chip>
                   <Chip tone={priorityTone(action.priority)}>{formatPriority(action.priority)}</Chip>
                   <Chip tone={assignedLabel === "Unassigned" ? "neutral" : "info"}>{assignedLabel}</Chip>
                   {renderPlanSummary(action)}

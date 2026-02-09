@@ -30,6 +30,7 @@ function renderLayout(path = "/app/11111111-1111-4111-8111-111111111111/advisor"
             <Route path="advisor" element={<div>Inbox screen</div>} />
             <Route path="signals" element={<div>Signals center</div>} />
             <Route path="ledger" element={<div>Ledger screen</div>} />
+            <Route path="summary" element={<div>Summary screen</div>} />
           </Route>
         </Routes>
       </MemoryRouter>
@@ -52,5 +53,8 @@ describe("AppLayout sidebar navigation", () => {
 
     await user.click(screen.getByRole("link", { name: "Ledger" }));
     expect(await screen.findByText("Ledger screen")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("link", { name: "Summary" }));
+    expect(await screen.findByText("Summary screen")).toBeInTheDocument();
   });
 });

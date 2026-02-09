@@ -1,12 +1,14 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { MemoryRouter } from "react-router-dom";
 import ActionDetailDrawer from "./ActionDetailDrawer";
 
 const fetchBusinessMembers = vi.fn();
 const fetchActionEvents = vi.fn();
 const getPlanDetail = vi.fn();
 const refreshPlan = vi.fn();
+const createPlan = vi.fn();
 
 vi.mock("../../api/actions", () => ({
   assignAction: vi.fn(),
@@ -21,7 +23,7 @@ vi.mock("../../api/businesses", () => ({
 
 vi.mock("../../api/plansV2", () => ({
   closePlan: vi.fn(),
-  createPlan: vi.fn(),
+  createPlan: (...args: unknown[]) => createPlan(...args),
   getPlanDetail: (...args: unknown[]) => getPlanDetail(...args),
   refreshPlan: (...args: unknown[]) => refreshPlan(...args),
 }));
@@ -70,6 +72,64 @@ describe("ActionDetailDrawer", () => {
 
     expect(await screen.findByText("Create a remediation plan")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create Plan" })).toBeInTheDocument();
+  });
+
+  it("creates a plan with the required payload", async () => {
+    fetchBusinessMembers.mockResolvedValue([]);
+    fetchActionEvents.mockResolvedValue([]);
+    createPlan.mockResolvedValue({
+      plan: {
+        id: "plan-1",
+        business_id: "biz-1",
+        created_by_user_id: "user-1",
+        title: "Categorize transactions",
+        intent: "Plan intent",
+        status: "draft",
+        created_at: "2024-01-01T00:00:00Z",
+        updated_at: "2024-01-01T00:00:00Z",
+      },
+      conditions: [],
+      latest_observation: null,
+      observations: [],
+      state_events: [],
+    });
+
+    render(
+      <MemoryRouter>
+        <ActionDetailDrawer
+          open
+          action={baseAction}
+          onClose={() => undefined}
+        />
+      </MemoryRouter>
+    );
+
+    const [planIntentInput] = await screen.findAllByPlaceholderText(
+      "Document the plan intent and why it matters"
+    );
+    await userEvent.type(planIntentInput, "Plan intent");
+    const [createButton] = screen.getAllByRole("button", { name: "Create Plan" });
+    await userEvent.click(createButton);
+
+    await waitFor(() =>
+      expect(createPlan).toHaveBeenCalledWith({
+        business_id: "biz-1",
+        title: "Categorize transactions",
+        intent: "Plan intent",
+        source_action_id: "action-1",
+        primary_signal_id: undefined,
+        assigned_to_user_id: undefined,
+        conditions: [
+          {
+            type: "signal_resolved",
+            signal_id: null,
+            baseline_window_days: 0,
+            evaluation_window_days: 14,
+            direction: "resolve",
+          },
+        ],
+      })
+    );
   });
 
   it("renders plan summary and refreshes observations", async () => {
@@ -147,15 +207,17 @@ describe("ActionDetailDrawer", () => {
       />
     );
 
-    expect(await screen.findByText("Plan title")).toBeInTheDocument();
-    const summary = await screen.findByTestId("plan-observation-summary");
+    const planTitles = await screen.findAllByText("Plan title");
+    expect(planTitles[0]).toBeInTheDocument();
+    const [summary] = await screen.findAllByTestId("plan-observation-summary");
     expect(summary).toHaveTextContent("Metric baseline 8.00 → 10.00");
     expect(screen.getByRole("button", { name: "View Plan" })).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    const [refreshButton] = screen.getAllByRole("button", { name: "Refresh" });
+    await userEvent.click(refreshButton);
     await waitFor(() => expect(refreshPlan).toHaveBeenCalled());
     await waitFor(() =>
-      expect(screen.getByTestId("plan-observation-summary")).toHaveTextContent(
+      expect(screen.getAllByTestId("plan-observation-summary")[0]).toHaveTextContent(
         "Metric baseline 10.00 → 7.00"
       )
     );
