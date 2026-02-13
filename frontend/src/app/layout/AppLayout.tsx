@@ -17,6 +17,7 @@ const navSections: NavSectionItem[] = [
   { title: "Work", items: [{ label: "Inbox", path: "advisor" }] },
   { title: "Observe", items: [{ label: "Signals", path: "signals" }] },
   { title: "Verify", items: [{ label: "Ledger", path: "ledger" }] },
+  { title: "Organize", items: [{ label: "Categorize", path: "categorize" }, { label: "Rules", path: "rules" }] },
   { title: "Explain", items: [{ label: "Summary", path: "summary" }] },
 ];
 

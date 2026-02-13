@@ -7,7 +7,10 @@ export type NormalizedTxn = {
   amount: number;
   direction: string;
   account: string;
-  category_hint: string;
+  category_hint?: string | null;
+  category_id?: string | null;
+  category_name?: string | null;
+  counterparty_hint?: string | null;
 
   suggested_system_key?: string | null;
   suggested_category_id?: string | null;
@@ -163,12 +166,30 @@ export function getCategories(businessId: string) {
   return apiGet<CategoryOut[]>(`/categorize/business/${businessId}/categories`);
 }
 
+export function fetchTxnsToCategorize(
+  businessId: string,
+  params?: { start_date?: string; end_date?: string; limit?: number }
+) {
+  return getTxnsToCategorize(businessId, params?.limit ?? 50, {
+    start_date: params?.start_date,
+    end_date: params?.end_date,
+  });
+}
+
+export function fetchCategories(businessId: string) {
+  return getCategories(businessId);
+}
+
 export function getCategorizeMetrics(businessId: string) {
   return apiGet<CategorizeMetricsOut>(`/categorize/business/${businessId}/categorize/metrics`);
 }
 
 export function bulkApplyByMerchantKey(businessId: string, payload: BulkApplyByMerchantKeyIn) {
   return apiPost<BulkApplyByMerchantKeyOut>(`/categorize/business/${businessId}/categorize/bulk_apply`, payload);
+}
+
+export function bulkApplyCategorization(businessId: string, payload: BulkApplyByMerchantKeyIn) {
+  return bulkApplyByMerchantKey(businessId, payload);
 }
 
 export function saveCategorization(
