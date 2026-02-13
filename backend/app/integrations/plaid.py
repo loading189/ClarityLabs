@@ -116,6 +116,10 @@ class PlaidSyncResult:
     next_cursor: Optional[str]
 
 
+# backend/app/integrations/plaid.py
+
+from fastapi import HTTPException
+
 class PlaidClient:
     def __init__(self, *, base_url: Optional[str] = None, client: Optional[Any] = None):
         self.base_url = base_url or plaid_base_url()
@@ -130,19 +134,58 @@ class PlaidClient:
 
     def post(self, path: str, payload: dict, *, retry_once: bool = True) -> dict:
         request_payload = {**self._auth_payload(), **payload}
+
+        # We NEVER include access_token in error details. Strip it if present.
+        def _sanitize(obj: Any) -> Any:
+            if isinstance(obj, dict):
+                out = {}
+                for k, v in obj.items():
+                    if k in ("access_token", "public_token", "secret", "client_id"):
+                        out[k] = "***redacted***"
+                    else:
+                        out[k] = _sanitize(v)
+                return out
+            if isinstance(obj, list):
+                return [_sanitize(x) for x in obj]
+            return obj
+
+        last_exc: Optional[Exception] = None
         for attempt in range(2 if retry_once else 1):
             try:
                 response = self._client.post(path, json=request_payload)
-                response.raise_for_status()
-                return response.json()
-            except Exception as exc:
-                import httpx
+                if response.status_code >= 400:
+                    # Try to parse Plaid's error payload
+                    try:
+                        err = response.json()
+                    except Exception:
+                        err = {"raw": response.text}
 
-                if not isinstance(exc, httpx.HTTPError):
-                    raise
+                    raise HTTPException(
+                        status_code=response.status_code,
+                        detail={
+                            "provider": "plaid",
+                            "path": path,
+                            "status": response.status_code,
+                            "error": _sanitize(err),
+                            "request": {"payload_keys": sorted(list(request_payload.keys()))},
+                        },
+                    )
+                return response.json()
+            except HTTPException as e:
+                last_exc = e
                 if attempt == 0 and retry_once:
                     continue
                 raise
+            except Exception as exc:
+                # Non-HTTP errors (timeouts, etc.)
+                last_exc = exc
+                if attempt == 0 and retry_once:
+                    continue
+                raise
+
+        # should never hit
+        raise last_exc or RuntimeError("Plaid request failed unexpectedly.")
+
 
 
 if TYPE_CHECKING:

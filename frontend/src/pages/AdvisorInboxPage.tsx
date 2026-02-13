@@ -178,7 +178,6 @@ export default function AdvisorInboxPage() {
     };
   }, [actions, logout]);
 
-
   useEffect(() => {
     setPendingActionId(requestedActionId);
   }, [requestedActionId]);
@@ -192,10 +191,7 @@ export default function AdvisorInboxPage() {
   }, [actions, loading, pendingActionId]);
 
   const businessOptions = useMemo(() => {
-    return [
-      { business_id: "all", business_name: "All businesses" },
-      ...businesses,
-    ];
+    return [{ business_id: "all", business_name: "All businesses" }, ...businesses];
   }, [businesses]);
 
   const canRefreshActions = businessId !== "all";
@@ -293,19 +289,20 @@ export default function AdvisorInboxPage() {
     return `/app/${businessId}/signals`;
   }, [businessId, canRefreshActions]);
 
+  const openAction = useCallback((action: ActionTriageItem) => {
+    setSelected(action);
+  }, []);
+
   return (
     <div className={styles.page}>
       {businessId !== "all" && <DataStatusStrip businessId={businessId} />}
+
       <PageHeader
         title="Inbox"
         subtitle="Work queue for actions the firm chose to resolve."
         actions={
           <div className={styles.headerActions}>
-            <select
-              className={styles.select}
-              value={businessId}
-              onChange={(event) => setBusinessId(event.target.value)}
-            >
+            <select className={styles.select} value={businessId} onChange={(event) => setBusinessId(event.target.value)}>
               {businessOptions.map((biz) => (
                 <option key={biz.business_id} value={biz.business_id}>
                   {biz.business_name}
@@ -355,6 +352,7 @@ export default function AdvisorInboxPage() {
             </button>
           </div>
         </div>
+
         <div className={styles.filterGroup}>
           <span className={styles.filterLabel}>Status</span>
           <div className={styles.filterChips}>
@@ -407,10 +405,7 @@ export default function AdvisorInboxPage() {
       {loading && <LoadingState label="Loading actions…" rows={4} />}
 
       {error?.status === 403 && (
-        <EmptyState
-          title="You don’t have access"
-          description="Ask an admin to grant access to this business." 
-        />
+        <EmptyState title="You don’t have access" description="Ask an admin to grant access to this business." />
       )}
 
       {error && error.status !== 403 && (
@@ -432,11 +427,7 @@ export default function AdvisorInboxPage() {
       )}
 
       {planSummaryError && (
-        <InlineAlert
-          tone="error"
-          title="Plan summaries unavailable"
-          description={planSummaryError.message}
-        />
+        <InlineAlert tone="error" title="Plan summaries unavailable" description={planSummaryError.message} />
       )}
 
       {!loading && !error && actions.length === 0 && (
@@ -445,11 +436,7 @@ export default function AdvisorInboxPage() {
           description="Actions appear when your firm decides to work a signal."
           action={
             <div className={styles.emptyActions}>
-              <Button
-                variant="primary"
-                onClick={() => void handleRefreshActions()}
-                disabled={!canRefreshActions || refreshLoading}
-              >
+              <Button variant="primary" onClick={() => void handleRefreshActions()} disabled={!canRefreshActions || refreshLoading}>
                 {refreshLoading ? "Refreshing Actions…" : "Refresh Actions"}
               </Button>
               {signalsLink && (
@@ -488,26 +475,35 @@ export default function AdvisorInboxPage() {
                 : action.assigned_to_user?.name ??
                   action.assigned_to_user?.email ??
                   (action.assigned_to_user_id ? "Assigned" : "Unassigned");
+
             const planSummary = action.plan_id
               ? planSummaries.get(action.plan_id) ?? readPlanSummary(action.plan_id)
               : null;
-            const latestSummary = action.plan_id
-              ? formatObservationSummary(planSummary?.latest_observation)
-              : null;
+
+            const latestSummary = action.plan_id ? formatObservationSummary(planSummary?.latest_observation) : null;
+
             const signalName =
               (action.evidence_json as any)?.signal_title ??
               (action.evidence_json as any)?.signal_name ??
               action.source_signal_id ??
               "—";
+
             const ageLabel = formatAge(action.created_at);
             const stale = ageLabel !== "—" && ageLabel !== "Today" && ageLabel !== "1 day";
 
             return (
-              <button
-                type="button"
+              <div
                 key={action.id}
                 className={styles.row}
-                onClick={() => setSelected(action)}
+                role="button"
+                tabIndex={0}
+                onClick={() => openAction(action)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    openAction(action);
+                  }
+                }}
               >
                 <div className={styles.rowHeader}>
                   <div>
@@ -521,15 +517,29 @@ export default function AdvisorInboxPage() {
                     <div className={stale ? styles.stale : styles.age}>Age {ageLabel}</div>
                   </div>
                 </div>
+
                 <div className={styles.rowChips}>
                   <Chip tone={statusTone(action.status)}>{action.status}</Chip>
                   <Chip tone={priorityTone(action.priority)}>{formatPriority(action.priority)}</Chip>
                   <Chip tone={assignedLabel === "Unassigned" ? "neutral" : "info"}>{assignedLabel}</Chip>
                   {renderPlanSummary(action)}
                 </div>
-                <div className={styles.rowActions}><Button variant="secondary" type="button">Open</Button></div>
+
+                <div className={styles.rowActions}>
+                  <Button
+                    variant="secondary"
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openAction(action);
+                    }}
+                  >
+                    Open
+                  </Button>
+                </div>
+
                 {latestSummary && <div className={styles.outcome}>{latestSummary}</div>}
-              </button>
+              </div>
             );
           })}
         </Panel>
