@@ -101,7 +101,8 @@ export function createPlan(payload: {
     direction: PlanConditionDirection;
   }>;
 }) {
-  return apiPost<PlanDetail>("/api/plans", payload);
+  const query = new URLSearchParams({ business_id: payload.business_id });
+  return apiPost<PlanDetail>(`/api/plans?${query.toString()}`, payload);
 }
 
 export function listPlans(businessId: string, params?: { status?: PlanStatus; assigned_to?: string; source_action_id?: string }) {
