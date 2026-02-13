@@ -36,6 +36,17 @@ vi.mock("../../api/simV2", () => ({
   resetSimV2: (...a: unknown[]) => resetSimV2(...a),
 }));
 
+vi.mock("../../api/dataStatus", () => ({
+  fetchDataStatus: vi.fn().mockResolvedValue({
+    latest_event: { source: "plaid", occurred_at: new Date().toISOString() },
+    open_signals: 1,
+    open_actions: 1,
+    ledger_rows: 10,
+    uncategorized_txns: 1,
+    last_sync_at: new Date().toISOString(),
+  }),
+}));
+
 vi.mock("../../api/plaid", () => ({
   ensureDynamicPlaidItem: (...a: unknown[]) => ensureDynamicPlaidItem(...a),
   pumpPlaidTransactions: (...a: unknown[]) => pumpPlaidTransactions(...a),

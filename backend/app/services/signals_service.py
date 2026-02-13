@@ -10,7 +10,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from backend.app.models import Business, HealthSignalState
+from backend.app.models import ActionItem, Business, HealthSignalState
 from backend.app.norma.ledger import LedgerIntegrityError, build_cash_ledger
 from backend.app.norma.normalize import NormalizedTransaction
 from backend.app.services import audit_service, health_signal_service
@@ -1266,6 +1266,25 @@ def list_signal_states(db: Session, business_id: str) -> Tuple[List[Dict[str, An
         .all()
     )
 
+    signal_ids = [row.signal_id for row in rows]
+    linked_actions: Dict[str, ActionItem] = {}
+    if signal_ids:
+        action_rows = (
+            db.execute(
+                select(ActionItem)
+                .where(
+                    ActionItem.business_id == business_id,
+                    ActionItem.source_signal_id.in_(signal_ids),
+                )
+                .order_by(ActionItem.updated_at.desc(), ActionItem.created_at.desc())
+            )
+            .scalars()
+            .all()
+        )
+        for action in action_rows:
+            if action.source_signal_id and action.source_signal_id not in linked_actions:
+                linked_actions[action.source_signal_id] = action
+
     signals = []
     for row in rows:
         domain = None
@@ -1287,6 +1306,7 @@ def list_signal_states(db: Session, business_id: str) -> Tuple[List[Dict[str, An
                 "last_seen_at": row.last_seen_at.isoformat() if row.last_seen_at else None,
                 "resolved_at": row.resolved_at.isoformat() if row.resolved_at else None,
                 "has_ledger_anchors": has_ledger_anchors,
+                "linked_action_id": linked_actions.get(row.signal_id).id if linked_actions.get(row.signal_id) else None,
             }
         )
     return signals, {"count": len(signals)}

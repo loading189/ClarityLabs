@@ -19,6 +19,7 @@ import {
 import TransactionDetailDrawer from "../../components/transactions/TransactionDetailDrawer";
 import { Button, EmptyState, InlineAlert } from "../../components/ui";
 import styles from "./LedgerPage.module.css";
+import DataStatusStrip from "../../components/status/DataStatusStrip";
 
 const SIDEBAR_TOP_N = 12;
 const COLUMN_STORAGE_KEY = "ledger-column-visibility";
@@ -330,6 +331,7 @@ export default function LedgerPage() {
 
   return (
     <div className={styles.page}>
+      <DataStatusStrip businessId={businessId} refreshKey={dataVersion} />
       <PageHeader
         title="Ledger"
         subtitle="Deterministic proof layer for transactions, balances, and categorization."

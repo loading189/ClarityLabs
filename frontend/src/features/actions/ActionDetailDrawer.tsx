@@ -460,7 +460,7 @@ export default function ActionDetailDrawer({
             />
           )}
 
-          <Section title="Ownership & status" subtitle="Who owns this case and where it stands.">
+          <Section title="Summary" subtitle="Case summary and current status.">
             <Card className={styles.card}>
               <div className={styles.summaryText}>{action.summary}</div>
               <div className={styles.summaryMeta}>Created {formatTimestamp(action.created_at)}</div>
@@ -473,33 +473,7 @@ export default function ActionDetailDrawer({
                 { label: "Due", value: formatTimestamp(action.due_at) },
               ]}
             />
-            <div className={styles.row}>
-              <select
-                className={styles.select}
-                value={assignedTo}
-                onChange={(event) => handleAssign(event.target.value)}
-                disabled={loadingMembers}
-              >
-                <option value="">Unassigned</option>
-                {members.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.name ?? member.email} · {member.role}
-                  </option>
-                ))}
-              </select>
-              <Chip tone={assignedTo ? "info" : "neutral"}>{assignedLabel}</Chip>
-            </div>
-            <div className={styles.actions}>
-              <Button variant="primary" onClick={() => handleResolve("done")}>
-                Mark done
-              </Button>
-              <Button variant="secondary" onClick={() => handleResolve("ignored")}>
-                Ignore
-              </Button>
-              <Button variant="secondary" onClick={handleSnooze}>
-                Snooze 7d
-              </Button>
-            </div>
+
           </Section>
 
           <Section title="Evidence" subtitle="Signals and ledger anchors that informed this action.">
@@ -524,7 +498,7 @@ export default function ActionDetailDrawer({
             </div>
           </Section>
 
-          <Section title="Plan" subtitle="Track the remediation plan linked to this action.">
+          <Section title="Plan timeline & history" subtitle="Remediation progress, checks, and case history.">
             {planError && (
               <InlineAlert tone="error" title="Plan update failed" description={planError.message} />
             )}
@@ -626,13 +600,40 @@ export default function ActionDetailDrawer({
             )}
           </Section>
 
-          <Section title="Resolution notes & audit" subtitle="Captured for the audit trail.">
+          <Section title="Controls" subtitle="Assign, snooze, and resolve this case.">
+            <div className={styles.row}>
+              <select
+                className={styles.select}
+                value={assignedTo}
+                onChange={(event) => handleAssign(event.target.value)}
+                disabled={loadingMembers}
+              >
+                <option value="">Unassigned</option>
+                {members.map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.name ?? member.email} · {member.role}
+                  </option>
+                ))}
+              </select>
+              <Chip tone={assignedTo ? "info" : "neutral"}>{assignedLabel}</Chip>
+            </div>
+            <div className={styles.actions}>
+              <Button variant="primary" onClick={() => handleResolve("done")}>
+                Mark done
+              </Button>
+              <Button variant="secondary" onClick={() => handleResolve("ignored")}>
+                Ignore
+              </Button>
+              <Button variant="secondary" onClick={handleSnooze}>
+                Snooze 7d
+              </Button>
+            </div>
             <textarea
               className={styles.input}
               rows={3}
               value={note}
               onChange={(event) => setNote(event.target.value)}
-              placeholder="Add context for the audit trail"
+              placeholder="Add control note for the audit trail"
             />
             {loadingEvents && <LoadingState label="Loading activity…" rows={2} />}
             {!loadingEvents && activityItems.length === 0 && (

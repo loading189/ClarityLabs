@@ -27,6 +27,8 @@ import { ledgerPath } from "../../app/routes/routeUtils";
 import LedgerTraceDrawer from "../../components/ledger/LedgerTraceDrawer";
 import { ApiError } from "../../api/client";
 import { useAuth } from "../../app/auth/AuthContext";
+import { createActionFromSignal } from "../../api/actions";
+import DataStatusStrip from "../../components/status/DataStatusStrip";
 
 const STATUS_LABELS: Record<string, string> = {
   open: "Open",
@@ -263,7 +265,7 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
   const { logout } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [filters, setFilters] = useFilters();
-  const { setDateRange } = useAppState();
+  const { setDateRange, dataVersion } = useAppState();
   const [signals, setSignals] = useState<SignalState[]>([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<LoadError | null>(null);
@@ -275,6 +277,7 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
   const [detailExplain, setDetailExplain] = useState<any | null>(null);
   const [rowActionLoading, setRowActionLoading] = useState<Record<string, boolean>>({});
   const [rowActionError, setRowActionError] = useState<string | null>(null);
+  const [creatingActionSignalId, setCreatingActionSignalId] = useState<string | null>(null);
   const [detailSourceEventId, setDetailSourceEventId] = useState<string | null>(null);
   const [ledgerTraceOpen, setLedgerTraceOpen] = useState(false);
   const [selectedLedgerAnchor, setSelectedLedgerAnchor] = useState<SignalExplainLedgerAnchor | null>(null);
@@ -282,8 +285,8 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
   const [healthScoreLoading, setHealthScoreLoading] = useState(false);
   const [healthScoreErr, setHealthScoreErr] = useState<LoadError | null>(null);
   const [breakdownOpen, setBreakdownOpen] = useState(false);
-  const [toastMsg, setToastMsg] = useState<string | null>(null);
-  const [toastAuditId, setToastAuditId] = useState<string | null>(null);
+  const [toastMsg] = useState<string | null>(null);
+  const [toastAuditId] = useState<string | null>(null);
   const [monitorStatus, setMonitorStatus] = useState<MonitorStatus | null>(null);
   const [monitorLoading, setMonitorLoading] = useState(false);
   const [monitorErr, setMonitorErr] = useState<LoadError | null>(null);
@@ -514,6 +517,29 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
     [businessId, navigate]
   );
 
+  const handleCreateAction = useCallback(
+    async (signalId: string) => {
+      if (!businessId || !signalId) return;
+      setRowActionError(null);
+      setCreatingActionSignalId(signalId);
+      try {
+        const response = await createActionFromSignal(businessId, signalId);
+        const actionId = response.action?.id;
+        await loadSignals();
+        if (actionId) {
+          navigate(`/app/${businessId}/advisor?action_id=${encodeURIComponent(actionId)}`);
+        } else {
+          navigate(`/app/${businessId}/advisor`);
+        }
+      } catch (e: any) {
+        setRowActionError(e?.message ?? "Unable to create action from signal.");
+      } finally {
+        setCreatingActionSignalId(null);
+      }
+    },
+    [businessId, loadSignals, navigate]
+  );
+
   const handleAuditSelect = (auditId: string) => {
     navigate(`/app/${businessId}/categorize?auditId=${auditId}#recent-changes`);
   };
@@ -580,6 +606,7 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
 
   return (
     <div className={styles.container}>
+      <DataStatusStrip businessId={businessId} refreshKey={dataVersion} />
       <Panel className={styles.scoreHeader}>
         <div>
           <div className={styles.scoreTitle}>Health score</div>
@@ -812,6 +839,18 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
                       disabled={rowActionLoading[signal.id]}
                     >
                       {rowActionLoading[signal.id] ? "Opening…" : "View in Ledger"}
+                    </button>
+                    <button
+                      className={styles.secondaryButton}
+                      type="button"
+                      onClick={() => void handleCreateAction(signal.id)}
+                      disabled={creatingActionSignalId === signal.id}
+                    >
+                      {creatingActionSignalId === signal.id
+                        ? "Opening…"
+                        : signal.linked_action_id
+                          ? "View Action"
+                          : "Create Action"}
                     </button>
                   </div>
                 )}

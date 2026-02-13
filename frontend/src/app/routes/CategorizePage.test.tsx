@@ -8,6 +8,17 @@ const fetchTxnsToCategorize = vi.fn();
 const fetchCategories = vi.fn();
 const saveCategorization = vi.fn();
 
+vi.mock("../../api/dataStatus", () => ({
+  fetchDataStatus: vi.fn().mockResolvedValue({
+    latest_event: { source: "plaid", occurred_at: new Date().toISOString() },
+    open_signals: 1,
+    open_actions: 1,
+    ledger_rows: 1,
+    uncategorized_txns: 1,
+    last_sync_at: new Date().toISOString(),
+  }),
+}));
+
 vi.mock("../../api/categorize", () => ({
   fetchTxnsToCategorize: (...args: unknown[]) => fetchTxnsToCategorize(...args),
   fetchCategories: (...args: unknown[]) => fetchCategories(...args),

@@ -5,11 +5,14 @@ from typing import Any, Dict, List, Optional, Union
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from backend.app.api.deps import require_membership_dep
 from backend.app.db import get_db
+from backend.app.models import ActionItem, HealthSignalState, IntegrationConnection, RawEvent
 from backend.app.services import diagnostics_service
+from backend.app.services.posted_txn_service import count_uncategorized_raw_events
 
 router = APIRouter(prefix="/diagnostics", tags=["diagnostics"])
 
@@ -106,6 +109,21 @@ class ReconcileOut(BaseModel):
     latest_markers: ReconcileLatestMarkersOut
 
 
+
+class DataStatusLatestEventOut(BaseModel):
+    source: Optional[str] = None
+    occurred_at: Optional[datetime] = None
+
+
+class DataStatusOut(BaseModel):
+    latest_event: DataStatusLatestEventOut
+    open_signals: int
+    open_actions: int
+    ledger_rows: int
+    uncategorized_txns: int
+    last_sync_at: Optional[datetime] = None
+
+
 @router.get(
     "/{business_id}",
     response_model=Union[DiagnosticsOut, DiagnosticsErrorOut],
@@ -155,3 +173,57 @@ def get_reconcile_report(business_id: str, db: Session = Depends(get_db)):
             message=str(exc),
             details={"type": exc.__class__.__name__},
         )
+
+
+@router.get(
+    "/status/{business_id}",
+    response_model=DataStatusOut,
+    dependencies=[Depends(require_membership_dep())],
+)
+def get_data_status(business_id: str, db: Session = Depends(get_db)):
+    latest_event = (
+        db.execute(
+            select(RawEvent.source, RawEvent.occurred_at)
+            .where(RawEvent.business_id == business_id)
+            .order_by(RawEvent.occurred_at.desc(), RawEvent.source_event_id.desc())
+            .limit(1)
+        )
+        .first()
+    )
+    open_signals = int(
+        db.execute(
+            select(func.count())
+            .select_from(HealthSignalState)
+            .where(HealthSignalState.business_id == business_id, HealthSignalState.status == "open")
+        ).scalar_one()
+    )
+    open_actions = int(
+        db.execute(
+            select(func.count())
+            .select_from(ActionItem)
+            .where(ActionItem.business_id == business_id, ActionItem.status == "open")
+        ).scalar_one()
+    )
+    ledger_rows = int(
+        db.execute(
+            select(func.count())
+            .select_from(RawEvent)
+            .where(RawEvent.business_id == business_id)
+        ).scalar_one()
+    )
+    uncategorized = count_uncategorized_raw_events(db, business_id)
+    last_sync_at = db.execute(
+        select(func.max(IntegrationConnection.last_sync_at)).where(IntegrationConnection.business_id == business_id)
+    ).scalar_one()
+
+    return DataStatusOut(
+        latest_event=DataStatusLatestEventOut(
+            source=latest_event[0] if latest_event else None,
+            occurred_at=latest_event[1] if latest_event else None,
+        ),
+        open_signals=open_signals,
+        open_actions=open_actions,
+        ledger_rows=ledger_rows,
+        uncategorized_txns=int(uncategorized),
+        last_sync_at=last_sync_at,
+    )

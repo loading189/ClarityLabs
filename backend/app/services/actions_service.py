@@ -263,10 +263,17 @@ def _signal_candidates(db: Session, business_id: str, now: datetime) -> list[Act
         decision = _evaluate_signal_policy(db, business_id, row, now)
         if not decision.allowed:
             continue
+        candidate = _candidate_from_signal_state(business_id, row)
+        if candidate:
+            candidates.append(candidate)
+    return candidates
+
+
+def _candidate_from_signal_state(business_id: str, row: HealthSignalState) -> Optional[ActionCandidate]:
         payload = row.payload_json if isinstance(row.payload_json, dict) else {}
         anchors = _payload_ledger_anchors(payload)
         if not anchors:
-            continue
+            return None
         domain = _signal_domain(row.signal_type)
         severity = (row.severity or "").lower()
         title = "Investigate signal"
@@ -297,27 +304,113 @@ def _signal_candidates(db: Session, business_id: str, now: datetime) -> list[Act
             "baseline_window": payload.get("baseline_window"),
             "delta": payload.get("delta"),
         }
-        candidates.append(
-            ActionCandidate(
-                action_type="investigate_anomaly",
-                title=title,
-                summary=row.summary or row.title or "Review the underlying ledger evidence.",
-                priority=5 if severity in {"high", "critical"} else 4,
-                idempotency_key=_idempotency_key(
-                    business_id,
-                    "investigate_anomaly",
-                    None,
-                    None,
-                    None,
-                    _signal_fingerprint(row),
-                ),
-                due_at=None,
-                source_signal_id=row.signal_id,
-                evidence_json=evidence,
-                rationale_json=rationale,
+        return ActionCandidate(
+            action_type="investigate_anomaly",
+            title=title,
+            summary=row.summary or row.title or "Review the underlying ledger evidence.",
+            priority=5 if severity in {"high", "critical"} else 4,
+            idempotency_key=_idempotency_key(
+                business_id,
+                "investigate_anomaly",
+                None,
+                None,
+                None,
+                _signal_fingerprint(row),
+            ),
+            due_at=None,
+            source_signal_id=row.signal_id,
+            evidence_json=evidence,
+            rationale_json=rationale,
+        )
+ 
+
+def create_action_from_signal(
+    db: Session,
+    business_id: str,
+    signal_id: str,
+    *,
+    now: Optional[datetime] = None,
+) -> tuple[ActionItem, bool]:
+    now = now or utcnow()
+    state = db.get(HealthSignalState, (business_id, signal_id))
+    if not state:
+        raise ValueError("signal not found")
+
+    existing_by_signal = (
+        db.execute(
+            select(ActionItem)
+            .where(
+                ActionItem.business_id == business_id,
+                ActionItem.source_signal_id == signal_id,
+            )
+            .order_by(ActionItem.updated_at.desc(), ActionItem.created_at.desc())
+        )
+        .scalars()
+        .first()
+    )
+    if existing_by_signal:
+        return existing_by_signal, False
+
+    candidate = _candidate_from_signal_state(business_id, state)
+    if not candidate:
+        payload = state.payload_json if isinstance(state.payload_json, dict) else {}
+        severity = (state.severity or "").lower()
+        candidate = ActionCandidate(
+            action_type="investigate_anomaly",
+            title=state.title or "Investigate signal",
+            summary=state.summary or "Review the underlying signal evidence.",
+            priority=5 if severity in {"high", "critical"} else 4,
+            idempotency_key=f"{business_id}:from_signal:{signal_id}",
+            due_at=None,
+            source_signal_id=signal_id,
+            evidence_json={"signal_id": signal_id, "signal_type": state.signal_type, "payload": payload},
+            rationale_json={"why_now": "Action manually created from signal."},
+        )
+    else:
+        candidate = ActionCandidate(
+            action_type=candidate.action_type,
+            title=candidate.title,
+            summary=candidate.summary,
+            priority=candidate.priority,
+            idempotency_key=f"{business_id}:from_signal:{signal_id}",
+            due_at=candidate.due_at,
+            source_signal_id=candidate.source_signal_id,
+            evidence_json=candidate.evidence_json,
+            rationale_json=candidate.rationale_json,
+        )
+
+    existing = (
+        db.execute(
+            select(ActionItem).where(
+                ActionItem.business_id == business_id,
+                ActionItem.idempotency_key == candidate.idempotency_key,
             )
         )
-    return candidates
+        .scalars()
+        .first()
+    )
+    if existing:
+        _apply_candidate(existing, candidate, now, reopen=existing.status != "open")
+        return existing, False
+
+    action = ActionItem(
+        business_id=business_id,
+        action_type=candidate.action_type,
+        title=candidate.title,
+        summary=candidate.summary,
+        priority=candidate.priority,
+        status="open",
+        created_at=now,
+        updated_at=now,
+        due_at=candidate.due_at,
+        source_signal_id=candidate.source_signal_id,
+        evidence_json=candidate.evidence_json,
+        rationale_json=candidate.rationale_json,
+        idempotency_key=candidate.idempotency_key,
+    )
+    db.add(action)
+    db.flush()
+    return action, True
 
 
 def _signal_fingerprint(state: HealthSignalState) -> str:

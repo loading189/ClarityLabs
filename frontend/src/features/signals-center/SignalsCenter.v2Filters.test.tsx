@@ -99,3 +99,14 @@ describe("SignalsCenter v2 filters", () => {
     expect(runwayLabels.length).toBeGreaterThan(0);
   });
 });
+
+vi.mock("../../api/dataStatus", () => ({
+  fetchDataStatus: vi.fn().mockResolvedValue({
+    latest_event: { source: "plaid", occurred_at: new Date().toISOString() },
+    open_signals: 1,
+    open_actions: 1,
+    ledger_rows: 1,
+    uncategorized_txns: 1,
+    last_sync_at: new Date().toISOString(),
+  }),
+}));

@@ -13,6 +13,7 @@ from backend.app.db import get_db
 from backend.app.models import ActionItem, ActionStateEvent, Business, BusinessMembership, Plan, User
 from backend.app.services.actions_service import (
     assign_action,
+    create_action_from_signal,
     generate_actions_for_business,
     list_actions,
     resolve_action,
@@ -91,6 +92,15 @@ class ActionStateEventOut(BaseModel):
     reason: Optional[str]
     note: Optional[str]
     created_at: datetime
+
+
+class ActionFromSignalIn(BaseModel):
+    signal_id: str
+
+
+class ActionFromSignalOut(BaseModel):
+    action: ActionItemOut
+    created: bool
 
 
 class ActionTriageUserOut(BaseModel):
@@ -187,6 +197,26 @@ def refresh_actions(
         "suppressed_count": result.suppressed_count,
         "suppression_reasons": result.suppression_reasons,
     }
+
+
+@router.post(
+    "/{business_id}/from_signal",
+    response_model=ActionFromSignalOut,
+    dependencies=[Depends(require_membership_dep(min_role="staff"))],
+)
+def create_action_for_signal(
+    business_id: str,
+    req: ActionFromSignalIn,
+    db: Session = Depends(get_db),
+):
+    try:
+        action, created = create_action_from_signal(db, business_id, req.signal_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    db.commit()
+    db.refresh(action)
+    payload = ActionItemOut.model_validate(action)
+    return ActionFromSignalOut(action=payload, created=created)
 
 
 @router.post(

@@ -76,6 +76,20 @@ export async function snoozeAction(
   return apiPost(`/api/actions/${businessId}/${actionId}/snooze`, payload);
 }
 
+
+
+export type CreateActionFromSignalResponse = {
+  action: ActionItem;
+  created: boolean;
+};
+
+export async function createActionFromSignal(
+  businessId: string,
+  signalId: string
+): Promise<CreateActionFromSignalResponse> {
+  return apiPost(`/api/actions/${businessId}/from_signal`, { signal_id: signalId });
+}
+
 export type ActionTriageUser = {
   id: string;
   email: string;

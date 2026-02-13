@@ -14,6 +14,7 @@ import Button from "../../components/ui/Button";
 import { assertBusinessId } from "../../utils/businessId";
 import { normalizeVendorDisplay } from "../../utils/vendors";
 import styles from "./CategorizePage.module.css";
+import DataStatusStrip from "../../components/status/DataStatusStrip";
 
 export default function CategorizePage() {
   const { businessId: businessIdParam } = useParams();
@@ -209,6 +210,7 @@ export default function CategorizePage() {
 
   return (
     <div className={styles.page}>
+      <DataStatusStrip businessId={businessId} />
       <PageHeader
         title="Categorize"
         subtitle="Stay on top of uncategorized transactions with a focused, bookkeeping-first view."

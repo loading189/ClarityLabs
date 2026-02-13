@@ -53,6 +53,7 @@ export type SignalState = {
   summary: string | null;
   updated_at: string | null;
   has_ledger_anchors?: boolean;
+  linked_action_id?: string | null;
 };
 
 export type SignalStateDetail = SignalState & {
