@@ -52,3 +52,47 @@ export function exchangePlaidPublicToken(businessId: string, publicToken: string
 export function syncPlaid(businessId: string) {
   return apiPost<PlaidSyncResponse>(`/integrations/plaid/sync/${businessId}`);
 }
+
+export type EnsureDynamicItemResponse = {
+  business_id: string;
+  provider: string;
+  item_id: string;
+  status: string;
+};
+
+export type PlaidPumpResponse = {
+  business_id: string;
+  date_range: { start_date: string; end_date: string };
+  seed_key: string;
+  txns_requested: number;
+  txns_created: number;
+  sync?: { new: number; updated: number; removed: number; cursor?: string | null } | null;
+  pipeline?: { ledger_rows: number; signals_open_count: number } | null;
+  actions?: {
+    created_count: number;
+    updated_count: number;
+    suppressed_count: number;
+    suppression_reasons: Record<string, number>;
+  } | null;
+};
+
+export function ensureDynamicPlaidItem(businessId: string, forceRecreate = false) {
+  return apiPost<EnsureDynamicItemResponse>(`/api/dev/plaid/${businessId}/ensure_dynamic_item`, {
+    force_recreate: forceRecreate,
+  });
+}
+
+export function pumpPlaidTransactions(
+  businessId: string,
+  payload: {
+    start_date: string;
+    end_date: string;
+    daily_txn_count: number;
+    profile: "retail" | "services" | "ecom" | "mixed";
+    run_sync?: boolean;
+    run_pipeline?: boolean;
+    refresh_actions?: boolean;
+  },
+) {
+  return apiPost<PlaidPumpResponse>(`/api/dev/plaid/${businessId}/pump_transactions`, payload);
+}
