@@ -280,6 +280,8 @@ def test_create_action_from_signal_is_idempotent(api_client, sqlite_session):
     assert first.status_code == 200
     first_payload = first.json()
     assert first_payload["created"] is True
+    assert first_payload["action_id"]
+    assert first_payload["linked_signal_id"] == "signal-from-row"
 
     second = api_client.post(
         f"/api/actions/{biz.id}/from_signal",
@@ -289,7 +291,16 @@ def test_create_action_from_signal_is_idempotent(api_client, sqlite_session):
     assert second.status_code == 200
     second_payload = second.json()
     assert second_payload["created"] is False
-    assert second_payload["action"]["id"] == first_payload["action"]["id"]
+    assert second_payload["action_id"] == first_payload["action_id"]
 
     count = sqlite_session.query(ActionItem).filter(ActionItem.business_id == biz.id).count()
     assert count == 1
+
+    signals = api_client.get(
+        f"/api/signals?business_id={biz.id}",
+        headers={"X-User-Email": user.email},
+    )
+    assert signals.status_code == 200
+    signal_payload = signals.json()
+    signal = next(item for item in signal_payload["signals"] if item["id"] == "signal-from-row")
+    assert signal["linked_action_id"] == first_payload["action_id"]

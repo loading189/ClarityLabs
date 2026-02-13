@@ -79,8 +79,9 @@ export async function snoozeAction(
 
 
 export type CreateActionFromSignalResponse = {
-  action: ActionItem;
+  action_id: string;
   created: boolean;
+  linked_signal_id: string;
 };
 
 export async function createActionFromSignal(

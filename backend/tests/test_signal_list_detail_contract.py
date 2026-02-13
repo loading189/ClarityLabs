@@ -63,6 +63,7 @@ def test_signal_list_and_detail_contract_fields():
     assert items[0]["title"] is not None
     assert items[0]["summary"] is not None
     assert items[0]["updated_at"] is not None
+    assert "linked_action_id" in items[0]
 
     detail = signals_service.get_signal_state_detail(db, biz.id, state.signal_id)
     assert detail["payload_json"] == {"vendor": "Acme"}

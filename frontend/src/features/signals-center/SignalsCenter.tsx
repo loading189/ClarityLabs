@@ -275,7 +275,6 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailErr, setDetailErr] = useState<LoadError | null>(null);
   const [detailExplain, setDetailExplain] = useState<any | null>(null);
-  const [rowActionLoading, setRowActionLoading] = useState<Record<string, boolean>>({});
   const [rowActionError, setRowActionError] = useState<string | null>(null);
   const [creatingActionSignalId, setCreatingActionSignalId] = useState<string | null>(null);
   const [detailSourceEventId, setDetailSourceEventId] = useState<string | null>(null);
@@ -494,43 +493,19 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
     });
   }, [domainFilter, hasLedgerAnchors, signals, severityFilter, statusFilter, textFilter]);
 
-  const handleViewLedger = useCallback(
-    async (signalId: string) => {
+  const handlePrimaryAction = useCallback(
+    async (signalId: string, linkedActionId?: string | null) => {
       if (!businessId || !signalId) return;
       setRowActionError(null);
-      setRowActionLoading((prev) => ({ ...prev, [signalId]: true }));
-      try {
-        const explainData = await getSignalExplain(businessId, signalId);
-        const anchor = (explainData.ledger_anchors ?? [])[0] ?? null;
-        const filters = anchorToLedgerFilters(anchor);
-        if (!filters) {
-          setRowActionError("No ledger anchor available yet for this signal.");
-          return;
-        }
-        navigate(ledgerPath(businessId, filters));
-      } catch (e: any) {
-        setRowActionError(e?.message ?? "Unable to open ledger for this signal.");
-      } finally {
-        setRowActionLoading((prev) => ({ ...prev, [signalId]: false }));
+      if (linkedActionId) {
+        navigate(`/app/${businessId}/advisor?action_id=${encodeURIComponent(linkedActionId)}`);
+        return;
       }
-    },
-    [businessId, navigate]
-  );
-
-  const handleCreateAction = useCallback(
-    async (signalId: string) => {
-      if (!businessId || !signalId) return;
-      setRowActionError(null);
       setCreatingActionSignalId(signalId);
       try {
         const response = await createActionFromSignal(businessId, signalId);
-        const actionId = response.action?.id;
         await loadSignals();
-        if (actionId) {
-          navigate(`/app/${businessId}/advisor?action_id=${encodeURIComponent(actionId)}`);
-        } else {
-          navigate(`/app/${businessId}/advisor`);
-        }
+        navigate(`/app/${businessId}/advisor?action_id=${encodeURIComponent(response.action_id)}`);
       } catch (e: any) {
         setRowActionError(e?.message ?? "Unable to create action from signal.");
       } finally {
@@ -833,23 +808,15 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
                       Explain
                     </button>
                     <button
-                      className={styles.secondaryButton}
+                      className={styles.primaryButton}
                       type="button"
-                      onClick={() => void handleViewLedger(signal.id)}
-                      disabled={rowActionLoading[signal.id]}
-                    >
-                      {rowActionLoading[signal.id] ? "Opening…" : "View in Ledger"}
-                    </button>
-                    <button
-                      className={styles.secondaryButton}
-                      type="button"
-                      onClick={() => void handleCreateAction(signal.id)}
+                      onClick={() => void handlePrimaryAction(signal.id, signal.linked_action_id)}
                       disabled={creatingActionSignalId === signal.id}
                     >
                       {creatingActionSignalId === signal.id
                         ? "Opening…"
                         : signal.linked_action_id
-                          ? "View Action"
+                          ? "Open in Inbox"
                           : "Create Action"}
                     </button>
                   </div>

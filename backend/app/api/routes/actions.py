@@ -99,8 +99,9 @@ class ActionFromSignalIn(BaseModel):
 
 
 class ActionFromSignalOut(BaseModel):
-    action: ActionItemOut
+    action_id: str
     created: bool
+    linked_signal_id: str
 
 
 class ActionTriageUserOut(BaseModel):
@@ -215,8 +216,7 @@ def create_action_for_signal(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     db.commit()
     db.refresh(action)
-    payload = ActionItemOut.model_validate(action)
-    return ActionFromSignalOut(action=payload, created=created)
+    return ActionFromSignalOut(action_id=action.id, created=created, linked_signal_id=req.signal_id)
 
 
 @router.post(

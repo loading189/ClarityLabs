@@ -1,12 +1,21 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import AdvisorInboxPage from "./AdvisorInboxPage";
 
 const fetchActionTriage = vi.fn();
 const refreshActions = vi.fn();
 const getPlanSummaries = vi.fn();
+
+const actionDetailDrawer = vi.fn();
+
+vi.mock("../features/actions/ActionDetailDrawer", () => ({
+  default: (props: { open: boolean; action: { id: string } | null }) => {
+    actionDetailDrawer(props);
+    return props.open ? <div>Action Drawer Open: {props.action?.id}</div> : null;
+  },
+}));
 
 vi.mock("../api/actions", () => ({
   fetchActionTriage: (...args: unknown[]) => fetchActionTriage(...args),
@@ -45,6 +54,12 @@ vi.mock("../hooks/useBusinessesMine", () => ({
 }));
 
 describe("AdvisorInboxPage", () => {
+  beforeEach(() => {
+    actionDetailDrawer.mockClear();
+    fetchActionTriage.mockReset();
+    refreshActions.mockReset();
+    getPlanSummaries.mockReset();
+  });
   it("renders plan status and latest verdict when present", async () => {
     fetchActionTriage.mockResolvedValue({
       actions: [
@@ -201,4 +216,44 @@ describe("AdvisorInboxPage", () => {
     await userEvent.click(refreshButton);
     await waitFor(() => expect(refreshActions).toHaveBeenCalledWith("biz-1"));
   });
+  it("auto-opens requested action drawer after actions load", async () => {
+    fetchActionTriage.mockResolvedValueOnce({
+      actions: [
+        {
+          id: "action-2",
+          business_id: "biz-1",
+          business_name: "Acme Co",
+          action_type: "followup",
+          title: "Review vendor anomaly",
+          summary: "Watch list",
+          priority: 3,
+          status: "open",
+          created_at: "2024-02-02T00:00:00Z",
+          due_at: null,
+          source_signal_id: "signal-2",
+          evidence_json: { signal_title: "Vendor spike" },
+          rationale_json: null,
+          resolution_reason: null,
+          resolution_note: null,
+          resolution_meta_json: null,
+          resolved_at: null,
+          assigned_to_user_id: null,
+          resolved_by_user_id: null,
+          snoozed_until: null,
+          assigned_to_user: null,
+          plan_id: null,
+        },
+      ],
+      summary: { by_status: { open: 1 }, by_business: [] },
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/app/biz-1/advisor?action_id=action-2"]}>
+        <AdvisorInboxPage />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText("Action Drawer Open: action-2")).toBeInTheDocument();
+  });
+
 });
