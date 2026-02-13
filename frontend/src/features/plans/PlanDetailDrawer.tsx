@@ -239,6 +239,7 @@ export default function PlanDetailDrawer({
               <div>
                 <div className={styles.title}>{plan.title}</div>
                 <div className={styles.subtitle}>Assigned to {assignedLabel}</div>
+                <div className={styles.subtitle}>Attached to Action {plan.source_action_id ?? "—"}{plan.primary_signal_id ? ` · Signal ${plan.primary_signal_id}` : ""}</div>
               </div>
               <Chip tone={planStatusTone(plan.status)}>{formatPlanStatus(plan.status)}</Chip>
             </div>

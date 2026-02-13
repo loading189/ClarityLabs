@@ -171,3 +171,29 @@ describe("SignalsCenter", () => {
     expect(screen.queryByRole("link", { name: /Create plan/i })).not.toBeInTheDocument();
   });
 });
+
+vi.mock("../../api/dataStatus", () => ({
+  fetchDataStatus: vi.fn().mockResolvedValue({
+    latest_event: { source: "plaid", occurred_at: new Date().toISOString() },
+    open_signals: 1,
+    open_actions: 1,
+    ledger_rows: 1,
+    uncategorized_txns: 1,
+    last_sync_at: new Date().toISOString(),
+  }),
+}));
+
+vi.mock("../../api/monitor", () => ({
+  getMonitorStatus: vi.fn().mockResolvedValue({
+    business_id: "biz-1",
+    last_pulse_at: null,
+    newest_event_at: null,
+    newest_event_source_event_id: null,
+    open_count: 0,
+    counts: { by_status: {}, by_severity: {} },
+    gated: false,
+    gating_reason: null,
+    stale: false,
+    stale_reason: null,
+  }),
+}));

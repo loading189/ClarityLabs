@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { getSimV2Catalog, resetSimV2, seedSimV2, type SimCatalog, type SimSeedResponse } from "../../api/simV2";
 import { useAppState } from "../../app/state/appState";
 import { ensureDynamicPlaidItem, pumpPlaidTransactions, type PlaidPumpResponse } from "../../api/plaid";
+import DataStatusStrip from "../../components/status/DataStatusStrip";
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -59,6 +60,7 @@ export default function SimulatorV2Page() {
 
   return (
     <div style={{ padding: 24 }}>
+      {selectedBusinessId && <DataStatusStrip businessId={selectedBusinessId} />}
       <h2>Scenario Tools</h2>
       <div style={{ display: "flex", gap: 12 }}>
         <label>

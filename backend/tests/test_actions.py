@@ -237,3 +237,59 @@ def test_resolve_updates_status(api_client, sqlite_session):
     payload = resp.json()
     assert payload["status"] == "done"
     assert payload["resolution_reason"] == "Reviewed"
+
+
+def test_create_action_from_signal_is_idempotent(api_client, sqlite_session):
+    now = datetime.now(timezone.utc)
+    biz = _create_business(sqlite_session)
+    user = _create_user(sqlite_session, "advisor@example.com")
+    _add_membership(sqlite_session, biz.id, user.id, role="advisor")
+    sqlite_session.add(
+        HealthSignalState(
+            business_id=biz.id,
+            signal_id="signal-from-row",
+            signal_type="cash_low",
+            status="open",
+            severity="high",
+            title="Cash dropped",
+            summary="Cash dropped below target.",
+            payload_json={
+                "ledger_anchors": [
+                    {
+                        "label": "Anchor",
+                        "query": {
+                            "start_date": (now - timedelta(days=3)).date().isoformat(),
+                            "end_date": now.date().isoformat(),
+                            "source_event_ids": ["evt-a"],
+                        },
+                    }
+                ]
+            },
+            detected_at=now - timedelta(hours=4),
+            last_seen_at=now,
+            updated_at=now,
+        )
+    )
+    sqlite_session.commit()
+
+    first = api_client.post(
+        f"/api/actions/{biz.id}/from_signal",
+        json={"signal_id": "signal-from-row"},
+        headers={"X-User-Email": user.email},
+    )
+    assert first.status_code == 200
+    first_payload = first.json()
+    assert first_payload["created"] is True
+
+    second = api_client.post(
+        f"/api/actions/{biz.id}/from_signal",
+        json={"signal_id": "signal-from-row"},
+        headers={"X-User-Email": user.email},
+    )
+    assert second.status_code == 200
+    second_payload = second.json()
+    assert second_payload["created"] is False
+    assert second_payload["action"]["id"] == first_payload["action"]["id"]
+
+    count = sqlite_session.query(ActionItem).filter(ActionItem.business_id == biz.id).count()
+    assert count == 1

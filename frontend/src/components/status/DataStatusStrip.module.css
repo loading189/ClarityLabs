@@ -1,0 +1,16 @@
+.strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: #475569;
+}
+.pill {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+.label { font-weight: 600; color: #334155; }
+.error { margin-bottom: 10px; }

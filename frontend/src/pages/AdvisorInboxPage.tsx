@@ -18,6 +18,7 @@ import { useBusinessesMine } from "../hooks/useBusinessesMine";
 import type { PlanSummary } from "../api/plansV2";
 import { ledgerPath } from "../app/routes/routeUtils";
 import styles from "./AdvisorInboxPage.module.css";
+import DataStatusStrip from "../components/status/DataStatusStrip";
 
 type AssignedFilter = "me" | "unassigned" | "any";
 type StatusFilter = "all" | "open" | "snoozed" | "done";
@@ -94,6 +95,7 @@ export default function AdvisorInboxPage() {
   const [planSummaryError, setPlanSummaryError] = useState<LoadError | null>(null);
   const [planSummaryLoading, setPlanSummaryLoading] = useState(false);
   const [filterMode, setFilterMode] = useState<"status" | "assigned">("assigned");
+  const requestedActionId = searchParams.get("action_id");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -174,6 +176,14 @@ export default function AdvisorInboxPage() {
       active = false;
     };
   }, [actions, logout]);
+
+
+  useEffect(() => {
+    if (!requestedActionId) return;
+    const found = actions.find((action) => action.id === requestedActionId);
+    if (!found) return;
+    setSelected(found);
+  }, [actions, requestedActionId]);
 
   const businessOptions = useMemo(() => {
     return [
@@ -279,6 +289,7 @@ export default function AdvisorInboxPage() {
 
   return (
     <div className={styles.page}>
+      {businessId !== "all" && <DataStatusStrip businessId={businessId} />}
       <PageHeader
         title="Inbox"
         subtitle="Work queue for actions the firm chose to resolve."
@@ -520,7 +531,14 @@ export default function AdvisorInboxPage() {
       <ActionDetailDrawer
         open={Boolean(selected)}
         action={selected}
-        onClose={() => setSelected(null)}
+        onClose={() => {
+          setSelected(null);
+          setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            next.delete("action_id");
+            return next;
+          });
+        }}
         onUpdated={load}
       />
     </div>

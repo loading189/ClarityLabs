@@ -10,6 +10,17 @@ const fetchLedgerQuery = vi.fn();
 const fetchLedgerAccountDimensions = vi.fn();
 const fetchLedgerVendorDimensions = vi.fn();
 
+vi.mock("../../api/dataStatus", () => ({
+  fetchDataStatus: vi.fn().mockResolvedValue({
+    latest_event: { source: "plaid", occurred_at: new Date().toISOString() },
+    open_signals: 1,
+    open_actions: 1,
+    ledger_rows: 10,
+    uncategorized_txns: 1,
+    last_sync_at: new Date().toISOString(),
+  }),
+}));
+
 vi.mock("../../api/ledger", () => ({
   fetchLedgerQuery: (...args: unknown[]) => fetchLedgerQuery(...args),
   fetchLedgerAccountDimensions: (...args: unknown[]) => fetchLedgerAccountDimensions(...args),
