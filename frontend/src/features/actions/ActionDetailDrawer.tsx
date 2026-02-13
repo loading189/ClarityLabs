@@ -487,12 +487,12 @@ export default function ActionDetailDrawer({
             <div className={styles.linkRow}>
               {ledgerLink && (
                 <Link className={styles.linkButton} to={ledgerLink}>
-                  View in Ledger →
+                  View in Ledger
                 </Link>
               )}
               {action.source_signal_id && businessId && (
                 <Link className={styles.linkButton} to={`/app/${businessId}/signals?signal_id=${action.source_signal_id}`}>
-                  Open Signal →
+                  View Signal Explain
                 </Link>
               )}
             </div>
@@ -512,7 +512,7 @@ export default function ActionDetailDrawer({
             )}
             {!planId && (
               <Card className={styles.planCard}>
-                <div className={styles.planTitle}>Create a remediation plan</div>
+                <div className={styles.planTitle}>Start remediation plan</div>
                 <div className={styles.planMeta}>
                   Plans track the remediation outcome for this action and surface observations after refresh.
                 </div>
@@ -524,7 +524,7 @@ export default function ActionDetailDrawer({
                   placeholder="Document the plan intent and why it matters"
                 />
                 <Button variant="primary" onClick={handleCreatePlan} disabled={!canCreatePlan || planCreateLoading}>
-                  {planCreateLoading ? "Creating Plan…" : "Create Plan"}
+                  {planCreateLoading ? "Starting Plan…" : "Start Plan"}
                 </Button>
               </Card>
             )}

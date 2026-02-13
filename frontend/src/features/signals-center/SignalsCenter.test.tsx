@@ -5,6 +5,21 @@ import { MemoryRouter } from "react-router-dom";
 import { AppStateProvider } from "../../app/state/appState";
 import SignalsCenter from "./SignalsCenter";
 
+const navigateMock = vi.fn();
+const createActionFromSignal = vi.fn().mockResolvedValue({
+  action_id: "act-created",
+  created: true,
+  linked_signal_id: "sig-2",
+});
+
+vi.mock("react-router-dom", async () => {
+  const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
+  return {
+    ...actual,
+    useNavigate: () => navigateMock,
+  };
+});
+
 const listSignalStates = vi.fn().mockResolvedValue({
   signals: [
     {
@@ -15,6 +30,7 @@ const listSignalStates = vi.fn().mockResolvedValue({
       title: "Expense creep detected",
       summary: "Outflow is rising",
       updated_at: new Date("2024-05-01T10:00:00Z").toISOString(),
+      linked_action_id: "act-1",
     },
     {
       id: "sig-2",
@@ -24,6 +40,7 @@ const listSignalStates = vi.fn().mockResolvedValue({
       title: "Runway declining",
       summary: "Cash runway shortening",
       updated_at: new Date("2024-05-02T12:00:00Z").toISOString(),
+      linked_action_id: null,
     },
   ],
   meta: {},
@@ -89,9 +106,15 @@ vi.mock("../../api/healthScore", () => ({
   fetchHealthScore: (...args: unknown[]) => fetchHealthScore(...args),
 }));
 
+vi.mock("../../api/actions", () => ({
+  createActionFromSignal: (...args: unknown[]) => createActionFromSignal(...args),
+}));
+
 describe("SignalsCenter", () => {
   afterEach(() => {
     cleanup();
+    navigateMock.mockReset();
+    createActionFromSignal.mockClear();
   });
 
   it("renders signals and filters by status", async () => {
@@ -133,6 +156,39 @@ describe("SignalsCenter", () => {
     await waitFor(() => expect(getSignalDetail).toHaveBeenCalledWith("biz-1", "sig-1"));
     expect(screen.getByText(/"vendor": "Acme"/i)).toBeInTheDocument();
     expect(screen.getByText(/"total": 1200/i)).toBeInTheDocument();
+  });
+
+  it("shows deterministic primary CTA based on linked action", async () => {
+    render(
+      <AppStateProvider>
+        <MemoryRouter>
+          <SignalsCenter businessId="biz-1" />
+        </MemoryRouter>
+      </AppStateProvider>
+    );
+
+    await waitFor(() => expect(listSignalStates).toHaveBeenCalled());
+    expect(screen.getByRole("button", { name: "Open in Inbox" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create Action" })).toBeInTheDocument();
+  });
+
+  it("creates an action then routes to inbox with action_id", async () => {
+    render(
+      <AppStateProvider>
+        <MemoryRouter>
+          <SignalsCenter businessId="biz-1" />
+        </MemoryRouter>
+      </AppStateProvider>
+    );
+
+    await waitFor(() => expect(listSignalStates).toHaveBeenCalled());
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Create Action" }));
+
+    await waitFor(() => {
+      expect(createActionFromSignal).toHaveBeenCalledWith("biz-1", "sig-2");
+      expect(navigateMock).toHaveBeenCalledWith("/app/biz-1/advisor?action_id=act-created");
+    });
   });
 
   it("renders health score widget and opens breakdown", async () => {

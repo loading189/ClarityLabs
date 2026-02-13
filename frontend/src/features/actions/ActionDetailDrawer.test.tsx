@@ -70,8 +70,8 @@ describe("ActionDetailDrawer", () => {
       />
     );
 
-    expect(await screen.findByText("Create a remediation plan")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Create Plan" })).toBeInTheDocument();
+    expect(await screen.findByText("Start remediation plan")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start Plan" })).toBeInTheDocument();
   });
 
   it("creates a plan with the required payload", async () => {
@@ -108,7 +108,7 @@ describe("ActionDetailDrawer", () => {
       "Document the plan intent and why it matters"
     );
     await userEvent.type(planIntentInput, "Plan intent");
-    const [createButton] = screen.getAllByRole("button", { name: "Create Plan" });
+    const [createButton] = screen.getAllByRole("button", { name: "Start Plan" });
     await userEvent.click(createButton);
 
     await waitFor(() =>
@@ -211,7 +211,7 @@ describe("ActionDetailDrawer", () => {
     expect(planTitles[0]).toBeInTheDocument();
     const [summary] = await screen.findAllByTestId("plan-observation-summary");
     expect(summary).toHaveTextContent("Metric baseline 8.00 → 10.00");
-    expect(screen.getByRole("button", { name: "View Plan" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "View Plan" }).length).toBeGreaterThan(0);
 
     const [refreshButton] = screen.getAllByRole("button", { name: "Refresh" });
     await userEvent.click(refreshButton);

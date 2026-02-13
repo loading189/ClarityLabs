@@ -96,6 +96,7 @@ export default function AdvisorInboxPage() {
   const [planSummaryLoading, setPlanSummaryLoading] = useState(false);
   const [filterMode, setFilterMode] = useState<"status" | "assigned">("assigned");
   const requestedActionId = searchParams.get("action_id");
+  const [pendingActionId, setPendingActionId] = useState<string | null>(requestedActionId);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -179,11 +180,16 @@ export default function AdvisorInboxPage() {
 
 
   useEffect(() => {
-    if (!requestedActionId) return;
-    const found = actions.find((action) => action.id === requestedActionId);
+    setPendingActionId(requestedActionId);
+  }, [requestedActionId]);
+
+  useEffect(() => {
+    if (!pendingActionId || loading) return;
+    const found = actions.find((action) => action.id === pendingActionId);
     if (!found) return;
     setSelected(found);
-  }, [actions, requestedActionId]);
+    setPendingActionId(null);
+  }, [actions, loading, pendingActionId]);
 
   const businessOptions = useMemo(() => {
     return [
@@ -521,6 +527,7 @@ export default function AdvisorInboxPage() {
                   <Chip tone={assignedLabel === "Unassigned" ? "neutral" : "info"}>{assignedLabel}</Chip>
                   {renderPlanSummary(action)}
                 </div>
+                <div className={styles.rowActions}><Button variant="secondary" type="button">Open</Button></div>
                 {latestSummary && <div className={styles.outcome}>{latestSummary}</div>}
               </button>
             );
@@ -533,6 +540,7 @@ export default function AdvisorInboxPage() {
         action={selected}
         onClose={() => {
           setSelected(null);
+          setPendingActionId(null);
           setSearchParams((prev) => {
             const next = new URLSearchParams(prev);
             next.delete("action_id");

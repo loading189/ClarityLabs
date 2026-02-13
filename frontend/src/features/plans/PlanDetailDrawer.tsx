@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import Drawer from "../../components/common/Drawer";
 import { fetchBusinessMembers, type BusinessMember } from "../../api/businesses";
 import {
@@ -239,7 +240,26 @@ export default function PlanDetailDrawer({
               <div>
                 <div className={styles.title}>{plan.title}</div>
                 <div className={styles.subtitle}>Assigned to {assignedLabel}</div>
-                <div className={styles.subtitle}>Attached to Action {plan.source_action_id ?? "—"}{plan.primary_signal_id ? ` · Signal ${plan.primary_signal_id}` : ""}</div>
+                <div className={styles.subtitle}>
+                  Attached to Action:{" "}
+                  {plan.source_action_id && businessId ? (
+                    <Link to={`/app/${businessId}/advisor?action_id=${encodeURIComponent(plan.source_action_id)}`}>
+                      {plan.source_action_id}
+                    </Link>
+                  ) : (
+                    "—"
+                  )}
+                </div>
+                <div className={styles.subtitle}>
+                  Created from Signal:{" "}
+                  {plan.primary_signal_id && businessId ? (
+                    <Link to={`/app/${businessId}/signals?signal_id=${encodeURIComponent(plan.primary_signal_id)}`}>
+                      {plan.primary_signal_id}
+                    </Link>
+                  ) : (
+                    "—"
+                  )}
+                </div>
               </div>
               <Chip tone={planStatusTone(plan.status)}>{formatPlanStatus(plan.status)}</Chip>
             </div>
