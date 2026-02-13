@@ -5,6 +5,7 @@ import pytest
 pytest.importorskip("httpx")
 
 from backend.app.models import ActionItem, ActionStateEvent, Business, BusinessMembership, Organization, RawEvent, User
+import backend.app.sim.models  # noqa: F401
 
 
 def _create_business(session) -> Business:

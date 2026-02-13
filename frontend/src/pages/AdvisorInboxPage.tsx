@@ -198,7 +198,9 @@ export default function AdvisorInboxPage() {
     setRefreshMessage(null);
     try {
       const response = await refreshActions(businessId);
-      if (response?.actions) {
+      if (typeof response?.created_count === "number" && typeof response?.suppressed_count === "number") {
+        setRefreshMessage(`Created ${response.created_count}, suppressed ${response.suppressed_count}.`);
+      } else if (response?.actions) {
         const createdCount = response.actions.length;
         setRefreshMessage(createdCount > 0 ? `Created ${createdCount} new actions.` : "No new actions detected.");
       } else {

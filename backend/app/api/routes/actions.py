@@ -56,6 +56,13 @@ class ActionListOut(BaseModel):
     summary: dict
 
 
+class ActionRefreshOut(ActionListOut):
+    created_count: int
+    updated_count: int
+    suppressed_count: int
+    suppression_reasons: dict[str, int]
+
+
 class ActionResolveIn(BaseModel):
     status: str
     resolution_reason: Optional[str] = None
@@ -162,17 +169,24 @@ def get_actions(
 
 @router.post(
     "/{business_id}/refresh",
-    response_model=ActionListOut,
+    response_model=ActionRefreshOut,
     dependencies=[Depends(require_membership_dep(min_role="advisor"))],
 )
 def refresh_actions(
     business_id: str,
     db: Session = Depends(get_db),
 ):
-    generate_actions_for_business(db, business_id)
+    result = generate_actions_for_business(db, business_id)
     db.commit()
     actions, summary = list_actions(db, business_id, status="open", limit=50, offset=0)
-    return {"actions": _serialize_actions(db, actions), "summary": summary}
+    return {
+        "actions": _serialize_actions(db, actions),
+        "summary": summary,
+        "created_count": result.created_count,
+        "updated_count": result.updated_count,
+        "suppressed_count": result.suppressed_count,
+        "suppression_reasons": result.suppression_reasons,
+    }
 
 
 @router.post(

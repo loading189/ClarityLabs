@@ -32,6 +32,13 @@ export interface ActionListResponse {
   summary: Record<string, number>;
 }
 
+export interface ActionRefreshResponse extends ActionListResponse {
+  created_count: number;
+  updated_count: number;
+  suppressed_count: number;
+  suppression_reasons?: Record<string, number>;
+}
+
 export async function getActions(
   businessId: string,
   params?: { status?: ActionStatus; limit?: number; offset?: number }
@@ -44,7 +51,7 @@ export async function getActions(
   return apiGet(`/api/actions/${businessId}${query ? `?${query}` : ""}`);
 }
 
-export async function refreshActions(businessId: string): Promise<ActionListResponse> {
+export async function refreshActions(businessId: string): Promise<ActionRefreshResponse> {
   return apiPost(`/api/actions/${businessId}/refresh`);
 }
 

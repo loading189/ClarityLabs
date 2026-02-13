@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from backend.app.models import (
     ActionItem,
     ActionStateEvent,
+    AuditLog,
     BusinessMembership,
     HealthSignalState,
     IntegrationConnection,
@@ -21,6 +22,11 @@ from backend.app.services.signals_service import SIGNAL_CATALOG, _payload_ledger
 
 
 ACTION_COOLDOWN_DAYS = 14
+PERSISTENCE_MIN_EVALS = 2
+PERSISTENCE_MIN_AGE_HOURS = 24
+FLAP_WINDOW_HOURS = 72
+FLAP_MAX_TOGGLES = 3
+COOLDOWN_HOURS_AFTER_RESOLVE = 72
 INTEGRATION_STALE_HOURS = 12
 VENDOR_VARIANCE_RATIO = 0.5
 VENDOR_MIN_DELTA = 200.0
@@ -40,8 +46,45 @@ class ActionCandidate:
     rationale_json: dict
 
 
+@dataclass(frozen=True)
+class ActionRefreshResult:
+    actions: list[ActionItem]
+    created_count: int
+    updated_count: int
+    suppressed_count: int
+    suppression_reasons: dict[str, int]
+
+
+@dataclass(frozen=True)
+class SignalPolicyDecision:
+    allowed: bool
+    reason: Optional[str] = None
+
+
+SEVERITY_RANK = {
+    "low": 1,
+    "warning": 2,
+    "medium": 2,
+    "high": 3,
+    "critical": 4,
+}
+
+SUPPRESSION_PERSISTENCE_EVALS = "persistence_min_evals"
+SUPPRESSION_PERSISTENCE_AGE = "persistence_min_age"
+SUPPRESSION_FLAPPING = "flapping"
+SUPPRESSION_COOLDOWN = "cooldown_after_resolve"
+
+
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _normalize_dt(value: Optional[datetime]) -> Optional[datetime]:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value
 
 
 def _date_bounds(now: datetime, days: int) -> tuple[date, date]:
@@ -91,6 +134,18 @@ def _signal_material_change(existing: ActionItem, candidate: ActionCandidate) ->
     )
 
 
+def _severity_rank(value: Optional[str]) -> int:
+    return SEVERITY_RANK.get((value or "").lower(), 0)
+
+
+def _severity_escalated(existing: ActionItem, candidate: ActionCandidate) -> bool:
+    existing_evidence = existing.evidence_json if isinstance(existing.evidence_json, dict) else {}
+    candidate_evidence = candidate.evidence_json if isinstance(candidate.evidence_json, dict) else {}
+    return _severity_rank(candidate_evidence.get("signal_severity")) > _severity_rank(
+        existing_evidence.get("signal_severity")
+    )
+
+
 def _apply_candidate(existing: ActionItem, candidate: ActionCandidate, now: datetime, *, reopen: bool) -> None:
     existing.title = candidate.title
     existing.summary = candidate.summary
@@ -114,8 +169,14 @@ def _should_reopen(existing: ActionItem, candidate: ActionCandidate, now: dateti
         return True
 
     if existing.status in {"done", "ignored"}:
-        if existing.resolved_at:
-            cooldown = now - existing.resolved_at
+        resolved_at = _normalize_dt(existing.resolved_at)
+        if resolved_at:
+            cooldown = now - resolved_at
+            if cooldown < timedelta(hours=COOLDOWN_HOURS_AFTER_RESOLVE):
+                if _severity_escalated(existing, candidate):
+                    return True
+                if not _signal_material_change(existing, candidate):
+                    return False
             if cooldown < timedelta(days=ACTION_COOLDOWN_DAYS) and not _signal_material_change(existing, candidate):
                 return False
         return True
@@ -199,6 +260,9 @@ def _signal_candidates(db: Session, business_id: str, now: datetime) -> list[Act
 
     candidates: list[ActionCandidate] = []
     for row in rows:
+        decision = _evaluate_signal_policy(db, business_id, row, now)
+        if not decision.allowed:
+            continue
         payload = row.payload_json if isinstance(row.payload_json, dict) else {}
         anchors = _payload_ledger_anchors(payload)
         if not anchors:
@@ -219,6 +283,7 @@ def _signal_candidates(db: Session, business_id: str, now: datetime) -> list[Act
         window_end = str(window_end) if window_end else None
         evidence = {
             "signal_id": row.signal_id,
+            "signal_fingerprint": _signal_fingerprint(row),
             "signal_type": row.signal_type,
             "signal_severity": row.severity,
             "signal_summary": row.summary,
@@ -241,10 +306,10 @@ def _signal_candidates(db: Session, business_id: str, now: datetime) -> list[Act
                 idempotency_key=_idempotency_key(
                     business_id,
                     "investigate_anomaly",
-                    row.signal_id,
-                    window_start,
-                    window_end,
-                    domain or row.signal_type or "signal",
+                    None,
+                    None,
+                    None,
+                    _signal_fingerprint(row),
                 ),
                 due_at=None,
                 source_signal_id=row.signal_id,
@@ -253,6 +318,115 @@ def _signal_candidates(db: Session, business_id: str, now: datetime) -> list[Act
             )
         )
     return candidates
+
+
+def _signal_fingerprint(state: HealthSignalState) -> str:
+    payload = state.payload_json if isinstance(state.payload_json, dict) else {}
+    detector_version = payload.get("detector_version") or payload.get("detector") or "v1"
+    primary_dimension = (
+        payload.get("vendor")
+        or payload.get("vendor_name")
+        or payload.get("category")
+        or payload.get("account")
+        or payload.get("customer")
+        or payload.get("dimension")
+        or payload.get("window_end")
+        or state.fingerprint
+        or state.signal_id
+    )
+    return f"{state.signal_type or 'signal'}|{primary_dimension}|{detector_version}"
+
+
+def _signal_policy_eval_count(db: Session, business_id: str, signal_id: str, since: datetime) -> int:
+    rows = (
+        db.execute(
+            select(AuditLog)
+            .where(
+                AuditLog.business_id == business_id,
+                AuditLog.created_at >= since,
+                AuditLog.event_type.in_(
+                    [
+                        "signal_detected",
+                        "signal_updated",
+                        "signal_status_updated",
+                        "signal_status_changed",
+                    ]
+                ),
+            )
+            .order_by(AuditLog.created_at.asc(), AuditLog.id.asc())
+        )
+        .scalars()
+        .all()
+    )
+    count = 0
+    for row in rows:
+        after = row.after_state if isinstance(row.after_state, dict) else {}
+        before = row.before_state if isinstance(row.before_state, dict) else {}
+        if after.get("signal_id") == signal_id or before.get("signal_id") == signal_id:
+            count += 1
+    return count
+
+
+def _signal_flap_toggles(db: Session, business_id: str, signal_id: str, now: datetime) -> int:
+    since = now - timedelta(hours=FLAP_WINDOW_HOURS)
+    rows = (
+        db.execute(
+            select(AuditLog)
+            .where(
+                AuditLog.business_id == business_id,
+                AuditLog.created_at >= since,
+                AuditLog.event_type.in_(
+                    [
+                        "signal_detected",
+                        "signal_resolved",
+                        "signal_status_updated",
+                        "signal_status_changed",
+                    ]
+                ),
+            )
+            .order_by(AuditLog.created_at.asc(), AuditLog.id.asc())
+        )
+        .scalars()
+        .all()
+    )
+    statuses: list[str] = []
+    for row in rows:
+        after = row.after_state if isinstance(row.after_state, dict) else {}
+        before = row.before_state if isinstance(row.before_state, dict) else {}
+        sid = after.get("signal_id") or before.get("signal_id")
+        if sid != signal_id:
+            continue
+        status = after.get("status")
+        if isinstance(status, str):
+            statuses.append(status)
+    toggles = 0
+    for idx in range(1, len(statuses)):
+        prev_open = statuses[idx - 1] == "open"
+        curr_open = statuses[idx] == "open"
+        if prev_open != curr_open:
+            toggles += 1
+    return toggles
+
+
+def _evaluate_signal_policy(
+    db: Session,
+    business_id: str,
+    state: HealthSignalState,
+    now: datetime,
+) -> SignalPolicyDecision:
+    detected_at = _normalize_dt(state.detected_at)
+    if not detected_at:
+        return SignalPolicyDecision(allowed=False, reason=SUPPRESSION_PERSISTENCE_AGE)
+    signal_age = now - detected_at
+    if signal_age < timedelta(hours=PERSISTENCE_MIN_AGE_HOURS):
+        return SignalPolicyDecision(allowed=False, reason=SUPPRESSION_PERSISTENCE_AGE)
+    eval_count = _signal_policy_eval_count(db, business_id, state.signal_id, detected_at)
+    if eval_count < PERSISTENCE_MIN_EVALS:
+        return SignalPolicyDecision(allowed=False, reason=SUPPRESSION_PERSISTENCE_EVALS)
+    toggles = _signal_flap_toggles(db, business_id, state.signal_id, now)
+    if toggles > FLAP_MAX_TOGGLES:
+        return SignalPolicyDecision(allowed=False, reason=SUPPRESSION_FLAPPING)
+    return SignalPolicyDecision(allowed=True)
 
 
 def _integration_candidates(db: Session, business_id: str, now: datetime) -> list[ActionCandidate]:
@@ -422,7 +596,12 @@ def _net_cash_trend(db: Session, business_id: str, now: datetime) -> dict:
     }
 
 
-def generate_actions_for_business(db: Session, business_id: str, *, now: Optional[datetime] = None) -> list[ActionItem]:
+def generate_actions_for_business(
+    db: Session,
+    business_id: str,
+    *,
+    now: Optional[datetime] = None,
+) -> ActionRefreshResult:
     now = now or utcnow()
     _ = _net_cash_trend(db, business_id, now)
 
@@ -439,16 +618,26 @@ def generate_actions_for_business(db: Session, business_id: str, *, now: Optiona
     )
     existing_map = {row.idempotency_key: row for row in existing_rows}
 
+    created_count = 0
+    updated_count = 0
+    suppressed_count = 0
+    suppression_reasons: dict[str, int] = {}
+
     open_actions: list[ActionItem] = []
     for candidate in candidates:
         existing = existing_map.get(candidate.idempotency_key)
         if existing:
             if existing.status == "open":
+                updated_count += 1
                 _apply_candidate(existing, candidate, now, reopen=False)
                 open_actions.append(existing)
             elif _should_reopen(existing, candidate, now):
+                updated_count += 1
                 _apply_candidate(existing, candidate, now, reopen=True)
                 open_actions.append(existing)
+            else:
+                suppressed_count += 1
+                suppression_reasons[SUPPRESSION_COOLDOWN] = suppression_reasons.get(SUPPRESSION_COOLDOWN, 0) + 1
             continue
 
         action = ActionItem(
@@ -468,8 +657,30 @@ def generate_actions_for_business(db: Session, business_id: str, *, now: Optiona
         )
         db.add(action)
         open_actions.append(action)
+        created_count += 1
 
-    return open_actions
+    for row in (
+        db.execute(
+            select(HealthSignalState)
+            .where(HealthSignalState.business_id == business_id, HealthSignalState.status == "open")
+            .order_by(HealthSignalState.updated_at.desc())
+        )
+        .scalars()
+        .all()
+    ):
+        decision = _evaluate_signal_policy(db, business_id, row, now)
+        if decision.allowed or not decision.reason:
+            continue
+        suppressed_count += 1
+        suppression_reasons[decision.reason] = suppression_reasons.get(decision.reason, 0) + 1
+
+    return ActionRefreshResult(
+        actions=open_actions,
+        created_count=created_count,
+        updated_count=updated_count,
+        suppressed_count=suppressed_count,
+        suppression_reasons=suppression_reasons,
+    )
 
 
 def list_actions(
