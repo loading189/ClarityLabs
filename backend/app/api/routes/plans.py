@@ -20,6 +20,7 @@ from backend.app.services.plan_service import (
     add_plan_note,
     assign_plan,
     close_plan,
+    create_plan_from_action,
     create_plan,
     get_plan_detail,
     list_plans,
@@ -201,6 +202,15 @@ class PlanSummaryOut(BaseModel):
         return value
 
 
+class PlanFromActionIn(BaseModel):
+    action_id: str
+
+
+class PlanFromActionOut(BaseModel):
+    plan_id: str
+    created: bool
+
+
 @router.post("", response_model=PlanDetailOut, dependencies=[Depends(require_membership_dep(min_role="staff"))])
 def post_plan(
     req: PlanCreateIn,
@@ -228,6 +238,23 @@ def post_plan(
         observations=[PlanObservationOut.model_validate(observation) for observation in observations],
         state_events=[PlanStateEventOut.model_validate(event) for event in events],
     )
+
+
+@router.post("/{business_id}/from_action", response_model=PlanFromActionOut, dependencies=[Depends(require_membership_dep(min_role="staff"))])
+def post_plan_from_action(
+    business_id: str,
+    req: PlanFromActionIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    plan_id, created = create_plan_from_action(
+        db,
+        business_id=business_id,
+        action_id=req.action_id,
+        actor_user_id=user.id,
+    )
+    db.commit()
+    return PlanFromActionOut(plan_id=plan_id, created=created)
 
 
 @router.get("", response_model=List[PlanOut], dependencies=[Depends(require_membership_dep())])

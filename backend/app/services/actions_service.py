@@ -17,6 +17,7 @@ from backend.app.models import (
     RawEvent,
     TxnCategorization,
 )
+from backend.app.services.audit_service import log_audit_event
 from backend.app.services.posted_txn_service import count_uncategorized_raw_events, fetch_posted_transactions
 from backend.app.services.signals_service import SIGNAL_CATALOG, _payload_ledger_anchors
 
@@ -842,6 +843,15 @@ def resolve_action(
                 note=resolution_note,
             )
         )
+        log_audit_event(
+            db,
+            business_id=business_id,
+            event_type="action_status_changed",
+            actor=actor_user_id,
+            reason=resolution_reason,
+            before={"action_id": row.id, "status": from_status},
+            after={"action_id": row.id, "status": status},
+        )
     return row
 
 
@@ -875,6 +885,61 @@ def snooze_action(
                 reason=reason,
                 note=note,
             )
+        )
+        log_audit_event(
+            db,
+            business_id=business_id,
+            event_type="action_status_changed",
+            actor=actor_user_id,
+            reason=reason,
+            before={"action_id": row.id, "status": from_status},
+            after={"action_id": row.id, "status": "snoozed"},
+        )
+    return row
+
+
+def reopen_action(
+    db: Session,
+    business_id: str,
+    action_id: str,
+    *,
+    reason: Optional[str] = None,
+    note: Optional[str] = None,
+    actor_user_id: Optional[str] = None,
+) -> ActionItem:
+    row = db.get(ActionItem, action_id)
+    if not row or row.business_id != business_id:
+        raise ValueError("action not found")
+    from_status = row.status
+    if from_status == "open":
+        return row
+    row.status = "open"
+    row.snoozed_until = None
+    row.resolution_reason = None
+    row.resolution_note = note
+    row.resolution_meta_json = None
+    row.resolved_at = None
+    row.updated_at = utcnow()
+    db.add(row)
+    if actor_user_id:
+        db.add(
+            ActionStateEvent(
+                action_id=row.id,
+                actor_user_id=actor_user_id,
+                from_status=from_status,
+                to_status="open",
+                reason=reason,
+                note=note,
+            )
+        )
+        log_audit_event(
+            db,
+            business_id=business_id,
+            event_type="action_status_changed",
+            actor=actor_user_id,
+            reason=reason,
+            before={"action_id": row.id, "status": from_status},
+            after={"action_id": row.id, "status": "open"},
         )
     return row
 

@@ -498,14 +498,14 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
       if (!businessId || !signalId) return;
       setRowActionError(null);
       if (linkedActionId) {
-        navigate(`/app/${businessId}/advisor?action_id=${encodeURIComponent(linkedActionId)}`);
+        navigate(`/app/${businessId}/inbox?action_id=${encodeURIComponent(linkedActionId)}`);
         return;
       }
       setCreatingActionSignalId(signalId);
       try {
         const response = await createActionFromSignal(businessId, signalId);
         await loadSignals();
-        navigate(`/app/${businessId}/advisor?action_id=${encodeURIComponent(response.action_id)}`);
+        navigate(`/app/${businessId}/inbox?action_id=${encodeURIComponent(response.action_id)}`);
       } catch (e: any) {
         setRowActionError(e?.message ?? "Unable to create action from signal.");
       } finally {

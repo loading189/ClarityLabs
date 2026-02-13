@@ -125,6 +125,15 @@ export type ActionStateEvent = {
   created_at: string;
 };
 
+
+export async function updateActionStatus(
+  businessId: string,
+  actionId: string,
+  payload: { status: "open" | "snoozed" | "done"; note?: string }
+): Promise<ActionItem> {
+  return apiPost(`/api/actions/${businessId}/${actionId}/status`, payload);
+}
+
 export async function assignAction(
   businessId: string,
   actionId: string,

@@ -183,6 +183,13 @@ export default function AdvisorInboxPage() {
   }, [requestedActionId]);
 
   useEffect(() => {
+    if (!requestedActionId) return;
+    setStatus("all");
+    setAssigned("any");
+    setBusinessId("all");
+  }, [requestedActionId]);
+
+  useEffect(() => {
     if (!pendingActionId || loading) return;
     const found = actions.find((action) => action.id === pendingActionId);
     if (!found) return;

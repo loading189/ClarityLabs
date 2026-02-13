@@ -187,7 +187,7 @@ describe("SignalsCenter", () => {
 
     await waitFor(() => {
       expect(createActionFromSignal).toHaveBeenCalledWith("biz-1", "sig-2");
-      expect(navigateMock).toHaveBeenCalledWith("/app/biz-1/advisor?action_id=act-created");
+      expect(navigateMock).toHaveBeenCalledWith("/app/biz-1/inbox?action_id=act-created");
     });
   });
 

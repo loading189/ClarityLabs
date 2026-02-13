@@ -243,7 +243,7 @@ export default function PlanDetailDrawer({
                 <div className={styles.subtitle}>
                   Attached to Action:{" "}
                   {plan.source_action_id && businessId ? (
-                    <Link to={`/app/${businessId}/advisor?action_id=${encodeURIComponent(plan.source_action_id)}`}>
+                    <Link to={`/app/${businessId}/inbox?action_id=${encodeURIComponent(plan.source_action_id)}`}>
                       {plan.source_action_id}
                     </Link>
                   ) : (

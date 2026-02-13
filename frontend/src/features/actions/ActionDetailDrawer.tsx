@@ -4,8 +4,7 @@ import Drawer from "../../components/common/Drawer";
 import {
   assignAction,
   fetchActionEvents,
-  resolveAction,
-  snoozeAction,
+  updateActionStatus,
   type ActionItem,
   type ActionStateEvent,
   type ActionTriageItem,
@@ -13,7 +12,7 @@ import {
 import { fetchBusinessMembers, type BusinessMember } from "../../api/businesses";
 import {
   closePlan,
-  createPlan,
+  createPlanFromAction,
   getPlanDetail,
   refreshPlan,
   type PlanCloseOutcome,
@@ -34,8 +33,6 @@ import {
 } from "../plans/planSummary";
 import PlanDetailDrawer from "../plans/PlanDetailDrawer";
 import styles from "./ActionDetailDrawer.module.css";
-
-const SNOOZE_DAYS = 7;
 
 type ActionDetail = (ActionItem | ActionTriageItem) & {
   business_name?: string;
@@ -114,7 +111,6 @@ export default function ActionDetailDrawer({
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [error, setError] = useState<LoadError | null>(null);
-  const [planIntent, setPlanIntent] = useState("");
   const [planError, setPlanError] = useState<LoadError | null>(null);
   const [planCreateLoading, setPlanCreateLoading] = useState(false);
   const [planRefreshLoading, setPlanRefreshLoading] = useState(false);
@@ -201,7 +197,6 @@ export default function ActionDetailDrawer({
     if (!open) return;
     setError(null);
     setNote(action?.resolution_note ?? "");
-    setPlanIntent("");
     setPlanError(null);
     setPlanCreateLoading(false);
     setPlanRefreshLoading(false);
@@ -268,14 +263,13 @@ export default function ActionDetailDrawer({
     }
   };
 
-  const handleResolve = async (status: "done" | "ignored") => {
+  const handleStatusChange = async (status: "open" | "snoozed" | "done") => {
     if (!businessId || !actionId) return;
     setError(null);
     try {
-      await resolveAction(businessId, actionId, {
+      await updateActionStatus(businessId, actionId, {
         status,
-        resolution_reason: status === "done" ? "Completed" : "Ignored",
-        resolution_note: note || undefined,
+        note: note || undefined,
       });
       await loadEvents();
       onUpdated?.();
@@ -288,57 +282,15 @@ export default function ActionDetailDrawer({
     }
   };
 
-  const handleSnooze = async () => {
-    if (!businessId || !actionId) return;
-    const until = new Date();
-    until.setDate(until.getDate() + SNOOZE_DAYS);
-    setError(null);
-    try {
-      await snoozeAction(businessId, actionId, {
-        until: until.toISOString(),
-        reason: "Snoozed",
-        note: note || undefined,
-      });
-      await loadEvents();
-      onUpdated?.();
-    } catch (err: any) {
-      if (err instanceof ApiError && err.status === 401) {
-        logout();
-        return;
-      }
-      setError({ message: err?.message ?? "Failed to snooze action", status: err?.status });
-    }
-  };
-
   const handleCreatePlan = async () => {
-    if (!businessId || !actionId || !action) return;
-    if (!planIntent.trim()) {
-      setPlanError({ message: "Add a plan intent before creating.", status: 400 });
-      return;
-    }
+    if (!businessId || !actionId) return;
     setPlanError(null);
-    const conditions = [
-      {
-        type: "signal_resolved" as const,
-        signal_id: action.source_signal_id ?? null,
-        baseline_window_days: 0,
-        evaluation_window_days: 14,
-        direction: "resolve" as const,
-      },
-    ];
     setPlanCreateLoading(true);
     try {
-      const response = await createPlan({
-        business_id: businessId,
-        title: action.title,
-        intent: planIntent.trim(),
-        source_action_id: actionId,
-        primary_signal_id: action.source_signal_id ?? undefined,
-        assigned_to_user_id: action.assigned_to_user_id ?? undefined,
-        conditions,
-      });
-      setPlanIdOverride(response.plan.id);
-      setPlanDetail(response);
+      const response = await createPlanFromAction(businessId, actionId);
+      setPlanIdOverride(response.plan_id);
+      const detail = await getPlanDetail(businessId, response.plan_id);
+      setPlanDetail(detail);
       setPlanOpen(true);
       onUpdated?.();
     } catch (err: any) {
@@ -434,9 +386,7 @@ export default function ActionDetailDrawer({
   const canRefreshPlan = Boolean(planId && businessId && planDetail?.plan.status === "active");
   const planHelpText = !canCreatePlan
     ? "Plan actions need a business and action id."
-    : !planIntent.trim() && !planId
-      ? "Add a plan intent to enable plan creation."
-      : null;
+    : null;
   const handleOpenPlan = async () => {
     if (!canViewPlan) return;
     if (!planDetail) {
@@ -516,13 +466,6 @@ export default function ActionDetailDrawer({
                 <div className={styles.planMeta}>
                   Plans track the remediation outcome for this action and surface observations after refresh.
                 </div>
-                <textarea
-                  className={styles.input}
-                  rows={3}
-                  value={planIntent}
-                  onChange={(event) => setPlanIntent(event.target.value)}
-                  placeholder="Document the plan intent and why it matters"
-                />
                 <Button variant="primary" onClick={handleCreatePlan} disabled={!canCreatePlan || planCreateLoading}>
                   {planCreateLoading ? "Starting Plan…" : "Start Plan"}
                 </Button>
@@ -558,7 +501,7 @@ export default function ActionDetailDrawer({
                 </div>
                 <div className={styles.planActions}>
                   <Button variant="secondary" onClick={handleOpenPlan} disabled={!canViewPlan}>
-                    View Plan
+                    Open Plan
                   </Button>
                   {planDetail.plan.status === "active" && (
                     <Button variant="secondary" onClick={handlePlanRefresh} disabled={!canRefreshPlan || planRefreshLoading}>
@@ -618,14 +561,14 @@ export default function ActionDetailDrawer({
               <Chip tone={assignedTo ? "info" : "neutral"}>{assignedLabel}</Chip>
             </div>
             <div className={styles.actions}>
-              <Button variant="primary" onClick={() => handleResolve("done")}>
-                Mark done
+              <Button variant="secondary" onClick={() => handleStatusChange("open")}>
+                Open
               </Button>
-              <Button variant="secondary" onClick={() => handleResolve("ignored")}>
-                Ignore
+              <Button variant="secondary" onClick={() => handleStatusChange("snoozed")}>
+                Snoozed
               </Button>
-              <Button variant="secondary" onClick={handleSnooze}>
-                Snooze 7d
+              <Button variant="primary" onClick={() => handleStatusChange("done")}>
+                Done
               </Button>
             </div>
             <textarea
