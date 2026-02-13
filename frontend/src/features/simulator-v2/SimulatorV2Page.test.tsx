@@ -5,34 +5,16 @@ import { AppStateProvider } from "../../app/state/appState";
 import SimulatorV2Page from "./SimulatorV2Page";
 
 const getSimV2Catalog = vi.fn().mockResolvedValue({
-  presets: [{ id: "healthy", title: "Healthy", scenarios: [{ id: "steady_state", intensity: 1 }] }],
-  scenarios: [{ id: "cash_crunch", title: "Cash Crunch", description: "", expected_signals: [] }],
+  scenarios: [{ id: "baseline_stable", name: "Baseline Stable", description: "", tags: ["baseline"], parameters: {} }],
 });
 const seedSimV2 = vi.fn().mockResolvedValue({
-  window: { start_date: "2025-01-01", end_date: "2025-02-01" },
-  stats: { raw_events_inserted: 12, pulse_ran: true },
-  signals: { total: 3 },
-  coverage: {
-    window_observed: { start_date: "2025-01-01", end_date: "2025-02-01" },
-    inputs: {
-      raw_events_count: 20,
-      normalized_txns_count: 18,
-      deposits_count_last30: 8,
-      expenses_count_last30: 12,
-      distinct_vendors_last30: 4,
-      balance_series_points: 18,
-    },
-    detectors: [
-      {
-        detector_id: "detect_liquidity_runway_low",
-        signal_id: "liquidity.runway_low",
-        domain: "liquidity",
-        ran: true,
-        fired: true,
-        severity: "warning",
-        evidence_keys: ["runway_days"],
-      },
-    ],
+  scenario_id: "baseline_stable",
+  seed_key: 123,
+  summary: {
+    txns_created: 12,
+    ledger_rows: 11,
+    signals_open_count: 3,
+    actions_open_count: 2,
   },
 });
 const resetSimV2 = vi.fn().mockResolvedValue({});
@@ -44,7 +26,7 @@ vi.mock("../../api/simV2", () => ({
 }));
 
 describe("SimulatorV2Page", () => {
-  it("loads catalog and seeds preset", async () => {
+  it("loads catalog and seeds scenario", async () => {
     render(
       <AppStateProvider>
         <MemoryRouter initialEntries={["/app/b1/admin/simulator"]}>
@@ -56,10 +38,9 @@ describe("SimulatorV2Page", () => {
     );
 
     await waitFor(() => expect(getSimV2Catalog).toHaveBeenCalled());
-    fireEvent.click(await screen.findByText("Seed Healthy"));
+    fireEvent.click(await screen.findByText("Seed"));
     await waitFor(() => expect(seedSimV2).toHaveBeenCalled());
-    expect(await screen.findByText(/Signals produced: 3/)).toBeInTheDocument();
-    expect(await screen.findByText(/Coverage Report/)).toBeInTheDocument();
-    expect(await screen.findByText(/detect_liquidity_runway_low/)).toBeInTheDocument();
+    expect(await screen.findByText(/Open signals: 3/)).toBeInTheDocument();
+    expect(await screen.findByText(/Transactions created: 12/)).toBeInTheDocument();
   });
 });
