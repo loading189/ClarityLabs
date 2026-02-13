@@ -18,6 +18,7 @@ import ErrorBoundary from "../../components/common/ErrorBoundary";
 import AssistantPage from "./AssistantPage";
 import AdvisorInboxPage from "../../pages/AdvisorInboxPage";
 import FirmDashboardPage from "../../pages/FirmDashboardPage";
+import SignalExplainPage from "../../features/signals-explain/SignalExplainPage";
 
 
 function AssistantCompatRedirect() {
@@ -55,8 +56,10 @@ export default function AppRoutes() {
           <Route path="assistant" element={<Navigate to="../summary" replace />} />
           <Route path="summary" element={<AssistantPage />} />
           <Route path="advisor" element={<AdvisorInboxPage />} />
+          <Route path="inbox" element={<AdvisorInboxPage />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="signals" element={<SignalsCenterPage />} />
+          <Route path="signals/:signalId/explain" element={<SignalExplainPage />} />
           <Route path="ledger" element={<LedgerPage />} />
           <Route path="trends" element={<TrendsPage />} />
           <Route path="vendors" element={<VendorsPage />} />

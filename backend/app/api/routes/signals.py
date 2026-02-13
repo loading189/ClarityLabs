@@ -256,7 +256,6 @@ def get_signal_detail(
 
 @router.get(
     "/{business_id}/{signal_id}/explain",
-    response_model=SignalExplainOut,
     dependencies=[Depends(require_membership_dep())],
 )
 def get_signal_explain(
