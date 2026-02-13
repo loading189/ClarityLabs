@@ -14,6 +14,7 @@ from backend.app.models import ActionItem, Business, HealthSignalState
 from backend.app.norma.ledger import LedgerIntegrityError, build_cash_ledger
 from backend.app.norma.normalize import NormalizedTransaction
 from backend.app.services import audit_service, health_signal_service
+from backend.app.services.signal_explain_service import explain_signal
 from backend.app.services.posted_txn_service import fetch_posted_transactions
 
 
@@ -1828,6 +1829,7 @@ def get_signal_explain(db: Session, business_id: str, signal_id: str) -> Dict[st
     if not ledger_anchors:
         ledger_anchors = _evidence_ledger_anchors(evidence)
 
+    case_file = explain_signal(business_id, signal_id, db)
     return {
         "business_id": business_id,
         "signal_id": signal_id,
@@ -1841,6 +1843,12 @@ def get_signal_explain(db: Session, business_id: str, signal_id: str) -> Dict[st
             "metadata": state.payload_json,
             "resolved_condition_met": is_signal_resolved_condition_met(state),
         },
+        "title": case_file["title"],
+        "status": case_file["status"],
+        "severity": case_file["severity"],
+        "linked_action_id": case_file["linked_action_id"],
+        "narrative": case_file["narrative"],
+        "case_evidence": case_file["evidence"],
         "detector": detector,
         "evidence": evidence,
         "related_audits": related_audits,

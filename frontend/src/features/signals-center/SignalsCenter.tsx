@@ -800,10 +800,7 @@ export default function SignalsCenter({ businessId }: { businessId: string }) {
                     <button
                       className={styles.secondaryButton}
                       type="button"
-                      onClick={() => {
-                        setSelected(signal);
-                        updateSignalParam(signal.id);
-                      }}
+                      onClick={() => navigate(`/app/${businessId}/signals/${signal.id}/explain`)}
                     >
                       Explain
                     </button>

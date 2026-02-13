@@ -491,7 +491,7 @@ export default function ActionDetailDrawer({
                 </Link>
               )}
               {action.source_signal_id && businessId && (
-                <Link className={styles.linkButton} to={`/app/${businessId}/signals?signal_id=${action.source_signal_id}`}>
+                <Link className={styles.linkButton} to={`/app/${businessId}/signals/${action.source_signal_id}/explain`}>
                   View Signal Explain
                 </Link>
               )}

@@ -242,3 +242,32 @@ def test_explain_includes_deterministic_next_actions(db_session):
         [item["action"] for item in actions], key=lambda action: {"acknowledge": 0, "snooze": 1, "resolve": 2}[action]
     )
     assert actions[0]["requires_reason"] is True
+
+
+def test_case_file_contract_and_determinism(db_session):
+    biz = _create_business(db_session)
+    _seed_expense_creep(db_session, biz.id)
+    signal_id = signals_service.list_signal_states(db_session, biz.id)[0][0]["id"]
+
+    explain_one = signals_service.get_signal_explain(db_session, biz.id, signal_id)
+    explain_two = signals_service.get_signal_explain(db_session, biz.id, signal_id)
+
+    assert explain_one["signal_id"] == signal_id
+    assert explain_one["business_id"] == biz.id
+    assert explain_one["narrative"]["headline"]
+    assert "top_transactions" in explain_one["case_evidence"]
+    assert isinstance(explain_one["case_evidence"]["top_transactions"], list)
+    assert explain_one["narrative"] == explain_two["narrative"]
+
+
+def test_case_file_includes_linked_action_id(db_session):
+    from backend.app.services.actions_service import create_action_from_signal
+
+    biz = _create_business(db_session)
+    _seed_expense_creep(db_session, biz.id)
+    signal_id = signals_service.list_signal_states(db_session, biz.id)[0][0]["id"]
+
+    action, _created = create_action_from_signal(db_session, biz.id, signal_id)
+    explain = signals_service.get_signal_explain(db_session, biz.id, signal_id)
+
+    assert explain["linked_action_id"] == action.id
