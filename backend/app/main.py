@@ -23,6 +23,7 @@ from backend.app.api.routes.monitor import router as monitor_router
 from backend.app.api.routes.changes import router as changes_router
 from backend.app.api.routes.assistant_thread import router as assistant_thread_router
 from backend.app.api.routes.sim_v2 import router as sim_v2_router
+from backend.app.api.routes.scenarios import router as scenarios_router
 from backend.app.api.routes.businesses import router as businesses_router
 from backend.app.api.routes.daily_brief import router as daily_brief_router
 from backend.app.api.routes.assistant_plans import router as assistant_plans_router
@@ -101,6 +102,7 @@ app.include_router(changes_router)
 
 app.include_router(assistant_thread_router)
 app.include_router(sim_v2_router)
+app.include_router(scenarios_router)
 app.include_router(businesses_router)
 app.include_router(daily_brief_router)
 app.include_router(assistant_plans_router)
