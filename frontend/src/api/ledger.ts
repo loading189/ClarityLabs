@@ -72,6 +72,9 @@ export type LedgerQuerySummary = {
 export type LedgerQueryResponse = {
   rows: LedgerQueryRow[];
   summary: LedgerQuerySummary;
+  total_count: number;
+  has_more: boolean;
+  next_offset?: number | null;
 };
 
 export type LedgerDimensionAccount = {

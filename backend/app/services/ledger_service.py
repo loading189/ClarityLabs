@@ -191,8 +191,11 @@ def ledger_query(
         else:
             total_out += abs(amt)
 
+    total_count = len(filtered)
     # Page slice (after computing balances so balances are correct on the page)
     page = filtered[offset : offset + limit]
+    next_offset = offset + len(page)
+    has_more = next_offset < total_count
 
     return {
         "rows": page,
@@ -201,8 +204,11 @@ def ledger_query(
             "end_balance": round(balance, 2),
             "total_in": round(total_in, 2),
             "total_out": round(total_out, 2),
-            "row_count": len(filtered),
+            "row_count": total_count,
         },
+        "total_count": total_count,
+        "has_more": has_more,
+        "next_offset": next_offset if has_more else None,
         "window": {"start_date": start_date, "end_date": end_date},
     }
 

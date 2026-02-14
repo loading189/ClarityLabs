@@ -96,6 +96,9 @@ describe("LedgerPage anchor behavior", () => {
         },
       ],
       summary: { row_count: 2, start_balance: 0, end_balance: 0, total_in: 0, total_out: 0 },
+      total_count: 2,
+      has_more: false,
+      next_offset: null,
     });
     fetchLedgerAccountDimensions.mockResolvedValue([]);
     fetchLedgerVendorDimensions.mockResolvedValue([]);
@@ -135,6 +138,9 @@ describe("LedgerPage anchor behavior", () => {
         },
       ],
       summary: { row_count: 1, start_balance: 0, end_balance: 0, total_in: 0, total_out: 0 },
+      total_count: 1,
+      has_more: false,
+      next_offset: null,
     });
     fetchLedgerAccountDimensions.mockResolvedValue([]);
     fetchLedgerVendorDimensions.mockResolvedValue([]);
@@ -176,6 +182,9 @@ describe("LedgerPage anchor behavior", () => {
         },
       ],
       summary: { row_count: 1, start_balance: 0, end_balance: 0, total_in: 0, total_out: 0 },
+      total_count: 1,
+      has_more: false,
+      next_offset: null,
     });
     fetchLedgerAccountDimensions.mockResolvedValue([]);
     fetchLedgerVendorDimensions.mockResolvedValue([]);

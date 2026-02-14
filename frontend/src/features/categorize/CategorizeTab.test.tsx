@@ -271,7 +271,7 @@ describe("CategorizeTab", () => {
     expect(getTxnsToCategorize).toHaveBeenLastCalledWith(
       "11111111-1111-4111-8111-111111111111",
       50,
-      { start_date: "2025-01-01", end_date: "2025-01-31" }
+      { start_date: "2025-01-01", end_date: "2025-01-31", offset: 0 }
     );
 
     mockAppState = {
@@ -289,7 +289,7 @@ describe("CategorizeTab", () => {
     expect(getTxnsToCategorize).toHaveBeenLastCalledWith(
       "11111111-1111-4111-8111-111111111111",
       50,
-      { start_date: "2025-02-01", end_date: "2025-02-28" }
+      { start_date: "2025-02-01", end_date: "2025-02-28", offset: 0 }
     );
   });
 
@@ -552,4 +552,63 @@ describe("CategorizeTab", () => {
     const betaButton = await screen.findByRole("button", { name: /Beta Vendor/i });
     await waitFor(() => expect(betaButton).toHaveAttribute("aria-pressed", "true"));
   });
+
+  it("loads more uncategorized transactions", async () => {
+    const user = userEvent.setup();
+    getTxnsToCategorize
+      .mockResolvedValueOnce({
+        items: [
+          {
+            source_event_id: "evt-1",
+            occurred_at: "2025-01-10T15:00:00.000Z",
+            description: "Alpha Vendor",
+            amount: -10,
+            direction: "outflow",
+            account: "card",
+            category_hint: "uncategorized",
+            merchant_key: "alpha",
+          },
+        ],
+        total_count: 2,
+        has_more: true,
+        next_offset: 1,
+      })
+      .mockResolvedValueOnce({
+        items: [
+          {
+            source_event_id: "evt-2",
+            occurred_at: "2025-01-12T15:00:00.000Z",
+            description: "Beta Vendor",
+            amount: -20,
+            direction: "outflow",
+            account: "card",
+            category_hint: "uncategorized",
+            merchant_key: "beta",
+          },
+        ],
+        total_count: 2,
+        has_more: false,
+        next_offset: null,
+      });
+
+    render(
+      <MemoryRouter>
+        <CategorizeTab businessId="11111111-1111-4111-8111-111111111111" />
+      </MemoryRouter>
+    );
+
+    expect((await screen.findAllByText("Alpha Vendor")).length).toBeGreaterThan(0);
+    expect(screen.getByText("Showing 1 of 2")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Load more/i }));
+
+    await screen.findByText("Beta Vendor");
+    expect(screen.getByText("Showing 2 of 2")).toBeInTheDocument();
+    expect(getTxnsToCategorize).toHaveBeenLastCalledWith(
+      "11111111-1111-4111-8111-111111111111",
+      50,
+      { start_date: "2025-01-01", end_date: "2025-01-31", offset: 1 }
+    );
+  });
+
 });

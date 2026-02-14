@@ -39,6 +39,14 @@ class NormalizedTxnOut(BaseModel):
     merchant_key: Optional[str] = None
 
 
+
+
+class TxnsToCategorizePageOut(BaseModel):
+    items: List[NormalizedTxnOut]
+    total_count: int
+    has_more: bool
+    next_offset: Optional[int] = None
+
 class LabelVendorIn(BaseModel):
     source_event_id: str
     system_key: str
@@ -183,10 +191,11 @@ def forget_brain_vendor(business_id: str, req: BrainVendorForgetIn, db: Session 
     return categorize_service.forget_brain_vendor(db, business_id, req)
 
 
-@router.get("/business/{business_id}/txns", response_model=List[NormalizedTxnOut])
+@router.get("/business/{business_id}/txns", response_model=TxnsToCategorizePageOut)
 def list_txns_to_categorize(
     business_id: str,
     limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     only_uncategorized: bool = True,
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
@@ -196,17 +205,21 @@ def list_txns_to_categorize(
         start_date = None
     if isinstance(end_date, QueryParam):
         end_date = None
-    return [
-        NormalizedTxnOut(**item)
-        for item in categorize_service.list_txns_to_categorize(
-            db,
-            business_id,
-            limit,
-            only_uncategorized,
-            start_date=start_date,
-            end_date=end_date,
-        )
-    ]
+    payload = categorize_service.list_txns_to_categorize_page(
+        db,
+        business_id,
+        limit=limit,
+        offset=offset,
+        only_uncategorized=only_uncategorized,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    return {
+        "items": [NormalizedTxnOut(**item) for item in payload["items"]],
+        "total_count": payload["total_count"],
+        "has_more": payload["has_more"],
+        "next_offset": payload["next_offset"],
+    }
 
 
 @router.get("/business/{business_id}/categories", response_model=List[CategoryOut])

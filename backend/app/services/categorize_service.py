@@ -435,6 +435,28 @@ def list_txns_to_categorize(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
 ) -> List[Dict[str, Any]]:
+    payload = list_txns_to_categorize_page(
+        db,
+        business_id,
+        limit=limit,
+        offset=0,
+        only_uncategorized=only_uncategorized,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    return payload["items"]
+
+
+def list_txns_to_categorize_page(
+    db: Session,
+    business_id: str,
+    *,
+    limit: int,
+    offset: int,
+    only_uncategorized: bool,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+) -> Dict[str, Any]:
     require_business(db, business_id)
     seed_coa_and_categories_and_mappings(db, business_id)
 
@@ -444,7 +466,7 @@ def list_txns_to_categorize(
             business_id,
             start_date=start_date,
             end_date=end_date,
-            limit=max(500, limit),
+            limit=None,
         )
         existing_set: set[str] = set()
     else:
@@ -457,7 +479,7 @@ def list_txns_to_categorize(
             stmt = stmt.where(
                 RawEvent.occurred_at <= datetime.combine(end_date, time.max, tzinfo=timezone.utc)
             )
-        rows = db.execute(stmt.order_by(RawEvent.occurred_at.desc()).limit(500)).scalars().all()
+        rows = db.execute(stmt.order_by(RawEvent.occurred_at.desc())).scalars().all()
         existing = db.execute(
             select(TxnCategorization.source_event_id).where(TxnCategorization.business_id == business_id)
         ).scalars().all()
@@ -519,10 +541,17 @@ def list_txns_to_categorize(
             }
         )
 
-        if len(out) >= limit:
-            break
+    total_count = len(out)
+    page = out[offset : offset + limit]
+    next_offset = offset + len(page)
+    has_more = next_offset < total_count
 
-    return out
+    return {
+        "items": page,
+        "total_count": total_count,
+        "has_more": has_more,
+        "next_offset": next_offset if has_more else None,
+    }
 
 
 def list_categories(db: Session, business_id: str) -> List[Dict[str, Any]]:

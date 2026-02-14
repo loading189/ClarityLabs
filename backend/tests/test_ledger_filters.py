@@ -10,6 +10,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from backend.app.db import Base
+from backend.app.sim import models as sim_models  # noqa: F401
 from backend.app.models import Organization, Business, Account, Category, RawEvent, TxnCategorization
 from backend.app.services import ledger_service
 
@@ -67,3 +68,44 @@ def test_ledger_filters_and_ordering_and_balance_math():
     assert res["summary"]["end_balance"] == -40.0
     assert res["rows"][0]["balance"] == -30.0
     assert res["rows"][1]["balance"] == -40.0
+    assert res["total_count"] == 2
+    assert res["has_more"] is False
+    assert res["next_offset"] is None
+
+
+def test_ledger_query_offset_pagination_is_deterministic():
+    db = _session()
+    biz_id = _seed(db)
+
+    page_1 = ledger_service.ledger_query(
+        db,
+        biz_id,
+        start_date=date(2024, 1, 1),
+        end_date=date(2024, 1, 3),
+        limit=2,
+        offset=0,
+    )
+    page_2 = ledger_service.ledger_query(
+        db,
+        biz_id,
+        start_date=date(2024, 1, 1),
+        end_date=date(2024, 1, 3),
+        limit=2,
+        offset=page_1["next_offset"] or 0,
+    )
+
+    ids_1 = [row["source_event_id"] for row in page_1["rows"]]
+    ids_2 = [row["source_event_id"] for row in page_2["rows"]]
+
+    assert page_1["total_count"] == 3
+    assert len(page_1["rows"]) == 2
+    assert page_1["has_more"] is True
+    assert page_1["next_offset"] == 2
+
+    assert len(page_2["rows"]) == 1
+    assert page_2["has_more"] is False
+    assert page_2["next_offset"] is None
+
+    assert ids_1 == ["evt_1", "evt_2"]
+    assert ids_2 == ["evt_3"]
+    assert set(ids_1).isdisjoint(ids_2)
