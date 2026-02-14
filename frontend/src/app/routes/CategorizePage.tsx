@@ -8,6 +8,7 @@ import {
   saveCategorization,
   type CategoryOut,
   type NormalizedTxn,
+  type PagedTxns,
 } from "../../api/categorize";
 import { EmptyState, InlineAlert, LoadingState, Panel } from "../../components/ui";
 import Button from "../../components/ui/Button";
@@ -21,6 +22,10 @@ export default function CategorizePage() {
   const businessId = assertBusinessId(businessIdParam, "CategorizePage");
   const [loading, setLoading] = useState(true);
   const [txns, setTxns] = useState<NormalizedTxn[]>([]);
+  const [totalTxnCount, setTotalTxnCount] = useState(0);
+  const [hasMoreTxns, setHasMoreTxns] = useState(false);
+  const [nextTxnOffset, setNextTxnOffset] = useState<number | null>(null);
+  const [loadingMoreTxns, setLoadingMoreTxns] = useState(false);
   const [categories, setCategories] = useState<CategoryOut[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [categoriesError, setCategoriesError] = useState<string | null>(null);
@@ -30,11 +35,19 @@ export default function CategorizePage() {
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<Record<string, string>>({});
   const [search, setSearch] = useState("");
   const [direction, setDirection] = useState<"all" | "inflow" | "outflow">("all");
+  const pageSize = 50;
 
   const formatError = useCallback((err: unknown, fallback: string) => {
     if (err instanceof ApiError) return err.message;
     if (err instanceof Error) return err.message;
     return fallback;
+  }, []);
+
+  const applyTxnPage = useCallback((page: PagedTxns, append: boolean) => {
+    setTxns((current) => (append ? [...current, ...page.items] : page.items));
+    setTotalTxnCount(page.total_count);
+    setHasMoreTxns(page.has_more);
+    setNextTxnOffset(page.next_offset ?? null);
   }, []);
 
   const load = useCallback(async () => {
@@ -44,15 +57,18 @@ export default function CategorizePage() {
     setCategoriesError(null);
     try {
       const [txnResult, categoryResult] = await Promise.allSettled([
-        fetchTxnsToCategorize(businessId),
+        fetchTxnsToCategorize(businessId, { limit: pageSize, offset: 0 }),
         fetchCategories(businessId),
       ]);
 
       if (txnResult.status === "fulfilled") {
-        setTxns(txnResult.value);
+        applyTxnPage(txnResult.value, false);
       } else {
         setLoadError(formatError(txnResult.reason, "Unable to load transactions."));
         setTxns([]);
+        setTotalTxnCount(0);
+        setHasMoreTxns(false);
+        setNextTxnOffset(null);
       }
 
       if (categoryResult.status === "fulfilled") {
@@ -66,7 +82,24 @@ export default function CategorizePage() {
     } finally {
       setLoading(false);
     }
-  }, [businessId, formatError]);
+  }, [applyTxnPage, businessId, formatError, pageSize]);
+
+  const handleLoadMore = useCallback(async () => {
+    if (!businessId || !hasMoreTxns || nextTxnOffset == null) return;
+    setLoadingMoreTxns(true);
+    setLoadError(null);
+    try {
+      const page = await fetchTxnsToCategorize(businessId, {
+        limit: pageSize,
+        offset: nextTxnOffset,
+      });
+      applyTxnPage(page, true);
+    } catch (err) {
+      setLoadError(formatError(err, "Unable to load transactions."));
+    } finally {
+      setLoadingMoreTxns(false);
+    }
+  }, [applyTxnPage, businessId, formatError, hasMoreTxns, nextTxnOffset, pageSize]);
 
   useEffect(() => {
     void load();
@@ -220,7 +253,7 @@ export default function CategorizePage() {
           <div className={styles.toolbarInfo}>
             <div className={styles.toolbarTitle}>Uncategorized queue</div>
             <div className={styles.toolbarMeta}>
-              {uncategorizedTxns.length} transactions awaiting categorization
+              Showing {uncategorizedTxns.length} of {totalTxnCount} uncategorized transactions
             </div>
           </div>
           <div className={styles.toolbarFilters}>
@@ -316,69 +349,78 @@ export default function CategorizePage() {
         )}
 
         {!loading && !loadError && categories.length > 0 && filteredTxns.length > 0 && (
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Description</th>
-                  <th>Vendor</th>
-                  <th className={styles.amountCell}>Amount</th>
-                  <th>Current category</th>
-                  <th>Assign</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredTxns.map((txn) => {
-                  const categoryValue =
-                    selectedCategoryIds[txn.source_event_id] ?? categories[0]?.id ?? "";
-                  const vendorLabel = normalizeVendorDisplay(
-                    txn.description,
-                    txn.counterparty_hint ?? txn.merchant_key
-                  );
-                  return (
-                    <tr key={txn.source_event_id}>
-                      <td>{formatDate(txn.occurred_at)}</td>
-                      <td>
-                        <div className={styles.cellTitle}>{txn.description}</div>
-                      </td>
-                      <td>{vendorLabel}</td>
-                      <td className={styles.amountCell}>{formatAmount(txn)}</td>
-                      <td>{resolveCategoryLabel(txn)}</td>
-                      <td>
-                        <select
-                          className={styles.select}
-                          value={categoryValue}
-                          onChange={(event) =>
-                            setSelectedCategoryIds((prev) => ({
-                              ...prev,
-                              [txn.source_event_id]: event.target.value,
-                            }))
-                          }
-                        >
-                          {categories.map((category) => (
-                            <option key={category.id} value={category.id}>
-                              {category.name}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className={styles.actionCell}>
-                        <Button
-                          variant="primary"
-                          onClick={() => handleApply(txn)}
-                          disabled={rowLoading[txn.source_event_id]}
-                        >
-                          {rowLoading[txn.source_event_id] ? "Saving…" : "Apply"}
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <div className={styles.tableWrap}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Description</th>
+                    <th>Vendor</th>
+                    <th className={styles.amountCell}>Amount</th>
+                    <th>Current category</th>
+                    <th>Assign</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredTxns.map((txn) => {
+                    const categoryValue =
+                      selectedCategoryIds[txn.source_event_id] ?? categories[0]?.id ?? "";
+                    const vendorLabel = normalizeVendorDisplay(
+                      txn.description,
+                      txn.counterparty_hint ?? txn.merchant_key
+                    );
+                    return (
+                      <tr key={txn.source_event_id}>
+                        <td>{formatDate(txn.occurred_at)}</td>
+                        <td>
+                          <div className={styles.cellTitle}>{txn.description}</div>
+                        </td>
+                        <td>{vendorLabel}</td>
+                        <td className={styles.amountCell}>{formatAmount(txn)}</td>
+                        <td>{resolveCategoryLabel(txn)}</td>
+                        <td>
+                          <select
+                            className={styles.select}
+                            value={categoryValue}
+                            onChange={(event) =>
+                              setSelectedCategoryIds((prev) => ({
+                                ...prev,
+                                [txn.source_event_id]: event.target.value,
+                              }))
+                            }
+                          >
+                            {categories.map((category) => (
+                              <option key={category.id} value={category.id}>
+                                {category.name}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className={styles.actionCell}>
+                          <Button
+                            variant="primary"
+                            onClick={() => handleApply(txn)}
+                            disabled={rowLoading[txn.source_event_id]}
+                          >
+                            {rowLoading[txn.source_event_id] ? "Saving…" : "Apply"}
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {hasMoreTxns && (
+              <div className={styles.loadMoreWrap}>
+                <Button variant="secondary" onClick={handleLoadMore} disabled={loadingMoreTxns}>
+                  {loadingMoreTxns ? "Loading…" : "Load more"}
+                </Button>
+              </div>
+            )}
+          </>
         )}
 
         {actionMessage && <div className={styles.actionMessage}>{actionMessage}</div>}

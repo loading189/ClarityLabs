@@ -32,6 +32,12 @@ vi.mock("../../api/categorize", () => ({
   deleteCategoryRule: vi.fn(),
   getCategories: (...args: unknown[]) => getCategories(...args),
   getCategorizeMetrics: (...args: unknown[]) => getCategorizeMetrics(...args),
+  normalizePagedTxns: (payload: unknown) => {
+    if (Array.isArray(payload)) {
+      return { items: payload, total_count: payload.length, has_more: false, next_offset: null };
+    }
+    return payload;
+  },
   getBrainVendors: (...args: unknown[]) => getBrainVendors(...args),
   getTxnsToCategorize: (...args: unknown[]) => getTxnsToCategorize(...args),
   listCategoryRules: (...args: unknown[]) => listCategoryRules(...args),

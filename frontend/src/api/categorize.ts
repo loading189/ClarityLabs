@@ -21,12 +21,43 @@ export type NormalizedTxn = {
   merchant_key?: string | null;
 };
 
-export type TxnsToCategorizePage = {
+export type PagedTxns = {
   items: NormalizedTxn[];
   total_count: number;
   has_more: boolean;
   next_offset?: number | null;
 };
+
+export type TxnsToCategorizePage = PagedTxns;
+
+export function normalizePagedTxns(payload: unknown): PagedTxns {
+  if (Array.isArray(payload)) {
+    return {
+      items: payload as NormalizedTxn[],
+      total_count: payload.length,
+      has_more: false,
+      next_offset: null,
+    };
+  }
+
+  if (payload && typeof payload === "object") {
+    const page = payload as Partial<PagedTxns>;
+    const items = Array.isArray(page.items) ? page.items : [];
+    return {
+      items,
+      total_count: typeof page.total_count === "number" ? page.total_count : items.length,
+      has_more: Boolean(page.has_more),
+      next_offset: typeof page.next_offset === "number" ? page.next_offset : null,
+    };
+  }
+
+  return {
+    items: [],
+    total_count: 0,
+    has_more: false,
+    next_offset: null,
+  };
+}
 
 export type BrainVendor = {
   merchant_id: string;
@@ -167,7 +198,9 @@ export function getTxnsToCategorize(
   if (params?.start_date) query.set("start_date", params.start_date);
   if (params?.end_date) query.set("end_date", params.end_date);
   if (params?.offset != null) query.set("offset", String(params.offset));
-  return apiGet<TxnsToCategorizePage>(`/categorize/business/${businessId}/txns?${query.toString()}`);
+  return apiGet<PagedTxns | NormalizedTxn[]>(
+    `/categorize/business/${businessId}/txns?${query.toString()}`
+  ).then((payload) => normalizePagedTxns(payload));
 }
 
 export function getCategories(businessId: string) {
