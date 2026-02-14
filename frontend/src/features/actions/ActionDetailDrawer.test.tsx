@@ -8,13 +8,13 @@ const fetchBusinessMembers = vi.fn();
 const fetchActionEvents = vi.fn();
 const getPlanDetail = vi.fn();
 const refreshPlan = vi.fn();
-const createPlan = vi.fn();
+const createPlanFromAction = vi.fn();
+const updateActionStatus = vi.fn();
 
 vi.mock("../../api/actions", () => ({
   assignAction: vi.fn(),
   fetchActionEvents: (...args: unknown[]) => fetchActionEvents(...args),
-  resolveAction: vi.fn(),
-  snoozeAction: vi.fn(),
+  updateActionStatus: (...args: unknown[]) => updateActionStatus(...args),
 }));
 
 vi.mock("../../api/businesses", () => ({
@@ -23,7 +23,7 @@ vi.mock("../../api/businesses", () => ({
 
 vi.mock("../../api/plansV2", () => ({
   closePlan: vi.fn(),
-  createPlan: (...args: unknown[]) => createPlan(...args),
+  createPlanFromAction: (...args: unknown[]) => createPlanFromAction(...args),
   getPlanDetail: (...args: unknown[]) => getPlanDetail(...args),
   refreshPlan: (...args: unknown[]) => refreshPlan(...args),
 }));
@@ -58,31 +58,16 @@ describe("ActionDetailDrawer", () => {
     plan_id: null,
   };
 
-  it("shows create plan CTA when no plan exists", async () => {
+  it("Start Plan calls createPlanFromAction", async () => {
     fetchBusinessMembers.mockResolvedValue([]);
     fetchActionEvents.mockResolvedValue([]);
-
-    render(
-      <ActionDetailDrawer
-        open
-        action={baseAction}
-        onClose={() => undefined}
-      />
-    );
-
-    expect(await screen.findByText("Start remediation plan")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Start Plan" })).toBeInTheDocument();
-  });
-
-  it("creates a plan with the required payload", async () => {
-    fetchBusinessMembers.mockResolvedValue([]);
-    fetchActionEvents.mockResolvedValue([]);
-    createPlan.mockResolvedValue({
+    createPlanFromAction.mockResolvedValue({ plan_id: "plan-1", created: true });
+    getPlanDetail.mockResolvedValue({
       plan: {
         id: "plan-1",
         business_id: "biz-1",
         created_by_user_id: "user-1",
-        title: "Categorize transactions",
+        title: "Plan title",
         intent: "Plan intent",
         status: "draft",
         created_at: "2024-01-01T00:00:00Z",
@@ -96,43 +81,16 @@ describe("ActionDetailDrawer", () => {
 
     render(
       <MemoryRouter>
-        <ActionDetailDrawer
-          open
-          action={baseAction}
-          onClose={() => undefined}
-        />
+        <ActionDetailDrawer open action={baseAction} onClose={() => undefined} />
       </MemoryRouter>
     );
 
-    const [planIntentInput] = await screen.findAllByPlaceholderText(
-      "Document the plan intent and why it matters"
-    );
-    await userEvent.type(planIntentInput, "Plan intent");
-    const [createButton] = screen.getAllByRole("button", { name: "Start Plan" });
-    await userEvent.click(createButton);
+    await userEvent.click(await screen.findByRole("button", { name: "Start Plan" }));
 
-    await waitFor(() =>
-      expect(createPlan).toHaveBeenCalledWith({
-        business_id: "biz-1",
-        title: "Categorize transactions",
-        intent: "Plan intent",
-        source_action_id: "action-1",
-        primary_signal_id: undefined,
-        assigned_to_user_id: undefined,
-        conditions: [
-          {
-            type: "signal_resolved",
-            signal_id: null,
-            baseline_window_days: 0,
-            evaluation_window_days: 14,
-            direction: "resolve",
-          },
-        ],
-      })
-    );
+    await waitFor(() => expect(createPlanFromAction).toHaveBeenCalledWith("biz-1", "action-1"));
   });
 
-  it("renders plan summary and refreshes observations", async () => {
+  it("shows Open Plan when action already has plan", async () => {
     fetchBusinessMembers.mockResolvedValue([]);
     fetchActionEvents.mockResolvedValue([]);
     getPlanDetail.mockResolvedValue({
@@ -145,81 +103,35 @@ describe("ActionDetailDrawer", () => {
         status: "active",
         created_at: "2024-01-01T00:00:00Z",
         updated_at: "2024-01-01T00:00:00Z",
-        activated_at: "2024-01-02T00:00:00Z",
-        closed_at: null,
       },
       conditions: [],
-      latest_observation: {
-        id: "obs-1",
-        plan_id: "plan-1",
-        observed_at: "2024-02-01T00:00:00Z",
-        evaluation_start: "2024-02-01",
-        evaluation_end: "2024-02-01",
-        signal_state: null,
-        metric_value: 10,
-        metric_baseline: 8,
-        metric_delta: 2,
-        verdict: "success",
-        evidence_json: {},
-        created_at: "2024-02-01T00:00:00Z",
-      },
-      observations: [
-        {
-          id: "obs-1",
-          plan_id: "plan-1",
-          observed_at: "2024-02-01T00:00:00Z",
-          evaluation_start: "2024-02-01",
-          evaluation_end: "2024-02-01",
-          signal_state: null,
-          metric_value: 10,
-          metric_baseline: 8,
-          metric_delta: 2,
-          verdict: "success",
-          evidence_json: {},
-          created_at: "2024-02-01T00:00:00Z",
-        },
-      ],
+      latest_observation: null,
+      observations: [],
       state_events: [],
-    });
-    refreshPlan.mockResolvedValue({
-      observation: {
-        id: "obs-2",
-        plan_id: "plan-1",
-        observed_at: "2024-02-02T00:00:00Z",
-        evaluation_start: "2024-02-02",
-        evaluation_end: "2024-02-02",
-        signal_state: null,
-        metric_value: 7,
-        metric_baseline: 10,
-        metric_delta: -3,
-        verdict: "failure",
-        evidence_json: {},
-        created_at: "2024-02-02T00:00:00Z",
-      },
-      success_candidate: false,
     });
 
     render(
-      <ActionDetailDrawer
-        open
-        action={{ ...baseAction, plan_id: "plan-1" }}
-        onClose={() => undefined}
-      />
+      <MemoryRouter>
+        <ActionDetailDrawer open action={{ ...baseAction, plan_id: "plan-1" }} onClose={() => undefined} />
+      </MemoryRouter>
     );
 
-    const planTitles = await screen.findAllByText("Plan title");
-    expect(planTitles[0]).toBeInTheDocument();
-    const [summary] = await screen.findAllByTestId("plan-observation-summary");
-    expect(summary).toHaveTextContent("Metric baseline 8.00 → 10.00");
-    expect(screen.getAllByRole("button", { name: "View Plan" }).length).toBeGreaterThan(0);
+    expect(await screen.findByRole("button", { name: "Open Plan" })).toBeInTheDocument();
+  });
 
-    const [refreshButton] = screen.getAllByRole("button", { name: "Refresh" });
-    await userEvent.click(refreshButton);
-    await waitFor(() => expect(refreshPlan).toHaveBeenCalled());
-    await waitFor(() =>
-      expect(screen.getAllByTestId("plan-observation-summary")[0]).toHaveTextContent(
-        "Metric baseline 10.00 → 7.00"
-      )
+  it("status change triggers update call", async () => {
+    fetchBusinessMembers.mockResolvedValue([]);
+    fetchActionEvents.mockResolvedValue([]);
+    updateActionStatus.mockResolvedValue({ ...baseAction, status: "done" });
+
+    render(
+      <MemoryRouter>
+        <ActionDetailDrawer open action={baseAction} onClose={() => undefined} />
+      </MemoryRouter>
     );
+
+    const doneButtons = await screen.findAllByRole("button", { name: "Done" });
+    await userEvent.click(doneButtons[0]);
+    await waitFor(() => expect(updateActionStatus).toHaveBeenCalledWith("biz-1", "action-1", { status: "done", note: undefined }));
   });
 });

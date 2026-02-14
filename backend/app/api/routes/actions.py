@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -17,6 +17,7 @@ from backend.app.services.actions_service import (
     generate_actions_for_business,
     list_actions,
     resolve_action,
+    reopen_action,
     snooze_action,
 )
 
@@ -79,6 +80,11 @@ class ActionSnoozeIn(BaseModel):
 
 class ActionAssignIn(BaseModel):
     assigned_to_user_id: Optional[str] = None
+
+
+class ActionStatusIn(BaseModel):
+    status: str
+    note: Optional[str] = None
 
 
 class ActionStateEventOut(BaseModel):
@@ -272,6 +278,58 @@ def snooze_action_item(
             note=req.note,
             actor_user_id=user.id,
         )
+    except ValueError as exc:
+        message = str(exc)
+        raise HTTPException(404 if "not found" in message else 400, message) from exc
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@router.post(
+    "/{business_id}/{action_id}/status",
+    response_model=ActionItemOut,
+    dependencies=[Depends(require_membership_dep(min_role="staff"))],
+)
+def set_action_item_status(
+    business_id: str,
+    action_id: str,
+    req: ActionStatusIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    try:
+        if req.status == "open":
+            row = reopen_action(
+                db,
+                business_id,
+                action_id,
+                reason="reopened",
+                note=req.note,
+                actor_user_id=user.id,
+            )
+        elif req.status == "snoozed":
+            row = snooze_action(
+                db,
+                business_id,
+                action_id,
+                until=datetime.now(timezone.utc) + timedelta(days=7),
+                reason="snoozed",
+                note=req.note,
+                actor_user_id=user.id,
+            )
+        elif req.status == "done":
+            row = resolve_action(
+                db,
+                business_id,
+                action_id,
+                status="done",
+                resolution_reason="completed",
+                resolution_note=req.note,
+                actor_user_id=user.id,
+            )
+        else:
+            raise ValueError("invalid status")
     except ValueError as exc:
         message = str(exc)
         raise HTTPException(404 if "not found" in message else 400, message) from exc

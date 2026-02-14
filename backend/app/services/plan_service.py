@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.app.models import (
+    ActionItem,
     AssistantMessage,
     Business,
     HealthSignalState,
@@ -17,6 +18,8 @@ from backend.app.models import (
     PlanObservation,
     PlanStateEvent,
 )
+from backend.app.services.actions_service import _signal_domain
+from backend.app.services.audit_service import log_audit_event
 
 
 PLAN_STATUSES = {"draft", "active", "succeeded", "failed", "canceled"}
@@ -308,6 +311,99 @@ def create_plan(
         )
     )
     return plan
+
+
+def create_plan_from_action(
+    db: Session,
+    *,
+    business_id: str,
+    action_id: str,
+    actor_user_id: str,
+) -> tuple[str, bool]:
+    _require_business(db, business_id)
+    action = db.get(ActionItem, action_id)
+    if not action or action.business_id != business_id:
+        raise HTTPException(status_code=404, detail="action not found")
+
+    existing = (
+        db.execute(
+            select(Plan)
+            .where(
+                Plan.business_id == business_id,
+                Plan.source_action_id == action.id,
+            )
+            .order_by(Plan.created_at.asc(), Plan.id.asc())
+        )
+        .scalars()
+        .first()
+    )
+    if existing:
+        return existing.id, False
+
+    signal_type: Optional[str] = None
+    if isinstance(action.evidence_json, dict):
+        signal_type = action.evidence_json.get("signal_type")
+    if not signal_type and action.source_signal_id:
+        signal_state = (
+            db.execute(
+                select(HealthSignalState).where(
+                    HealthSignalState.business_id == business_id,
+                    HealthSignalState.signal_id == action.source_signal_id,
+                )
+            )
+            .scalars()
+            .first()
+        )
+        signal_type = signal_state.signal_type if signal_state else None
+
+    domain = _signal_domain(signal_type)
+    intent_by_domain = {
+        "expense": "reduce expense creep",
+        "expenses": "reduce expense creep",
+        "liquidity": "prevent cash shortfall",
+        "revenue": "stabilize revenue timing",
+    }
+    intent = intent_by_domain.get(domain, "resolve flagged risk")
+    title = f"Remediation: {action.title}"[:200]
+    conditions: list[dict[str, Any]] = [
+        {
+            "type": "signal_resolved",
+            "signal_id": action.source_signal_id,
+            "baseline_window_days": 0,
+            "evaluation_window_days": 14,
+            "direction": "resolve",
+        },
+        {
+            "type": "metric_delta",
+            "metric_key": "health_score",
+            "baseline_window_days": 7,
+            "evaluation_window_days": 7,
+            "threshold": 1.0,
+            "direction": "improve",
+        },
+    ]
+    plan = create_plan(
+        db,
+        business_id=business_id,
+        created_by_user_id=actor_user_id,
+        title=title,
+        intent=intent,
+        source_action_id=action.id,
+        primary_signal_id=action.source_signal_id,
+        assigned_to_user_id=action.assigned_to_user_id,
+        idempotency_key=f"from_action:{action.id}",
+        conditions=conditions,
+    )
+    log_audit_event(
+        db,
+        business_id=business_id,
+        event_type="plan_created_from_action",
+        actor=actor_user_id,
+        reason="plan seeded from action",
+        before={"action_id": action.id, "plan_id": None},
+        after={"action_id": action.id, "plan_id": plan.id},
+    )
+    return plan.id, True
 
 
 def activate_plan(db: Session, business_id: str, plan_id: str, actor_user_id: str) -> Plan:
