@@ -40,6 +40,22 @@ export type CategorizeDrilldown = {
 
 type DatePreset = "7d" | "30d" | "90d";
 
+const CATEGORIZE_PAGE_SIZE = 50;
+
+type TxnPageLike = {
+  items: NormalizedTxn[];
+  total_count: number;
+  has_more: boolean;
+  next_offset?: number | null;
+};
+
+function normalizeTxnPage(payload: NormalizedTxn[] | TxnPageLike): TxnPageLike {
+  if (Array.isArray(payload)) {
+    return { items: payload, total_count: payload.length, has_more: false, next_offset: null };
+  }
+  return payload;
+}
+
 const DATE_PRESET_DAYS: Record<DatePreset, number> = {
   "7d": 7,
   "30d": 30,
@@ -58,6 +74,10 @@ export default function CategorizeTab({
   onCategorizationChange?: () => void;
 }) {
   const [txns, setTxns] = useState<NormalizedTxn[]>([]);
+  const [totalTxnCount, setTotalTxnCount] = useState(0);
+  const [hasMoreTxns, setHasMoreTxns] = useState(false);
+  const [nextTxnOffset, setNextTxnOffset] = useState<number | null>(null);
+  const [loadingMoreTxns, setLoadingMoreTxns] = useState(false);
   const [cats, setCats] = useState<CategoryOut[]>([]);
   const [metrics, setMetrics] = useState<CategorizeMetricsOut | null>(null);
   const [rules, setRules] = useState<CategoryRuleOut[]>([]);
@@ -273,8 +293,8 @@ export default function CategorizeTab({
 
     try {
       logRefresh("categorize", "reload");
-      const [t, c, m] = await Promise.all([
-        getTxnsToCategorize(businessId, 50, { start_date: dateRangeStart, end_date: dateRangeEnd }),
+      const [txnsPayload, c, m] = await Promise.all([
+        getTxnsToCategorize(businessId, CATEGORIZE_PAGE_SIZE, { start_date: dateRangeStart, end_date: dateRangeEnd, offset: 0 }),
         getCategories(businessId),
         getCategorizeMetrics(businessId),
       ]);
@@ -282,7 +302,11 @@ export default function CategorizeTab({
       // If a newer load started, ignore this result
       if (seq !== loadSeq.current) return;
 
-      setTxns(t);
+      const t = normalizeTxnPage(txnsPayload);
+      setTxns(t.items);
+      setTotalTxnCount(t.total_count);
+      setHasMoreTxns(t.has_more);
+      setNextTxnOffset(t.next_offset ?? null);
       setCats(c);
       setMetrics(m);
       setVendorErr(null);
@@ -304,12 +328,12 @@ export default function CategorizeTab({
       }
 
       const urlTxn = urlSourceEventId
-        ? t.find((txn) => txn.source_event_id === urlSourceEventId) ?? null
+        ? t.items.find((txn) => txn.source_event_id === urlSourceEventId) ?? null
         : null;
       const existingTxn = selectedTxnRef.current
-        ? t.find((txn) => txn.source_event_id === selectedTxnRef.current?.source_event_id) ?? null
+        ? t.items.find((txn) => txn.source_event_id === selectedTxnRef.current?.source_event_id) ?? null
         : null;
-      const nextTxn = urlTxn ?? existingTxn ?? t[0] ?? null;
+      const nextTxn = urlTxn ?? existingTxn ?? t.items[0] ?? null;
       setSelectedTxn(nextTxn);
       setSelectedCategoryId(pickBestCategoryId(nextTxn, c));
       if (urlTxn) {
@@ -324,7 +348,7 @@ export default function CategorizeTab({
         businessId,
         dateRangeStart,
         dateRangeEnd,
-        url: `/categorize/business/${businessId}/txns?limit=50&only_uncategorized=true&start_date=${dateRangeStart}&end_date=${dateRangeEnd}`,
+        url: `/categorize/business/${businessId}/txns?limit=${CATEGORIZE_PAGE_SIZE}&offset=0&only_uncategorized=true&start_date=${dateRangeStart}&end_date=${dateRangeEnd}`,
         error: e?.message ?? e,
       });
       setLoadErr(e?.message ?? "Failed to load categorization");
@@ -378,6 +402,34 @@ export default function CategorizeTab({
     setDetailSourceEventId(null);
     updateDetailParam(null);
   }, [updateDetailParam]);
+
+  const handleLoadMoreTxns = useCallback(async () => {
+    if (!businessId || invalidBusinessId || !hasMoreTxns || nextTxnOffset == null) return;
+    setLoadingMoreTxns(true);
+    try {
+      const pagePayload = await getTxnsToCategorize(businessId, CATEGORIZE_PAGE_SIZE, {
+        start_date: dateRangeStart,
+        end_date: dateRangeEnd,
+        offset: nextTxnOffset,
+      });
+      const page = normalizeTxnPage(pagePayload);
+      setTxns((current) => [...current, ...page.items]);
+      setTotalTxnCount(page.total_count);
+      setHasMoreTxns(page.has_more);
+      setNextTxnOffset(page.next_offset ?? null);
+    } catch (e: any) {
+      setLoadErr(e?.message ?? "Failed to load more transactions");
+    } finally {
+      setLoadingMoreTxns(false);
+    }
+  }, [
+    businessId,
+    dateRangeEnd,
+    dateRangeStart,
+    hasMoreTxns,
+    invalidBusinessId,
+    nextTxnOffset,
+  ]);
 
   const handleAutoCategorize = useCallback(async () => {
     if (!businessId || invalidBusinessId) return;
@@ -901,6 +953,7 @@ export default function CategorizeTab({
           <div className={styles.headerRow}>
             <h3 className={styles.title}>To categorize</h3>
             <div className={styles.headerActions}>
+              <span>Showing {txns.length} of {totalTxnCount}</span>
               <button
                 className={styles.buttonSecondary}
                 onClick={handleAutoCategorize}
@@ -977,39 +1030,46 @@ export default function CategorizeTab({
         ) : filteredTxns.length === 0 ? (
           <div className={styles.emptyState}>No uncategorized transactions.</div>
         ) : (
-          <div className={styles.txnList}>
-            {filteredTxns.map((t) => (
-              <button
-                key={t.source_event_id}
-                onClick={() => pickTxn(t)}
-                aria-pressed={selectedTxn?.source_event_id === t.source_event_id}
-                aria-label={`Select transaction ${t.description}`}
-                className={`${styles.txnItem} ${
-                  selectedTxn?.source_event_id === t.source_event_id ? styles.txnItemActive : ""
-                }`}
-              >
-                <div className={styles.txnTitle}>
-                  {normalizeVendorDisplay(
-                    t.description,
-                    vendorNameByKey.get(t.merchant_key ?? "")?.canonical_name
-                  )}
-                </div>
-                <div className={styles.txnMeta}>
-                  {formatTxnDateTime(t.occurred_at)} • {t.account} • {t.direction} •{" "}
-                  {formatAmount(t)}
-                </div>
+          <>
+            <div className={styles.txnList}>
+              {filteredTxns.map((t) => (
+                <button
+                  key={t.source_event_id}
+                  onClick={() => pickTxn(t)}
+                  aria-pressed={selectedTxn?.source_event_id === t.source_event_id}
+                  aria-label={`Select transaction ${t.description}`}
+                  className={`${styles.txnItem} ${
+                    selectedTxn?.source_event_id === t.source_event_id ? styles.txnItemActive : ""
+                  }`}
+                >
+                  <div className={styles.txnTitle}>
+                    {normalizeVendorDisplay(
+                      t.description,
+                      vendorNameByKey.get(t.merchant_key ?? "")?.canonical_name
+                    )}
+                  </div>
+                  <div className={styles.txnMeta}>
+                    {formatTxnDateTime(t.occurred_at)} • {t.account} • {t.direction} •{" "}
+                    {formatAmount(t)}
+                  </div>
 
-                {t.suggested_category_id &&
-                  catsById.has(t.suggested_category_id) &&
-                  !isCategoryUncategorized(catsById.get(t.suggested_category_id)) && (
-                    <div className={styles.suggestionLine}>
-                      Suggestion: <strong>{catsById.get(t.suggested_category_id)?.name}</strong> •{" "}
-                      {Math.round(Number(t.confidence ?? 0) * 100)}%
-                    </div>
-                  )}
+                  {t.suggested_category_id &&
+                    catsById.has(t.suggested_category_id) &&
+                    !isCategoryUncategorized(catsById.get(t.suggested_category_id)) && (
+                      <div className={styles.suggestionLine}>
+                        Suggestion: <strong>{catsById.get(t.suggested_category_id)?.name}</strong> •{" "}
+                        {Math.round(Number(t.confidence ?? 0) * 100)}%
+                      </div>
+                    )}
+                </button>
+              ))}
+            </div>
+            {hasMoreTxns && (
+              <button className={styles.buttonSecondary} onClick={handleLoadMoreTxns} disabled={loadingMoreTxns}>
+                {loadingMoreTxns ? "Loading…" : "Load more"}
               </button>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
 

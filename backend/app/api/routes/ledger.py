@@ -112,6 +112,9 @@ class LedgerSummaryOut(BaseModel):
 class LedgerQueryOut(BaseModel):
     rows: List[LedgerQueryRowOut]
     summary: LedgerSummaryOut
+    total_count: int
+    has_more: bool
+    next_offset: Optional[int] = None
 
 
 class LedgerDimensionAccountOut(BaseModel):
@@ -260,7 +263,13 @@ def ledger_query(
         limit=limit,
         offset=offset,
     )
-    return {"rows": payload["rows"], "summary": payload["summary"]}
+    return {
+        "rows": payload["rows"],
+        "summary": payload["summary"],
+        "total_count": payload["total_count"],
+        "has_more": payload["has_more"],
+        "next_offset": payload["next_offset"],
+    }
 
 
 @api_router.get(

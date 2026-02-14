@@ -21,6 +21,13 @@ export type NormalizedTxn = {
   merchant_key?: string | null;
 };
 
+export type TxnsToCategorizePage = {
+  items: NormalizedTxn[];
+  total_count: number;
+  has_more: boolean;
+  next_offset?: number | null;
+};
+
 export type BrainVendor = {
   merchant_id: string;
   canonical_name: string;
@@ -152,14 +159,15 @@ export function forgetBrainVendor(businessId: string, payload: { merchant_key: s
 export function getTxnsToCategorize(
   businessId: string,
   limit = 50,
-  params?: { start_date?: string; end_date?: string }
+  params?: { start_date?: string; end_date?: string; offset?: number }
 ) {
   const query = new URLSearchParams();
   query.set("limit", String(limit));
   query.set("only_uncategorized", "true");
   if (params?.start_date) query.set("start_date", params.start_date);
   if (params?.end_date) query.set("end_date", params.end_date);
-  return apiGet<NormalizedTxn[]>(`/categorize/business/${businessId}/txns?${query.toString()}`);
+  if (params?.offset != null) query.set("offset", String(params.offset));
+  return apiGet<TxnsToCategorizePage>(`/categorize/business/${businessId}/txns?${query.toString()}`);
 }
 
 export function getCategories(businessId: string) {
@@ -168,11 +176,12 @@ export function getCategories(businessId: string) {
 
 export function fetchTxnsToCategorize(
   businessId: string,
-  params?: { start_date?: string; end_date?: string; limit?: number }
+  params?: { start_date?: string; end_date?: string; limit?: number; offset?: number }
 ) {
   return getTxnsToCategorize(businessId, params?.limit ?? 50, {
     start_date: params?.start_date,
     end_date: params?.end_date,
+    offset: params?.offset,
   });
 }
 

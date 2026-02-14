@@ -52,7 +52,7 @@ afterEach(() => {
 
 describe("LedgerPage sidebar", () => {
   it("loads accounts/vendors dimensions", async () => {
-    fetchLedgerQuery.mockResolvedValue({ rows: [], summary: { row_count: 0, start_balance: 0, end_balance: 0, total_in: 0, total_out: 0 } });
+    fetchLedgerQuery.mockResolvedValue({ rows: [], summary: { row_count: 0, start_balance: 0, end_balance: 0, total_in: 0, total_out: 0 }, total_count: 0, has_more: false, next_offset: null });
     fetchLedgerAccountDimensions.mockResolvedValue([{ account: "Operating", label: "Operating", count: 2, total: 100 }]);
     fetchLedgerVendorDimensions.mockResolvedValue([{ vendor: "Acme", count: 2, total: -50 }]);
 
@@ -62,7 +62,7 @@ describe("LedgerPage sidebar", () => {
   });
 
   it("clicking account filters ledger API call", async () => {
-    fetchLedgerQuery.mockResolvedValue({ rows: [], summary: { row_count: 0, start_balance: 0, end_balance: 0, total_in: 0, total_out: 0 } });
+    fetchLedgerQuery.mockResolvedValue({ rows: [], summary: { row_count: 0, start_balance: 0, end_balance: 0, total_in: 0, total_out: 0 }, total_count: 0, has_more: false, next_offset: null });
     fetchLedgerAccountDimensions.mockResolvedValue([{ account: "Operating", label: "Operating", count: 2, total: 100 }]);
     fetchLedgerVendorDimensions.mockResolvedValue([]);
 
@@ -78,7 +78,7 @@ describe("LedgerPage sidebar", () => {
   });
 
   it("query params restore state", async () => {
-    fetchLedgerQuery.mockResolvedValue({ rows: [], summary: { row_count: 0, start_balance: 0, end_balance: 0, total_in: 0, total_out: 0 } });
+    fetchLedgerQuery.mockResolvedValue({ rows: [], summary: { row_count: 0, start_balance: 0, end_balance: 0, total_in: 0, total_out: 0 }, total_count: 0, has_more: false, next_offset: null });
     fetchLedgerAccountDimensions.mockResolvedValue([]);
     fetchLedgerVendorDimensions.mockResolvedValue([]);
 
@@ -93,7 +93,7 @@ describe("LedgerPage sidebar", () => {
   });
 
   it("filters sidebar list with in-panel search", async () => {
-    fetchLedgerQuery.mockResolvedValue({ rows: [], summary: { row_count: 0, start_balance: 0, end_balance: 0, total_in: 0, total_out: 0 } });
+    fetchLedgerQuery.mockResolvedValue({ rows: [], summary: { row_count: 0, start_balance: 0, end_balance: 0, total_in: 0, total_out: 0 }, total_count: 0, has_more: false, next_offset: null });
     fetchLedgerAccountDimensions.mockResolvedValue([
       { account: "Operating", label: "Operating", count: 2, total: 100 },
       { account: "Payroll", label: "Payroll", count: 1, total: 50 },
@@ -136,6 +136,9 @@ describe("LedgerPage sidebar", () => {
         },
       ],
       summary: { row_count: 2, start_balance: 0, end_balance: 0, total_in: 0, total_out: 0 },
+      total_count: 2,
+      has_more: false,
+      next_offset: null,
     });
     fetchLedgerAccountDimensions.mockResolvedValue([]);
     fetchLedgerVendorDimensions.mockResolvedValue([]);
@@ -153,6 +156,9 @@ describe("LedgerPage sidebar", () => {
     fetchLedgerQuery.mockResolvedValue({
       rows: [{ occurred_at: "2024-01-01", date: "2024-01-01", description: "Desc", vendor: "V", amount: 1, category: "Cat", account: "Operating", balance: 3, source_event_id: "evt-1" }],
       summary: { row_count: 1, start_balance: 0, end_balance: 0, total_in: 0, total_out: 0 },
+      total_count: 1,
+      has_more: false,
+      next_offset: null,
     });
     fetchLedgerAccountDimensions.mockResolvedValue([]);
     fetchLedgerVendorDimensions.mockResolvedValue([]);
@@ -171,4 +177,72 @@ describe("LedgerPage sidebar", () => {
     await screen.findByText("Desc");
     expect(screen.queryByRole("columnheader", { name: "Vendor" })).not.toBeInTheDocument();
   });
+
+  it("loads more ledger rows and updates showing count", async () => {
+    const user = userEvent.setup();
+    fetchLedgerQuery.mockReset();
+    fetchLedgerAccountDimensions.mockReset();
+    fetchLedgerVendorDimensions.mockReset();
+
+    const page1 = {
+      rows: [
+        {
+          occurred_at: "2024-01-01",
+          date: "2024-01-01",
+          description: "Row 1",
+          vendor: "Vendor 1",
+          amount: -10,
+          category: "Meals",
+          account: "Operating",
+          balance: 100,
+          source_event_id: "evt-1",
+        },
+      ],
+      summary: { row_count: 2, start_balance: 0, end_balance: 0, total_in: 0, total_out: 0 },
+      total_count: 2,
+      has_more: true,
+      next_offset: 1,
+    };
+    const page2 = {
+      rows: [
+        {
+          occurred_at: "2024-01-02",
+          date: "2024-01-02",
+          description: "Row 2",
+          vendor: "Vendor 2",
+          amount: -20,
+          category: "Rent",
+          account: "Operating",
+          balance: 80,
+          source_event_id: "evt-2",
+        },
+      ],
+      summary: { row_count: 2, start_balance: 0, end_balance: 0, total_in: 0, total_out: 0 },
+      total_count: 2,
+      has_more: false,
+      next_offset: null,
+    };
+
+    fetchLedgerQuery.mockImplementation((_businessId, query) =>
+      Promise.resolve(query?.offset == 1 ? page2 : page1)
+    );
+    fetchLedgerAccountDimensions.mockResolvedValue([]);
+    fetchLedgerVendorDimensions.mockResolvedValue([]);
+
+    renderPage();
+    await screen.findByText("Row 1");
+    expect(screen.getAllByText("Showing 1 of 2").length).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole("button", { name: /Load more/i }));
+
+    await waitFor(() => {
+      expect(fetchLedgerQuery).toHaveBeenCalledWith(
+        BIZ_ID,
+        expect.objectContaining({ offset: 1 }),
+        expect.anything()
+      );
+    });
+  });
+
+
 });

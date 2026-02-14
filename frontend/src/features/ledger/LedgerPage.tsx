@@ -24,6 +24,7 @@ import DataStatusStrip from "../../components/status/DataStatusStrip";
 const SIDEBAR_TOP_N = 12;
 const COLUMN_STORAGE_KEY = "ledger-column-visibility";
 const ALL_COLUMNS = ["date", "description", "account", "vendor", "category", "amount", "balance"] as const;
+const LEDGER_PAGE_SIZE = 100;
 type ColumnKey = (typeof ALL_COLUMNS)[number];
 type LoadError = { message: string; status?: number };
 
@@ -128,6 +129,7 @@ export default function LedgerPage() {
   const [accounts, setAccounts] = useState<LedgerDimensionAccount[]>([]);
   const [vendors, setVendors] = useState<LedgerDimensionVendor[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [err, setErr] = useState<LoadError | null>(null);
   const [drawerSourceEventId, setDrawerSourceEventId] = useState<string | null>(null);
   const [highlightSourceEventId, setHighlightSourceEventId] = useState<string | null>(null);
@@ -193,7 +195,7 @@ export default function LedgerPage() {
             : anchorSourceEventId
               ? [anchorSourceEventId]
               : undefined,
-          limit: 500,
+          limit: LEDGER_PAGE_SIZE,
           offset: 0,
         },
         c.signal
@@ -236,6 +238,57 @@ export default function LedgerPage() {
     selectedVendors.join("|"),
     highlightSourceEventIds.join("|"),
     anchorSourceEventId,
+  ]);
+
+  const handleLoadMore = useCallback(async () => {
+    if (!ledger?.has_more || ledger.next_offset == null) return;
+    const c = new AbortController();
+    setLoadingMore(true);
+    try {
+      const nextPage = await fetchLedgerQuery(
+        businessId,
+        {
+          start_date: range.start,
+          end_date: range.end,
+          account: selectedAccounts,
+          vendor: selectedVendors,
+          category: selectedCategories,
+          search: filters.q,
+          direction: filters.direction,
+          highlight_source_event_id: highlightSourceEventIds.length
+            ? highlightSourceEventIds
+            : anchorSourceEventId
+              ? [anchorSourceEventId]
+              : undefined,
+          limit: LEDGER_PAGE_SIZE,
+          offset: ledger.next_offset,
+        },
+        c.signal
+      );
+      setLedger((current) => {
+        if (!current) return nextPage;
+        return {
+          ...nextPage,
+          rows: [...current.rows, ...nextPage.rows],
+        };
+      });
+    } catch (e: any) {
+      setErr({ message: e?.message ?? "Failed to load more ledger rows", status: e?.status });
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [
+    anchorSourceEventId,
+    businessId,
+    filters.direction,
+    filters.q,
+    highlightSourceEventIds,
+    ledger,
+    range.end,
+    range.start,
+    selectedAccounts,
+    selectedCategories,
+    selectedVendors,
   ]);
 
   const visibleRows = useMemo(() => {
@@ -335,7 +388,7 @@ export default function LedgerPage() {
       <PageHeader
         title="Ledger"
         subtitle="Deterministic proof layer for transactions, balances, and categorization."
-        actions={<div className={styles.headerMeta}>{visibleRows.length} rows</div>}
+        actions={<div className={styles.headerMeta}>Showing {visibleRows.length} of {ledger?.total_count ?? 0}</div>}
       />
 
       <div className={styles.topFilters}>
@@ -508,8 +561,10 @@ export default function LedgerPage() {
             />
           )}
           {!err && (
-            <div className={styles.tableWrap}>
-              <table className={`${styles.table} ${density === "compact" ? styles.tableCompact : ""}`}>
+            <>
+              <div className={styles.headerMeta}>Showing {visibleRows.length} of {ledger?.total_count ?? 0}</div>
+              <div className={styles.tableWrap}>
+                <table className={`${styles.table} ${density === "compact" ? styles.tableCompact : ""}`}>
                 <thead>
                   <tr>
                     {columnVisibility.date && <th className={styles.stickyLeft}>Date</th>}
@@ -566,8 +621,16 @@ export default function LedgerPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
-            </div>
+                </table>
+              </div>
+              {ledger?.has_more && (
+                <div className={styles.headerMeta}>
+                  <button className={styles.button} type="button" onClick={handleLoadMore} disabled={loadingMore}>
+                    {loadingMore ? "Loading…" : "Load more"}
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </section>
       </div>
