@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from backend.app.models import ActionItem, Business, HealthSignalState
 from backend.app.norma.ledger import LedgerIntegrityError, build_cash_ledger
 from backend.app.norma.normalize import NormalizedTransaction
-from backend.app.services import audit_service, health_signal_service
+from backend.app.services import audit_service, case_engine_service, health_signal_service
 from backend.app.services.signal_explain_service import explain_signal
 from backend.app.services.posted_txn_service import fetch_posted_transactions
 
@@ -1308,6 +1308,7 @@ def list_signal_states(db: Session, business_id: str) -> Tuple[List[Dict[str, An
                 "resolved_at": row.resolved_at.isoformat() if row.resolved_at else None,
                 "has_ledger_anchors": has_ledger_anchors,
                 "linked_action_id": linked_actions.get(row.signal_id).id if linked_actions.get(row.signal_id) else None,
+                "case_id": case_engine_service.get_case_id_for_signal(db, business_id, row.signal_id),
             }
         )
     return signals, {"count": len(signals)}
@@ -1336,6 +1337,7 @@ def get_signal_state_detail(db: Session, business_id: str, signal_id: str) -> Di
         "resolved_at": state.resolved_at.isoformat() if state.resolved_at else None,
         "resolution_note": state.resolution_note,
         "updated_at": state.updated_at.isoformat() if state.updated_at else None,
+        "case_id": case_engine_service.get_case_id_for_signal(db, business_id, signal_id),
     }
 
 
@@ -1847,6 +1849,7 @@ def get_signal_explain(db: Session, business_id: str, signal_id: str) -> Dict[st
         "status": case_file["status"],
         "severity": case_file["severity"],
         "linked_action_id": case_file["linked_action_id"],
+        "case_id": case_file.get("case_id"),
         "narrative": case_file["narrative"],
         "case_evidence": case_file["evidence"],
         "detector": detector,
@@ -1861,5 +1864,6 @@ def get_signal_explain(db: Session, business_id: str, signal_id: str) -> Dict[st
         "links": [
             "/signals",
             f"/app/{business_id}/signals",
+            f"/app/{business_id}/cases/{case_file.get('case_id')}" if case_file.get("case_id") else f"/app/{business_id}/signals/{signal_id}/explain",
         ],
     }

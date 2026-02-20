@@ -509,6 +509,12 @@ class Plan(Base):
         ForeignKey("businesses.id", ondelete="CASCADE"),
         nullable=False,
     )
+    case_id: Mapped[Optional[str]] = mapped_column(
+        String(36),
+        ForeignKey("cases.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
     created_by_user_id: Mapped[str] = mapped_column(
         String(36),
         ForeignKey("users.id", ondelete="RESTRICT"),
@@ -626,6 +632,90 @@ class PlanStateEvent(Base):
 
     plan = relationship("Plan")
     actor = relationship("User")
+
+
+class Case(Base):
+    __tablename__ = "cases"
+    __table_args__ = (
+        Index("ix_cases_business_status", "business_id", "status"),
+        Index("ix_cases_business_severity", "business_id", "severity"),
+        Index("ix_cases_domain_status", "domain", "status"),
+        Index("ix_cases_opened_at", "opened_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    business_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    domain: Mapped[str] = mapped_column(String(40), nullable=False)
+    primary_signal_type: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    severity: Mapped[str] = mapped_column(String(20), nullable=False, default="low", server_default=text("'low'"))
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="open", server_default=text("'open'"))
+    risk_score_snapshot: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    last_activity_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    assigned_to: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+
+
+class CaseSignal(Base):
+    __tablename__ = "case_signals"
+    __table_args__ = (
+        UniqueConstraint("business_id", "signal_id", name="uq_case_signals_business_signal"),
+        Index("ix_case_signals_case_id", "case_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    case_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("cases.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    business_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    signal_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+
+class CaseLedgerAnchor(Base):
+    __tablename__ = "case_ledger_anchors"
+    __table_args__ = (
+        UniqueConstraint("case_id", "anchor_key", name="uq_case_ledger_anchor_key"),
+        Index("ix_case_ledger_anchors_case_id", "case_id"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    case_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("cases.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    anchor_key: Mapped[str] = mapped_column(String(140), nullable=False)
+    anchor_payload_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+
+
+class CaseEvent(Base):
+    __tablename__ = "case_events"
+    __table_args__ = (
+        Index("ix_case_events_case_id", "case_id"),
+        Index("ix_case_events_created_at", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    case_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("cases.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    event_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    payload_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
 
 class ProcessingEventState(Base):

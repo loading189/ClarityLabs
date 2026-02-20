@@ -19,6 +19,7 @@ from backend.app.models import (
     PlanStateEvent,
 )
 from backend.app.services.actions_service import _signal_domain
+from backend.app.services import case_engine_service
 from backend.app.services.audit_service import log_audit_event
 
 
@@ -261,6 +262,7 @@ def create_plan(
     created_by_user_id: str,
     title: str,
     intent: str,
+    case_id: Optional[str],
     source_action_id: Optional[str],
     primary_signal_id: Optional[str],
     assigned_to_user_id: Optional[str],
@@ -268,6 +270,10 @@ def create_plan(
     conditions: List[Dict[str, Any]],
 ) -> Plan:
     _require_business(db, business_id)
+    if not case_id and primary_signal_id:
+        case_id = case_engine_service.get_case_id_for_signal(db, business_id, primary_signal_id)
+    if not case_id:
+        raise HTTPException(status_code=400, detail="case_id is required")
     now = utcnow()
     plan = Plan(
         business_id=business_id,
@@ -275,6 +281,7 @@ def create_plan(
         assigned_to_user_id=assigned_to_user_id,
         title=title,
         intent=intent,
+        case_id=case_id,
         status="draft",
         created_at=now,
         updated_at=now,
@@ -382,18 +389,26 @@ def create_plan_from_action(
             "direction": "improve",
         },
     ]
+    case_id = None
+    if action.source_signal_id:
+        case_id = case_engine_service.get_case_id_for_signal(db, business_id, action.source_signal_id)
+    if not case_id:
+        raise HTTPException(status_code=400, detail="action signal is not attached to a case")
+
     plan = create_plan(
         db,
         business_id=business_id,
         created_by_user_id=actor_user_id,
         title=title,
         intent=intent,
+        case_id=case_id,
         source_action_id=action.id,
         primary_signal_id=action.source_signal_id,
         assigned_to_user_id=action.assigned_to_user_id,
         idempotency_key=f"from_action:{action.id}",
         conditions=conditions,
     )
+    case_engine_service.emit_plan_event(db, plan.case_id, "PLAN_CREATED", {"plan_id": plan.id, "source_action_id": action.id})
     log_audit_event(
         db,
         business_id=business_id,
@@ -425,6 +440,7 @@ def activate_plan(db: Session, business_id: str, plan_id: str, actor_user_id: st
             note=None,
         )
     )
+    case_engine_service.emit_plan_event(db, plan.case_id, "PLAN_UPDATED", {"plan_id": plan.id, "status": "active"})
     return plan
 
 
@@ -443,6 +459,7 @@ def assign_plan(db: Session, business_id: str, plan_id: str, actor_user_id: str,
             note=f"assigned_to={assigned_to_user_id or 'unassigned'}",
         )
     )
+    case_engine_service.emit_plan_event(db, plan.case_id, "PLAN_UPDATED", {"plan_id": plan.id, "assigned_to_user_id": assigned_to_user_id})
     return plan
 
 
@@ -460,6 +477,7 @@ def add_plan_note(db: Session, business_id: str, plan_id: str, actor_user_id: st
             note=note,
         )
     )
+    case_engine_service.emit_plan_event(db, plan.case_id, "PLAN_UPDATED", {"plan_id": plan.id, "note": note})
     return plan
 
 
@@ -491,6 +509,7 @@ def close_plan(
             note=note,
         )
     )
+    case_engine_service.emit_plan_event(db, plan.case_id, "PLAN_COMPLETED", {"plan_id": plan.id, "outcome": outcome})
     return plan
 
 

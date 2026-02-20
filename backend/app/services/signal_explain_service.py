@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
 from backend.app.models import ActionItem, HealthSignalState, RawEvent
+from backend.app.services import case_engine_service
 
 
 def _iso(dt: Optional[datetime]) -> Optional[str]:
@@ -202,6 +203,7 @@ def explain_signal(business_id: str, signal_id: str, db: Session) -> Dict[str, A
         "severity": state.severity,
         "detector": detector,
         "linked_action_id": _linked_action_id(db, business_id, signal_id),
+        "case_id": case_engine_service.get_case_id_for_signal(db, business_id, signal_id),
         "narrative": narrative,
         "evidence": {
             "window": window,

@@ -58,6 +58,7 @@ class PlanConditionIn(BaseModel):
 
 class PlanCreateIn(BaseModel):
     business_id: str
+    case_id: Optional[str] = None
     title: str = Field(..., min_length=1, max_length=200)
     intent: str = Field(..., min_length=1, max_length=4000)
     source_action_id: Optional[str] = None
@@ -145,6 +146,7 @@ class PlanStateEventOut(BaseModel):
 class PlanOut(BaseModel):
     id: str
     business_id: str
+    case_id: Optional[str]
     created_by_user_id: str
     assigned_to_user_id: Optional[str]
     title: str
@@ -223,6 +225,7 @@ def post_plan(
         created_by_user_id=user.id,
         title=req.title,
         intent=req.intent,
+        case_id=req.case_id,
         source_action_id=req.source_action_id,
         primary_signal_id=req.primary_signal_id,
         assigned_to_user_id=req.assigned_to_user_id,
