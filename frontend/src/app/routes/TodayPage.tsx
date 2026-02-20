@@ -1,39 +1,43 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
-import { listCases, type CaseSummary } from "../../api/cases";
+import { completeWorkItem, listWorkItems, snoozeWorkItem, type WorkItem } from "../../api/work";
 
 export default function TodayPage() {
   const { businessId = "" } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [rows, setRows] = useState<CaseSummary[]>([]);
+  const [rows, setRows] = useState<WorkItem[]>([]);
 
   const filters = useMemo(
     () => ({
-      slaBreached: searchParams.get("sla_breached") === "true",
-      highCritical: searchParams.get("severity_gte") === "high",
-      noPlan: searchParams.get("no_plan") === "true",
-      planOverdue: searchParams.get("plan_overdue") === "true",
-      openedWindow: searchParams.get("opened_window") ?? "",
-      sort: (searchParams.get("sort") as "sla" | "severity" | "activity" | null) ?? "sla",
+      assignedOnly: searchParams.get("assigned_only") === "true",
+      highCritical: searchParams.get("case_severity_gte") === "high",
+      openOnly: (searchParams.get("status") as "open" | "snoozed" | "completed" | null) ?? "open",
+      priorityGte: Number(searchParams.get("priority_gte") ?? "0"),
+      dueWindow: searchParams.get("due_window") ?? "",
+      sort: (searchParams.get("sort") as "priority" | "due_at" | "created_at" | null) ?? "priority",
     }),
     [searchParams],
   );
 
-  useEffect(() => {
-    if (!businessId) return;
-    const openedSince = filters.openedWindow
-      ? new Date(Date.now() - Number(filters.openedWindow) * 24 * 60 * 60 * 1000).toISOString()
+  const load = useCallback(() => {
+    if (!businessId) return Promise.resolve();
+    const dueBefore = filters.dueWindow
+      ? new Date(Date.now() + Number(filters.dueWindow) * 24 * 60 * 60 * 1000).toISOString()
       : undefined;
-    void listCases(businessId, {
+    return listWorkItems(businessId, {
+      status: filters.openOnly,
+      assigned_only: filters.assignedOnly,
+      case_severity_gte: filters.highCritical ? "high" : undefined,
+      priority_gte: filters.priorityGte > 0 ? filters.priorityGte : undefined,
+      due_before: dueBefore,
       sort: filters.sort,
-      sla_breached: filters.slaBreached || undefined,
-      severity_gte: filters.highCritical ? "high" : undefined,
-      no_plan: filters.noPlan || undefined,
-      plan_overdue: filters.planOverdue || undefined,
-      opened_since: openedSince,
     }).then((res) => setRows(res.items));
   }, [businessId, filters]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const setToggle = (key: string, value: boolean) => {
     setSearchParams((params) => {
@@ -43,34 +47,51 @@ export default function TodayPage() {
     });
   };
 
+  const onComplete = async (workItemId: string) => {
+    if (!businessId) return;
+    await completeWorkItem(businessId, workItemId);
+    await load();
+  };
+
+  const onSnooze = async (workItemId: string) => {
+    if (!businessId) return;
+    const snoozedUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    await snoozeWorkItem(businessId, workItemId, snoozedUntil);
+    await load();
+  };
+
   return (
     <div>
       <h2>Advisor Today</h2>
       <div>
-        <label><input type="checkbox" checked={filters.slaBreached} onChange={(e) => setToggle("sla_breached", e.target.checked)} /> SLA breached</label>
-        <label><input type="checkbox" checked={filters.highCritical} onChange={(e) => setSearchParams((params) => { if (e.target.checked) params.set("severity_gte", "high"); else params.delete("severity_gte"); return params; })} /> High/Critical</label>
-        <label><input type="checkbox" checked={filters.noPlan} onChange={(e) => setToggle("no_plan", e.target.checked)} /> No plan</label>
-        <label><input type="checkbox" checked={filters.planOverdue} onChange={(e) => setToggle("plan_overdue", e.target.checked)} /> Plan overdue</label>
-        <select value={filters.openedWindow} onChange={(e) => setSearchParams((params) => { if (e.target.value) params.set("opened_window", e.target.value); else params.delete("opened_window"); return params; })}>
-          <option value="">Any age</option><option value="7">New (7d)</option><option value="14">New (14d)</option>
+        <label><input type="checkbox" checked={filters.assignedOnly} onChange={(e) => setToggle("assigned_only", e.target.checked)} /> Assigned only</label>
+        <label><input type="checkbox" checked={filters.highCritical} onChange={(e) => setSearchParams((params) => { if (e.target.checked) params.set("case_severity_gte", "high"); else params.delete("case_severity_gte"); return params; })} /> High/Critical</label>
+        <select value={filters.openOnly} onChange={(e) => setSearchParams((params) => { params.set("status", e.target.value); return params; })}>
+          <option value="open">Open</option><option value="snoozed">Snoozed</option><option value="completed">Completed</option>
+        </select>
+        <select value={filters.dueWindow} onChange={(e) => setSearchParams((params) => { if (e.target.value) params.set("due_window", e.target.value); else params.delete("due_window"); return params; })}>
+          <option value="">Any due date</option><option value="1">Due in 1 day</option><option value="3">Due in 3 days</option><option value="7">Due in 7 days</option>
         </select>
         <select value={filters.sort} onChange={(e) => setSearchParams((params) => { params.set("sort", e.target.value); return params; })}>
-          <option value="sla">SLA urgency</option><option value="severity">Severity</option><option value="activity">Last activity</option>
+          <option value="priority">Priority</option><option value="due_at">Due date</option><option value="created_at">Created</option>
         </select>
       </div>
       <table>
-        <thead><tr><th>Severity</th><th>Status</th><th>Domain</th><th>Age</th><th>SLA</th><th>Plan</th><th>Last activity</th><th>Assigned to</th></tr></thead>
+        <thead><tr><th>Work type</th><th>Case severity</th><th>Case domain</th><th>Due date</th><th>Priority</th><th>Assigned to</th><th>Quick actions</th></tr></thead>
         <tbody>
           {rows.map((row) => (
             <tr key={row.id}>
-              <td>{row.severity}</td>
-              <td><Link to={`/app/${businessId}/cases/${row.id}`}>{row.status}</Link></td>
-              <td>{row.domain}</td>
-              <td>{row.age_days ?? "—"}</td>
-              <td>{row.sla_due_at ? new Date(row.sla_due_at).toLocaleDateString() : "—"} {row.sla_breached ? "(breached)" : ""}</td>
-              <td>{row.plan_state ?? "none"}</td>
-              <td>{new Date(row.last_activity_at).toLocaleString()}</td>
+              <td>{row.type}</td>
+              <td>{row.case_severity}</td>
+              <td>{row.case_domain}</td>
+              <td>{row.due_at ? new Date(row.due_at).toLocaleString() : "—"}</td>
+              <td>{row.priority}</td>
               <td>{row.assigned_to ?? "—"}</td>
+              <td>
+                <button type="button" onClick={() => void onComplete(row.id)}>Mark complete</button>
+                <button type="button" onClick={() => void onSnooze(row.id)}>Snooze</button>
+                <Link to={`/app/${businessId}/cases/${row.case_id}`}>Go to Case</Link>
+              </td>
             </tr>
           ))}
         </tbody>
