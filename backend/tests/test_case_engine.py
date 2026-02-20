@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from backend.app.models import (
     Business,
     BusinessMembership,
+    Case,
     CaseEvent,
     CaseSignal,
     HealthSignalState,
@@ -158,3 +159,53 @@ def test_plan_requires_case(sqlite_session):
         assert False, "expected HTTPException"
     except HTTPException as exc:
         assert exc.status_code == 400
+
+
+def test_attach_signal_to_different_case_raises_invariant(sqlite_session):
+    biz, _ = _seed_business(sqlite_session)
+    now = datetime.now(timezone.utc)
+    _seed_signal(sqlite_session, biz.id, "sig-1")
+
+    case_id = case_engine_service.aggregate_signal_into_case(
+        sqlite_session,
+        business_id=biz.id,
+        signal_id="sig-1",
+        signal_type="liquidity.runway_low",
+        domain="liquidity",
+        severity="warning",
+        occurred_at=now,
+    )
+    other_case = Case(
+        business_id=biz.id,
+        domain="liquidity",
+        primary_signal_type="liquidity.runway_low",
+        severity="warning",
+        status="open",
+        opened_at=now,
+        last_activity_at=now,
+    )
+    sqlite_session.add(other_case)
+    sqlite_session.flush()
+
+    event_count_before = sqlite_session.query(CaseEvent).filter(CaseEvent.event_type == "SIGNAL_ATTACHED").count()
+
+    try:
+        case_engine_service._attach_signal_to_case(
+            sqlite_session,
+            case=other_case,
+            business_id=biz.id,
+            signal_id="sig-1",
+            signal_type="liquidity.runway_low",
+            domain="liquidity",
+            severity="warning",
+            occurred_at=now,
+        )
+        assert False, "expected CaseSignalInvariantError"
+    except case_engine_service.CaseSignalInvariantError as exc:
+        assert "Invariant violation" in str(exc)
+
+    assert sqlite_session.query(CaseSignal).filter(CaseSignal.business_id == biz.id, CaseSignal.signal_id == "sig-1").count() == 1
+    assert sqlite_session.query(CaseSignal).filter(CaseSignal.case_id == case_id).count() == 1
+    assert sqlite_session.query(CaseSignal).filter(CaseSignal.case_id == other_case.id).count() == 0
+    event_count_after = sqlite_session.query(CaseEvent).filter(CaseEvent.event_type == "SIGNAL_ATTACHED").count()
+    assert event_count_after == event_count_before
