@@ -21,6 +21,7 @@ import FirmDashboardPage from "../../pages/FirmDashboardPage";
 import SignalExplainPage from "../../features/signals-explain/SignalExplainPage";
 import CaseCenterPage from "./CaseCenterPage";
 import CaseDetailPage from "./CaseDetailPage";
+import TodayPage from "./TodayPage";
 
 
 function AssistantCompatRedirect() {
@@ -58,6 +59,7 @@ export default function AppRoutes() {
           <Route path="assistant" element={<Navigate to="../summary" replace />} />
           <Route path="summary" element={<AssistantPage />} />
           <Route path="advisor" element={<AdvisorInboxPage />} />
+          <Route path="today" element={<TodayPage />} />
           <Route path="inbox" element={<AdvisorInboxPage />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="signals" element={<SignalsCenterPage />} />

@@ -14,6 +14,14 @@ export type CaseSummary = {
   last_activity_at: string;
   closed_at?: string | null;
   signal_count: number;
+  assigned_to?: string | null;
+  next_review_at?: string | null;
+  age_days?: number;
+  sla_due_at?: string;
+  sla_breached?: boolean;
+  plan_overdue?: boolean;
+  plan_state?: "none" | "active" | "overdue";
+  risk_delta?: number | null;
 };
 
 export type CaseListResponse = {
@@ -33,7 +41,20 @@ export type CaseDetailResponse = {
 
 export function listCases(
   businessId: string,
-  params?: { status?: string; severity?: string; domain?: string; q?: string; sort?: "aging" | "severity" | "activity"; page?: number; page_size?: number },
+  params?: {
+    status?: string;
+    severity?: string;
+    domain?: string;
+    q?: string;
+    sort?: "aging" | "severity" | "activity" | "sla";
+    page?: number;
+    page_size?: number;
+    sla_breached?: boolean;
+    no_plan?: boolean;
+    plan_overdue?: boolean;
+    opened_since?: string;
+    severity_gte?: string;
+  },
 ) {
   const query = new URLSearchParams({ business_id: businessId });
   if (params?.status) query.set("status", params.status);
@@ -43,6 +64,11 @@ export function listCases(
   if (params?.sort) query.set("sort", params.sort);
   if (params?.page) query.set("page", String(params.page));
   if (params?.page_size) query.set("page_size", String(params.page_size));
+  if (params?.sla_breached !== undefined) query.set("sla_breached", String(params.sla_breached));
+  if (params?.no_plan !== undefined) query.set("no_plan", String(params.no_plan));
+  if (params?.plan_overdue !== undefined) query.set("plan_overdue", String(params.plan_overdue));
+  if (params?.opened_since) query.set("opened_since", params.opened_since);
+  if (params?.severity_gte) query.set("severity_gte", params.severity_gte);
   return apiGet<CaseListResponse>(`/api/cases?${query.toString()}`);
 }
 
@@ -59,4 +85,24 @@ export function getCaseTimeline(businessId: string, caseId: string) {
 export function updateCaseStatus(businessId: string, caseId: string, payload: { status: CaseStatus; reason?: string; actor?: string }) {
   const query = new URLSearchParams({ business_id: businessId });
   return apiPost(`/api/cases/${encodeURIComponent(caseId)}/status?${query.toString()}`, payload);
+}
+
+export function recomputeCase(businessId: string, caseId: string, apply = false) {
+  const query = new URLSearchParams({ business_id: businessId });
+  return apiPost(`/api/cases/${encodeURIComponent(caseId)}/recompute?${query.toString()}`, { apply });
+}
+
+export function recomputeCasesForBusiness(businessId: string, apply = false, limit?: number) {
+  const query = new URLSearchParams({ business_id: businessId });
+  return apiPost(`/api/cases/recompute?${query.toString()}`, { apply, limit });
+}
+
+export function assignCase(businessId: string, caseId: string, assignedTo: string | null, reason?: string) {
+  const query = new URLSearchParams({ business_id: businessId });
+  return apiPost(`/api/cases/${encodeURIComponent(caseId)}/assign?${query.toString()}`, { assigned_to: assignedTo, reason });
+}
+
+export function scheduleCaseReview(businessId: string, caseId: string, nextReviewAt: string | null) {
+  const query = new URLSearchParams({ business_id: businessId });
+  return apiPost(`/api/cases/${encodeURIComponent(caseId)}/schedule-review?${query.toString()}`, { next_review_at: nextReviewAt });
 }

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
@@ -37,6 +38,12 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
 def _severity_rank(level: str) -> int:
     try:
         return SEVERITY_LEVELS.index((level or "low").lower())
@@ -46,6 +53,51 @@ def _severity_rank(level: str) -> int:
 
 def _bump_severity(level: str) -> str:
     return SEVERITY_LEVELS[min(_severity_rank(level) + 1, len(SEVERITY_LEVELS) - 1)]
+
+
+SLA_DAYS_BY_SEVERITY = {
+    "critical": 3,
+    "high": 7,
+    "medium": 14,
+    "low": 30,
+}
+
+
+@dataclass(frozen=True)
+class ComputedCaseState:
+    case_id: str
+    computed_status: str
+    computed_severity: str
+    computed_risk_score: Optional[int]
+    computed_risk_delta: Optional[int]
+    computed_age_days: int
+    computed_sla_due_at: datetime
+    computed_sla_breached: bool
+    computed_last_activity_at: datetime
+    computed_escalation_reason: Optional[str]
+    computed_open_signal_count_30d: int
+    computed_plan_overdue: bool
+
+
+@dataclass(frozen=True)
+class CaseStateDiff:
+    is_match: bool
+    status_changed: bool
+    status_from: str
+    status_to: str
+    severity_changed: bool
+    severity_from: str
+    severity_to: str
+    risk_delta_changed: bool
+    risk_delta_from: Optional[int]
+    risk_delta_to: Optional[int]
+    sla_changed: bool
+    sla_from: Optional[datetime]
+    sla_to: datetime
+    last_activity_at_changed: bool
+    last_activity_at_from: datetime
+    last_activity_at_to: datetime
+    reasons: List[str]
 
 
 def _compute_risk_snapshot(db: Session, business_id: str) -> dict:
@@ -244,7 +296,7 @@ def aggregate_signal_into_case(
 
 def evaluate_escalation(db: Session, case_id: str, *, now: Optional[datetime] = None) -> Optional[CaseEvent]:
     case = _require_case(db, case_id)
-    current = now or _now()
+    current = _as_utc(now or _now())
 
     signal_count_30d = int(
         db.execute(
@@ -263,7 +315,7 @@ def evaluate_escalation(db: Session, case_id: str, *, now: Optional[datetime] = 
         .scalars()
         .first()
     )
-    plan_overdue = bool(active_plan and active_plan.created_at <= current - timedelta(days=14))
+    plan_overdue = bool(active_plan and _as_utc(active_plan.created_at) <= current - timedelta(days=14))
 
     snapshot_score = int((case.risk_score_snapshot or {}).get("score", 0))
     current_risk = _compute_risk_snapshot(db, case.business_id)
@@ -301,6 +353,158 @@ def evaluate_escalation(db: Session, case_id: str, *, now: Optional[datetime] = 
     case.severity = _bump_severity(case.severity)
     case.last_activity_at = current
     return _emit_case_event(db, case.id, "CASE_ESCALATED", signature, now=current)
+
+
+def _active_plan_for_case(db: Session, case_id: str) -> Optional[Plan]:
+    return (
+        db.execute(
+            select(Plan)
+            .where(Plan.case_id == case_id, Plan.status.in_(["draft", "active"]))
+            .order_by(Plan.created_at.asc(), Plan.id.asc())
+        )
+        .scalars()
+        .first()
+    )
+
+
+def _compute_case_status(case: Case, *, escalation_reason: Optional[str], plan_overdue: bool) -> str:
+    if case.status in CLOSED_CASE_STATUSES:
+        return case.status
+    if case.status == "reopened":
+        return "monitoring"
+    if escalation_reason or plan_overdue or case.status == "escalated":
+        return "escalated"
+    return "monitoring" if case.status == "monitoring" else "open"
+
+
+def compute_case_state(db: Session, case_id: str, *, now: Optional[datetime] = None) -> ComputedCaseState:
+    case = _require_case(db, case_id)
+    current = _as_utc(now or _now())
+    signal_count_30d = int(
+        db.execute(
+            select(func.count())
+            .select_from(CaseSignal)
+            .where(CaseSignal.case_id == case.id, CaseSignal.created_at >= current - timedelta(days=30))
+        ).scalar_one()
+        or 0
+    )
+    active_plan = _active_plan_for_case(db, case.id)
+    plan_overdue = bool(active_plan and _as_utc(active_plan.created_at) <= current - timedelta(days=14))
+
+    snapshot_score = int((case.risk_score_snapshot or {}).get("score", 0))
+    current_risk = _compute_risk_snapshot(db, case.business_id)
+    computed_risk_score = int(current_risk.get("score", 0))
+    risk_delta = computed_risk_score - snapshot_score
+
+    reasons: List[str] = []
+    computed_severity = case.severity
+    if signal_count_30d >= 3:
+        reasons.append("signal_volume_30d")
+        computed_severity = _bump_severity(computed_severity)
+    if plan_overdue:
+        reasons.append("plan_overdue")
+    if risk_delta >= 15:
+        reasons.append("risk_delta")
+
+    escalation_reason = reasons[0] if reasons else None
+    computed_status = _compute_case_status(case, escalation_reason=escalation_reason, plan_overdue=plan_overdue)
+    sla_days = SLA_DAYS_BY_SEVERITY.get((computed_severity or "low").lower(), SLA_DAYS_BY_SEVERITY["low"])
+    sla_due_at = _as_utc(case.opened_at) + timedelta(days=sla_days)
+    sla_breached = bool(current > sla_due_at and computed_status not in CLOSED_CASE_STATUSES)
+    last_event_at = db.execute(select(func.max(CaseEvent.created_at)).where(CaseEvent.case_id == case.id)).scalar_one_or_none()
+    computed_last_activity_at = max(_as_utc(case.last_activity_at), _as_utc(last_event_at or case.last_activity_at))
+    return ComputedCaseState(
+        case_id=case.id,
+        computed_status=computed_status,
+        computed_severity=computed_severity,
+        computed_risk_score=computed_risk_score,
+        computed_risk_delta=risk_delta,
+        computed_age_days=max((current - _as_utc(case.opened_at)).days, 0),
+        computed_sla_due_at=sla_due_at,
+        computed_sla_breached=sla_breached,
+        computed_last_activity_at=computed_last_activity_at,
+        computed_escalation_reason=escalation_reason,
+        computed_open_signal_count_30d=signal_count_30d,
+        computed_plan_overdue=plan_overdue,
+    )
+
+
+def _diff_case_state(case: Case, computed: ComputedCaseState) -> CaseStateDiff:
+    snapshot_score = int((case.risk_score_snapshot or {}).get("score", 0)) if case.risk_score_snapshot else None
+    stored_risk_delta = computed.computed_risk_score - snapshot_score if snapshot_score is not None and computed.computed_risk_score is not None else None
+    stored_sla_due_at = _as_utc(case.opened_at) + timedelta(days=SLA_DAYS_BY_SEVERITY.get((case.severity or "low").lower(), SLA_DAYS_BY_SEVERITY["low"]))
+    reasons = [computed.computed_escalation_reason] if computed.computed_escalation_reason else []
+    status_changed = case.status != computed.computed_status
+    severity_changed = case.severity != computed.computed_severity
+    risk_delta_changed = stored_risk_delta != computed.computed_risk_delta
+    sla_changed = stored_sla_due_at != computed.computed_sla_due_at
+    last_activity_changed = case.last_activity_at != computed.computed_last_activity_at
+    return CaseStateDiff(
+        is_match=not any([status_changed, severity_changed, risk_delta_changed, sla_changed, last_activity_changed]),
+        status_changed=status_changed,
+        status_from=case.status,
+        status_to=computed.computed_status,
+        severity_changed=severity_changed,
+        severity_from=case.severity,
+        severity_to=computed.computed_severity,
+        risk_delta_changed=risk_delta_changed,
+        risk_delta_from=stored_risk_delta,
+        risk_delta_to=computed.computed_risk_delta,
+        sla_changed=sla_changed,
+        sla_from=stored_sla_due_at,
+        sla_to=computed.computed_sla_due_at,
+        last_activity_at_changed=last_activity_changed,
+        last_activity_at_from=_as_utc(case.last_activity_at),
+        last_activity_at_to=computed.computed_last_activity_at,
+        reasons=reasons,
+    )
+
+
+def _json_safe(value: Any) -> Any:
+    if isinstance(value, datetime):
+        return _as_utc(value).isoformat()
+    if isinstance(value, list):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _json_safe(item) for key, item in value.items()}
+    return value
+
+
+def recompute_case(db: Session, case_id: str, *, apply: bool = False) -> Dict[str, Any]:
+    case = _require_case(db, case_id)
+    computed = compute_case_state(db, case_id)
+    diff = _diff_case_state(case, computed)
+    applied = False
+    if apply and not diff.is_match:
+        case.status = computed.computed_status
+        case.severity = computed.computed_severity
+        case.last_activity_at = computed.computed_last_activity_at
+        _emit_case_event(db, case.id, "CASE_RECOMPUTE_APPLIED", _json_safe({"diff": asdict(diff), "reasons": diff.reasons}))
+        applied = True
+    return _json_safe({"computed": asdict(computed), "diff": asdict(diff), "applied": applied})
+
+
+def recompute_cases_for_business(db: Session, business_id: str, *, apply: bool = False, limit: Optional[int] = None) -> Dict[str, Any]:
+    _require_business(db, business_id)
+    stmt = select(Case).where(Case.business_id == business_id).order_by(Case.opened_at.asc(), Case.id.asc())
+    if limit:
+        stmt = stmt.limit(limit)
+    rows = db.execute(stmt).scalars().all()
+    matched = 0
+    changed = 0
+    applied_count = 0
+    samples = []
+    for row in rows:
+        result = recompute_case(db, row.id, apply=apply)
+        if result["diff"]["is_match"]:
+            matched += 1
+        else:
+            changed += 1
+            if len(samples) < 20:
+                samples.append({"case_id": row.id, "diff_summary": result["diff"]})
+        if result["applied"]:
+            applied_count += 1
+    return {"total": len(rows), "matched": matched, "changed": changed, "applied": applied_count, "samples": samples}
 
 
 def update_case_status(db: Session, case_id: str, *, status: str, reason: Optional[str], actor: Optional[str]) -> Case:
@@ -351,36 +555,69 @@ def list_cases(
     domain: Optional[str],
     q: Optional[str],
     sort: str,
+    sla_breached: Optional[bool],
+    no_plan: Optional[bool],
+    plan_overdue: Optional[bool],
+    opened_since: Optional[datetime],
+    severity_gte: Optional[str],
     page: int,
     page_size: int,
 ) -> Dict[str, Any]:
     _require_business(db, business_id)
     stmt = select(Case).where(Case.business_id == business_id)
     if status:
-        stmt = stmt.where(Case.status == status)
+        statuses = [part.strip() for part in status.split(",") if part.strip()]
+        stmt = stmt.where(Case.status.in_(statuses))
     if severity:
         stmt = stmt.where(Case.severity == severity)
+    if severity_gte:
+        stmt = stmt.where(func.lower(Case.severity).in_(SEVERITY_LEVELS[_severity_rank(severity_gte):]))
     if domain:
         stmt = stmt.where(Case.domain == domain)
+    if opened_since:
+        stmt = stmt.where(Case.opened_at >= opened_since)
     if q:
         like = f"%{q.strip()}%"
         stmt = stmt.where((Case.primary_signal_type.ilike(like)) | (Case.domain.ilike(like)))
 
+    rows = db.execute(stmt).scalars().all()
+    summarized = [serialize_case_summary(db, row) for row in rows]
+    if no_plan is not None:
+        summarized = [row for row in summarized if (row["plan_state"] == "none") is no_plan]
+    if plan_overdue is not None:
+        summarized = [row for row in summarized if row["plan_overdue"] is plan_overdue]
+    if sla_breached is not None:
+        summarized = [row for row in summarized if row["sla_breached"] is sla_breached]
+
     if sort == "severity":
-        stmt = stmt.order_by(Case.severity.desc(), Case.last_activity_at.desc(), Case.id.asc())
+        summarized = sorted(summarized, key=lambda row: (-_severity_rank(row["severity"]), not row["sla_breached"], row["last_activity_at"], row["id"]))
+    elif sort == "sla":
+        summarized = sorted(
+            summarized,
+            key=lambda row: (
+                not row["sla_breached"],
+                row["sla_due_at"] or datetime.max.replace(tzinfo=timezone.utc),
+                -_severity_rank(row["severity"]),
+                row["id"],
+            ),
+        )
     elif sort == "aging":
-        stmt = stmt.order_by(Case.opened_at.asc(), Case.severity.desc(), Case.id.asc())
+        summarized = sorted(summarized, key=lambda row: (row["opened_at"], -_severity_rank(row["severity"]), row["id"]))
     else:
-        stmt = stmt.order_by(Case.last_activity_at.desc(), Case.severity.desc(), Case.id.asc())
+        summarized = sorted(summarized, key=lambda row: (row["last_activity_at"], -_severity_rank(row["severity"]), row["id"]), reverse=True)
 
     offset = max(page - 1, 0) * page_size
-    rows = db.execute(stmt.offset(offset).limit(page_size)).scalars().all()
-    total = int(db.execute(select(func.count()).select_from(Case).where(Case.business_id == business_id)).scalar_one() or 0)
-    return {"items": [serialize_case_summary(db, row) for row in rows], "total": total, "page": page, "page_size": page_size}
+    return {"items": summarized[offset : offset + page_size], "total": len(summarized), "page": page, "page_size": page_size}
 
 
 def serialize_case_summary(db: Session, row: Case) -> dict:
     signal_count = int(db.execute(select(func.count()).select_from(CaseSignal).where(CaseSignal.case_id == row.id)).scalar_one() or 0)
+    computed = compute_case_state(db, row.id)
+    plan_state = "none"
+    if computed.computed_plan_overdue:
+        plan_state = "overdue"
+    elif _active_plan_for_case(db, row.id):
+        plan_state = "active"
     return {
         "id": row.id,
         "business_id": row.business_id,
@@ -393,6 +630,14 @@ def serialize_case_summary(db: Session, row: Case) -> dict:
         "last_activity_at": row.last_activity_at,
         "closed_at": row.closed_at,
         "signal_count": signal_count,
+        "assigned_to": row.assigned_to,
+        "next_review_at": row.next_review_at,
+        "age_days": computed.computed_age_days,
+        "sla_due_at": computed.computed_sla_due_at,
+        "sla_breached": computed.computed_sla_breached,
+        "plan_overdue": computed.computed_plan_overdue,
+        "plan_state": plan_state,
+        "risk_delta": computed.computed_risk_delta,
     }
 
 
@@ -485,6 +730,22 @@ def detach_ledger_anchor(db: Session, case_id: str, anchor_key: str) -> None:
     db.delete(existing)
     case.last_activity_at = _now()
     _emit_case_event(db, case.id, "LEDGER_ANCHOR_DETACHED", {"anchor_key": anchor_key})
+
+
+def assign_case(db: Session, case_id: str, *, assigned_to: Optional[str], reason: Optional[str]) -> Case:
+    case = _require_case(db, case_id)
+    case.assigned_to = assigned_to
+    case.last_activity_at = _now()
+    _emit_case_event(db, case.id, "CASE_ASSIGNED", {"assigned_to": assigned_to, "reason": reason})
+    return case
+
+
+def schedule_case_review(db: Session, case_id: str, *, next_review_at: Optional[datetime]) -> Case:
+    case = _require_case(db, case_id)
+    case.next_review_at = next_review_at
+    case.last_activity_at = _now()
+    _emit_case_event(db, case.id, "CASE_REVIEW_SCHEDULED", {"next_review_at": next_review_at.isoformat() if next_review_at else None})
+    return case
 
 
 def get_case_id_for_signal(db: Session, business_id: str, signal_id: str) -> Optional[str]:
