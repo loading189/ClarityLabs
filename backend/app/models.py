@@ -719,6 +719,41 @@ class CaseEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
 
+class WorkItem(Base):
+    __tablename__ = "work_items"
+    __table_args__ = (
+        Index("ix_work_items_business_status_priority_due", "business_id", "status", "priority", "due_at"),
+        Index("ix_work_items_case_id", "case_id"),
+        UniqueConstraint("idempotency_key", name="uq_work_items_idempotency_key"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    case_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("cases.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    business_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    type: Mapped[str] = mapped_column(String(40), nullable=False)
+    priority: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="open", server_default=text("'open'"))
+    due_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    snoozed_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utcnow,
+        onupdate=utcnow,
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(220), nullable=False)
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class ProcessingEventState(Base):
     __tablename__ = "processing_event_states"
     __table_args__ = (
