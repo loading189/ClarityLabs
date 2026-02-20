@@ -151,3 +151,17 @@ def test_portfolio_ordering_is_deterministic(sqlite_session):
     )
 
     assert [row["idempotency_key"] for row in rows] == [f"{case_b}:custom-2", f"{case_a}:custom-1", f"{case_b}:custom-3"]
+
+
+def test_review_due_uses_date_bucket_idempotency_key(sqlite_session):
+    biz, _ = _seed_business(sqlite_session)
+    case_id = _seed_case_with_signal(sqlite_session, biz.id)
+    case = sqlite_session.get(Case, case_id)
+    case.next_review_at = datetime(2026, 2, 1, 12, 30, tzinfo=timezone.utc)
+    sqlite_session.commit()
+
+    rows = work_engine_service.generate_work_items_for_case(sqlite_session, case_id, now=datetime(2026, 2, 2, tzinfo=timezone.utc))
+
+    review_due = [row for row in rows if row.type == "REVIEW_DUE"]
+    assert len(review_due) == 1
+    assert review_due[0].idempotency_key == f"{case_id}:REVIEW_DUE:2026-02-01"
