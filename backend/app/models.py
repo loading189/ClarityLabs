@@ -754,6 +754,25 @@ class WorkItem(Base):
     resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class TickRun(Base):
+    __tablename__ = "tick_runs"
+    __table_args__ = (
+        UniqueConstraint("business_id", "bucket", name="uq_tick_runs_business_bucket"),
+        Index("ix_tick_runs_business_finished", "business_id", "finished_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    business_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    bucket: Mapped[str] = mapped_column(String(32), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utcnow)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    result_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+
+
 class ProcessingEventState(Base):
     __tablename__ = "processing_event_states"
     __table_args__ = (

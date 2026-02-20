@@ -2,11 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { completeWorkItem, listWorkItems, snoozeWorkItem, type WorkItem } from "../../api/work";
+import { getLastTick, tickSystem, type LastTickResponse } from "../../api/system";
 
 export default function TodayPage() {
   const { businessId = "" } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const [rows, setRows] = useState<WorkItem[]>([]);
+  const [lastTick, setLastTick] = useState<LastTickResponse>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const filters = useMemo(
     () => ({
@@ -35,9 +38,15 @@ export default function TodayPage() {
     }).then((res) => setRows(res.items));
   }, [businessId, filters]);
 
+  const loadLastTick = useCallback(() => {
+    if (!businessId) return Promise.resolve();
+    return getLastTick(businessId).then((result) => setLastTick(result));
+  }, [businessId]);
+
   useEffect(() => {
     void load();
-  }, [load]);
+    void loadLastTick();
+  }, [load, loadLastTick]);
 
   const setToggle = (key: string, value: boolean) => {
     setSearchParams((params) => {
@@ -53,6 +62,18 @@ export default function TodayPage() {
     await load();
   };
 
+  const onRefreshQueue = async () => {
+    if (!businessId) return;
+    setRefreshing(true);
+    try {
+      await tickSystem({ business_id: businessId, apply_recompute: false, materialize_work: true });
+      await load();
+      await loadLastTick();
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const onSnooze = async (workItemId: string) => {
     if (!businessId) return;
     const snoozedUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
@@ -64,6 +85,10 @@ export default function TodayPage() {
     <div>
       <h2>Advisor Today</h2>
       <div>
+        <button type="button" onClick={() => void onRefreshQueue()} disabled={refreshing}>
+          {refreshing ? "Refreshing queue…" : "Refresh queue"}
+        </button>
+        {lastTick?.finished_at ? <span>Last refreshed: {new Date(lastTick.finished_at).toLocaleString()}</span> : null}
         <label><input type="checkbox" checked={filters.assignedOnly} onChange={(e) => setToggle("assigned_only", e.target.checked)} /> Assigned only</label>
         <label><input type="checkbox" checked={filters.highCritical} onChange={(e) => setSearchParams((params) => { if (e.target.checked) params.set("case_severity_gte", "high"); else params.delete("case_severity_gte"); return params; })} /> High/Critical</label>
         <select value={filters.openOnly} onChange={(e) => setSearchParams((params) => { params.set("status", e.target.value); return params; })}>

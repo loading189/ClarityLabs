@@ -15,6 +15,8 @@ const recomputeCase = vi.fn();
 const listWorkItems = vi.fn();
 const completeWorkItem = vi.fn();
 const snoozeWorkItem = vi.fn();
+const tickSystem = vi.fn();
+const getLastTick = vi.fn();
 
 vi.mock("../../api/cases", () => ({
   listCases: (...args: unknown[]) => listCases(...args),
@@ -31,6 +33,11 @@ vi.mock("../../api/work", () => ({
   snoozeWorkItem: (...args: unknown[]) => snoozeWorkItem(...args),
 }));
 
+vi.mock("../../api/system", () => ({
+  tickSystem: (...args: unknown[]) => tickSystem(...args),
+  getLastTick: (...args: unknown[]) => getLastTick(...args),
+}));
+
 describe("Case pages", () => {
   it("renders case center list", async () => {
     listCases.mockResolvedValueOnce({ items: [{ id: "case-1", business_id: "biz-1", domain: "liquidity", primary_signal_type: "liquidity.runway_low", severity: "high", status: "open", opened_at: "2024-01-01T00:00:00Z", last_activity_at: "2024-01-02T00:00:00Z", closed_at: null, signal_count: 2 }], total: 1, page: 1, page_size: 25 });
@@ -42,6 +49,7 @@ describe("Case pages", () => {
   });
 
   it("renders today work items and complete action", async () => {
+    getLastTick.mockResolvedValue(null);
     listWorkItems.mockResolvedValue({
       items: [
         {
@@ -71,6 +79,20 @@ describe("Case pages", () => {
     expect(await screen.findByText("SLA_BREACH")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Mark complete" }));
     await waitFor(() => expect(completeWorkItem).toHaveBeenCalledWith("biz-1", "work-1"));
+  });
+
+  it("refreshes queue and reloads work list", async () => {
+    getLastTick.mockResolvedValue({ business_id: "biz-1", bucket: "2026-01-01", finished_at: "2026-01-01T00:00:00Z", result_summary: {} });
+    listWorkItems.mockResolvedValue({ items: [], total: 0 });
+    tickSystem.mockResolvedValue({ bucket: "2026-01-01" });
+
+    render(<MemoryRouter initialEntries={["/app/biz-1/today?status=open"]}><Routes><Route path="/app/:businessId/today" element={<TodayPage />} /></Routes></MemoryRouter>);
+
+    expect(await screen.findByRole("button", { name: "Refresh queue" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Refresh queue" }));
+
+    await waitFor(() => expect(tickSystem).toHaveBeenCalledWith({ business_id: "biz-1", apply_recompute: false, materialize_work: true }));
+    await waitFor(() => expect(listWorkItems).toHaveBeenCalledTimes(2));
   });
 
   it("renders case detail governance and timeline", async () => {
