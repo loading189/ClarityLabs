@@ -18,6 +18,7 @@ import {
   type CategoryOut,
   type BrainVendor,
   type CategorizeMetricsOut,
+  normalizePagedTxns,
   type NormalizedTxn,
 } from "../../api/categorize";
 import styles from "./CategorizeTab.module.css";
@@ -42,19 +43,6 @@ type DatePreset = "7d" | "30d" | "90d";
 
 const CATEGORIZE_PAGE_SIZE = 50;
 
-type TxnPageLike = {
-  items: NormalizedTxn[];
-  total_count: number;
-  has_more: boolean;
-  next_offset?: number | null;
-};
-
-function normalizeTxnPage(payload: NormalizedTxn[] | TxnPageLike): TxnPageLike {
-  if (Array.isArray(payload)) {
-    return { items: payload, total_count: payload.length, has_more: false, next_offset: null };
-  }
-  return payload;
-}
 
 const DATE_PRESET_DAYS: Record<DatePreset, number> = {
   "7d": 7,
@@ -302,7 +290,7 @@ export default function CategorizeTab({
       // If a newer load started, ignore this result
       if (seq !== loadSeq.current) return;
 
-      const t = normalizeTxnPage(txnsPayload);
+      const t = normalizePagedTxns(txnsPayload);
       setTxns(t.items);
       setTotalTxnCount(t.total_count);
       setHasMoreTxns(t.has_more);
@@ -412,7 +400,7 @@ export default function CategorizeTab({
         end_date: dateRangeEnd,
         offset: nextTxnOffset,
       });
-      const page = normalizeTxnPage(pagePayload);
+      const page = normalizePagedTxns(pagePayload);
       setTxns((current) => [...current, ...page.items]);
       setTotalTxnCount(page.total_count);
       setHasMoreTxns(page.has_more);

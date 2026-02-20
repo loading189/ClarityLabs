@@ -129,3 +129,8 @@
   color: var(--text);
   font-weight: 600;
 }
+
+.loadMoreWrap {
+  display: flex;
+  justify-content: center;
+}
