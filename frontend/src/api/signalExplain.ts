@@ -8,6 +8,7 @@ export type SignalExplainCaseFile = {
   severity: string | null;
   detector: { domain: string; rule_id: string; version: string };
   linked_action_id: string | null;
+  case_id?: string | null;
   narrative: {
     headline: string;
     why_it_matters: string[];

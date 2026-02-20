@@ -42,6 +42,7 @@ from backend.app.api.routes.me import router as me_router
 from backend.app.api.routes.config import router as config_router
 from backend.app.api.routes.dev_plaid import router as dev_plaid_router
 from backend.app.api.routes.firm import router as firm_router
+from backend.app.api.routes.cases import router as cases_router
 
 
 logger = logging.getLogger(__name__)
@@ -125,3 +126,4 @@ app.include_router(config_router)
 app.include_router(dev_plaid_router)
 
 app.include_router(firm_router)
+app.include_router(cases_router)

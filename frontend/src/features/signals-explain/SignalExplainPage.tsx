@@ -42,6 +42,12 @@ export default function SignalExplainPage() {
         <ul>{data.narrative.what_changed.map((item) => <li key={item}>{item}</li>)}</ul>
       </section>
 
+      {data.case_id ? (
+        <p>
+          Parent case: <Link to={`/app/${businessId}/cases/${data.case_id}`}>{data.case_id}</Link>
+        </p>
+      ) : null}
+
       <section>
         <h3>Evidence</h3>
         <div className={styles.stats}>

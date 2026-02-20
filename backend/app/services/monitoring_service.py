@@ -15,7 +15,7 @@ from backend.app.models import (
     RawEvent,
 )
 from backend.app.norma.normalize import NormalizedTransaction
-from backend.app.services import audit_service
+from backend.app.services import audit_service, case_engine_service
 from backend.app.services.health_signal_service import ALLOWED_STATUSES
 from backend.app.services.posted_txn_service import fetch_posted_transactions
 from backend.app.signals.v2 import DetectorRunSummary, DetectedSignal, run_v2_detectors_with_summary
@@ -204,6 +204,15 @@ def _upsert_signal_states(
                 before=None,
                 after=_serialize_state(state),
             )
+            case_engine_service.aggregate_signal_into_case(
+                db,
+                business_id=business_id,
+                signal_id=signal.signal_id,
+                signal_type=signal.signal_type,
+                domain=signal.domain,
+                severity=signal.severity,
+                occurred_at=now,
+            )
             continue
 
         before_state = _serialize_state(state)
@@ -241,6 +250,15 @@ def _upsert_signal_states(
                     before=before_state,
                     after=_serialize_state(state),
                 )
+            case_engine_service.aggregate_signal_into_case(
+                db,
+                business_id=business_id,
+                signal_id=signal.signal_id,
+                signal_type=signal.signal_type,
+                domain=signal.domain,
+                severity=signal.severity,
+                occurred_at=now,
+            )
 
     for state in existing_states:
         if state.signal_id in detected_ids:
