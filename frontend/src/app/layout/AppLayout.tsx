@@ -14,7 +14,7 @@ type NavItem = { label: string; path: string };
 type NavSectionItem = { title: string; items: NavItem[] };
 
 const navSections: NavSectionItem[] = [
-  { title: "Work", items: [{ label: "Inbox", path: "advisor" }, { label: "Case Center", path: "cases" }] },
+  { title: "Work", items: [{ label: "Inbox", path: "advisor" }, { label: "Today", path: "today" }, { label: "Case Center", path: "cases" }] },
   { title: "Observe", items: [{ label: "Signals", path: "signals" }] },
   { title: "Verify", items: [{ label: "Ledger", path: "ledger" }] },
   { title: "Organize", items: [{ label: "Categorize", path: "categorize" }, { label: "Rules", path: "rules" }] },

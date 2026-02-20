@@ -658,6 +658,7 @@ class Case(Base):
     last_activity_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
     closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     assigned_to: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    next_review_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class CaseSignal(Base):

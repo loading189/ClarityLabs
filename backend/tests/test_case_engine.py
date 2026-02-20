@@ -9,6 +9,7 @@ from backend.app.models import (
     CaseSignal,
     HealthSignalState,
     Organization,
+    Plan,
     User,
 )
 from fastapi import HTTPException
@@ -98,7 +99,7 @@ def test_case_escalation_by_signal_volume(sqlite_session):
         )
     sqlite_session.commit()
 
-    response = case_engine_service.list_cases(sqlite_session, business_id=biz.id, status=None, severity=None, domain=None, q=None, sort="activity", page=1, page_size=10)
+    response = case_engine_service.list_cases(sqlite_session, business_id=biz.id, status=None, severity=None, domain=None, q=None, sort="activity", sla_breached=None, no_plan=None, plan_overdue=None, opened_since=None, severity_gte=None, page=1, page_size=10)
     case_id = response["items"][0]["id"]
     events = case_engine_service.case_timeline(sqlite_session, case_id)
     escalations = [event for event in events if event["event_type"] == "CASE_ESCALATED"]
@@ -209,3 +210,105 @@ def test_attach_signal_to_different_case_raises_invariant(sqlite_session):
     assert sqlite_session.query(CaseSignal).filter(CaseSignal.case_id == other_case.id).count() == 0
     event_count_after = sqlite_session.query(CaseEvent).filter(CaseEvent.event_type == "SIGNAL_ATTACHED").count()
     assert event_count_after == event_count_before
+
+
+def test_compute_case_state_is_deterministic(sqlite_session):
+    biz, user = _seed_business(sqlite_session)
+    now = datetime.now(timezone.utc)
+    _seed_signal(sqlite_session, biz.id, "sig-det-1")
+    case_id = case_engine_service.aggregate_signal_into_case(
+        sqlite_session,
+        business_id=biz.id,
+        signal_id="sig-det-1",
+        signal_type="liquidity.runway_low",
+        domain="liquidity",
+        severity="high",
+        occurred_at=now,
+    )
+    sqlite_session.add(Plan(business_id=biz.id, case_id=case_id, created_by_user_id=user.id, title="Plan", intent="intent", status="active", created_at=now - timedelta(days=20)))
+    sqlite_session.commit()
+
+    t = datetime(2026, 1, 20, tzinfo=timezone.utc)
+    first = case_engine_service.compute_case_state(sqlite_session, case_id, now=t)
+    second = case_engine_service.compute_case_state(sqlite_session, case_id, now=t)
+    assert first == second
+
+
+def test_recompute_diff_and_apply_emits_single_event(sqlite_session):
+    biz, user = _seed_business(sqlite_session)
+    now = datetime.now(timezone.utc)
+    for idx in range(3):
+        sid = f"sig-rec-{idx}"
+        _seed_signal(sqlite_session, biz.id, sid)
+        case_engine_service.aggregate_signal_into_case(
+            sqlite_session,
+            business_id=biz.id,
+            signal_id=sid,
+            signal_type="liquidity.runway_low",
+            domain="liquidity",
+            severity="medium",
+            occurred_at=now - timedelta(days=idx),
+        )
+    case_id = sqlite_session.query(Case).filter(Case.business_id == biz.id).first().id
+    sqlite_session.add(Plan(business_id=biz.id, case_id=case_id, created_by_user_id=user.id, title="Plan", intent="intent", status="active", created_at=now - timedelta(days=20)))
+    sqlite_session.commit()
+
+    diff_only = case_engine_service.recompute_case(sqlite_session, case_id, apply=False)
+    assert diff_only["applied"] is False
+    assert diff_only["diff"]["is_match"] is False
+    before = sqlite_session.query(CaseEvent).filter(CaseEvent.case_id == case_id, CaseEvent.event_type == "CASE_RECOMPUTE_APPLIED").count()
+
+    applied = case_engine_service.recompute_case(sqlite_session, case_id, apply=True)
+    sqlite_session.commit()
+    assert applied["applied"] is True
+    after = sqlite_session.query(CaseEvent).filter(CaseEvent.case_id == case_id, CaseEvent.event_type == "CASE_RECOMPUTE_APPLIED").count()
+    assert after == before + 1
+
+
+def test_governance_endpoints_emit_one_event(api_client, sqlite_session):
+    biz, user = _seed_business(sqlite_session)
+    _seed_signal(sqlite_session, biz.id, "sig-gov")
+    case_id = case_engine_service.aggregate_signal_into_case(
+        sqlite_session,
+        business_id=biz.id,
+        signal_id="sig-gov",
+        signal_type="liquidity.runway_low",
+        domain="liquidity",
+        severity="warning",
+        occurred_at=datetime.now(timezone.utc),
+    )
+    sqlite_session.commit()
+
+    headers = {"X-User-Email": user.email}
+    assign_resp = api_client.post(f"/api/cases/{case_id}/assign?business_id={biz.id}", json={"assigned_to": "advisor-a", "reason": "ownership"}, headers=headers)
+    assert assign_resp.status_code == 200
+    review_resp = api_client.post(f"/api/cases/{case_id}/schedule-review?business_id={biz.id}", json={"next_review_at": "2026-01-10T00:00:00Z"}, headers=headers)
+    assert review_resp.status_code == 200
+
+    events = sqlite_session.query(CaseEvent).filter(CaseEvent.case_id == case_id).all()
+    assert len([event for event in events if event.event_type == "CASE_ASSIGNED"]) == 1
+    assert len([event for event in events if event.event_type == "CASE_REVIEW_SCHEDULED"]) == 1
+
+
+def test_list_cases_includes_computed_fields(api_client, sqlite_session):
+    biz, user = _seed_business(sqlite_session)
+    now = datetime.now(timezone.utc)
+    _seed_signal(sqlite_session, biz.id, "sig-list")
+    case_id = case_engine_service.aggregate_signal_into_case(
+        sqlite_session,
+        business_id=biz.id,
+        signal_id="sig-list",
+        signal_type="liquidity.runway_low",
+        domain="liquidity",
+        severity="critical",
+        occurred_at=now - timedelta(days=10),
+    )
+    sqlite_session.query(Case).filter(Case.id == case_id).update({"opened_at": now - timedelta(days=10)})
+    sqlite_session.commit()
+
+    headers = {"X-User-Email": user.email}
+    resp = api_client.get(f"/api/cases?business_id={biz.id}&sort=sla", headers=headers)
+    assert resp.status_code == 200
+    first = resp.json()["items"][0]
+    assert "age_days" in first
+    assert "sla_breached" in first
