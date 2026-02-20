@@ -112,6 +112,57 @@ def _require_business(db: Session, business_id: str) -> Business:
     return business
 
 
+
+
+class CaseSignalInvariantError(ValueError):
+    """Raised when a signal-case uniqueness invariant would be violated."""
+
+
+def _attach_signal_to_case(
+    db: Session,
+    *,
+    case: Case,
+    business_id: str,
+    signal_id: str,
+    signal_type: str,
+    domain: str,
+    severity: Optional[str],
+    occurred_at: datetime,
+) -> bool:
+    existing_link = (
+        db.execute(
+            select(CaseSignal).where(
+                CaseSignal.business_id == business_id,
+                CaseSignal.signal_id == signal_id,
+            )
+        )
+        .scalars()
+        .first()
+    )
+    if existing_link:
+        if existing_link.case_id == case.id:
+            return False
+        raise CaseSignalInvariantError(
+            f"Invariant violation: signal '{signal_id}' for business '{business_id}' is already attached to case '{existing_link.case_id}' and cannot be attached to '{case.id}'."
+        )
+
+    link = CaseSignal(
+        case_id=case.id,
+        business_id=business_id,
+        signal_id=signal_id,
+        created_at=occurred_at,
+    )
+    db.add(link)
+    db.flush()
+    _emit_case_event(
+        db,
+        case.id,
+        "SIGNAL_ATTACHED",
+        {"signal_id": signal_id, "signal_type": signal_type, "domain": domain, "severity": severity},
+        now=occurred_at,
+    )
+    return True
+
 def _require_case(db: Session, case_id: str) -> Case:
     row = db.get(Case, case_id)
     if not row:
@@ -130,19 +181,6 @@ def aggregate_signal_into_case(
     occurred_at: Optional[datetime],
 ) -> str:
     _require_business(db, business_id)
-    existing_link = (
-        db.execute(
-            select(CaseSignal).where(
-                CaseSignal.business_id == business_id,
-                CaseSignal.signal_id == signal_id,
-            )
-        )
-        .scalars()
-        .first()
-    )
-    if existing_link:
-        return existing_link.case_id
-
     now = occurred_at or _now()
     case = (
         db.execute(
@@ -184,24 +222,22 @@ def aggregate_signal_into_case(
             now=now,
         )
 
-    link = CaseSignal(
-        case_id=case.id,
+    attached = _attach_signal_to_case(
+        db,
+        case=case,
         business_id=business_id,
         signal_id=signal_id,
-        created_at=now,
+        signal_type=signal_type,
+        domain=domain,
+        severity=severity,
+        occurred_at=now,
     )
-    db.add(link)
-    db.flush()
+    if not attached:
+        return case.id
+
     case.last_activity_at = now
     if severity and _severity_rank(severity) > _severity_rank(case.severity):
         case.severity = severity
-    _emit_case_event(
-        db,
-        case.id,
-        "SIGNAL_ATTACHED",
-        {"signal_id": signal_id, "signal_type": signal_type, "domain": domain, "severity": severity},
-        now=now,
-    )
     evaluate_escalation(db, case.id, now=now)
     return case.id
 

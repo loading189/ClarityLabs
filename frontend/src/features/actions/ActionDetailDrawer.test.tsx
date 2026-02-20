@@ -2,7 +2,12 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
+import type { ActionItem, ActionTriageItem } from "../../api/actions";
 import ActionDetailDrawer from "./ActionDetailDrawer";
+
+type ActionDetailFixture = (ActionItem | ActionTriageItem) & {
+  business_name?: string;
+};
 
 const fetchBusinessMembers = vi.fn();
 const fetchActionEvents = vi.fn();
@@ -56,7 +61,7 @@ describe("ActionDetailDrawer", () => {
     snoozed_until: null,
     assigned_to_user: null,
     plan_id: null,
-  };
+  } satisfies ActionDetailFixture;
 
   it("Start Plan calls createPlanFromAction", async () => {
     fetchBusinessMembers.mockResolvedValue([]);

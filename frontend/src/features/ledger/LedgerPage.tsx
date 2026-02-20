@@ -14,7 +14,6 @@ import {
   type LedgerDimensionAccount,
   type LedgerDimensionVendor,
   type LedgerQueryResponse,
-  type LedgerQueryRow,
 } from "../../api/ledger";
 import TransactionDetailDrawer from "../../components/transactions/TransactionDetailDrawer";
 import { Button, EmptyState, InlineAlert } from "../../components/ui";
@@ -593,7 +592,9 @@ export default function LedgerPage() {
                   {!loading && visibleRows.map((row) => (
                     <tr
                       key={row.source_event_id}
-                      ref={(node) => rowRefs.current.set(row.source_event_id, node)}
+                      ref={(node) => {
+                        rowRefs.current.set(row.source_event_id, node);
+                      }}
                       className={[
                         row.is_highlighted ? styles.rowHighlighted : "",
                         (drawerSourceEventId ?? highlightSourceEventId) === row.source_event_id ? styles.rowSelected : "",
